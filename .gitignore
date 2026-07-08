@@ -1,14 +1,36 @@
-# API keys & secrets
+# Local secrets
 .env
+.env.*
+!.env.example
+!.env.*.example
 
-# Python virtual env
+# Python virtual environments
 .venv/
 .venvs/
+venv/
+ENV/
 
-# Python cache
+# Python cache and test output
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Logs and local runtime files
+*.log
+*.tmp
+*.bak
 
 # IDE
 .vscode/

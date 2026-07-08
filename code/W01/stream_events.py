@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 
 
 def load_env() -> None:
-    """从仓库根目录加载 .env，保持和 test_api.py 一致。"""
     env_path = Path(__file__).parent.parent.parent / ".env"
     load_dotenv(env_path)
 
@@ -21,6 +20,24 @@ def require_env(name: str) -> str:
     return value
 
 
+def fmt_usage(usage: object | None) -> str:
+    if usage is None:
+        return "-"
+
+    input_tokens = getattr(usage, "input_tokens", None)
+    output_tokens = getattr(usage, "output_tokens", None)
+    cache_creation_input_tokens = getattr(
+        usage, "cache_creation_input_tokens", None)
+    cache_read_input_tokens = getattr(usage, "cache_read_input_tokens", None)
+
+    return (
+        f"input={input_tokens}, "
+        f"output={output_tokens}, "
+        f"cache_create={cache_creation_input_tokens}, "
+        f"cache_read={cache_read_input_tokens}"
+    )
+
+
 def main() -> None:
     load_env()
 
@@ -30,15 +47,9 @@ def main() -> None:
     model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
     system_prompt = "你是一个简洁、准确的中文助理。"
-    user_message = " ".join(sys.argv[1:]).strip() or "请用三句话解释什么是 Messages API。"
+    user_message = " ".join(sys.argv[1:]).strip() or "请用三句话解释什么是 streaming。"
     max_tokens = 200
 
-    # 这里统一切到 Anthropic Messages API 风格：
-    # - messages: 只放 user / assistant 历史
-    # - system: 顶层独立参数
-    # - max_tokens: 输出上限
-    # - usage: token 统计
-    # - stop_reason: 停止原因
     messages = [
         {"role": "user", "content": user_message},
     ]
@@ -53,28 +64,34 @@ def main() -> None:
     print()
 
     client = Anthropic(api_key=api_key, base_url=base_url)
-    response = client.messages.create(
+
+    print("=== Events ===")
+    with client.messages.stream(
         model=model,
         system=system_prompt,
         messages=messages,
         max_tokens=max_tokens,
-    )
+    ) as stream:
+        for event in stream.text_stream:
+            print(event, end="", flush=True)
+        final_message = stream.get_final_message()
 
+    print()
+    print("=== Final Message ===")
     reply_parts = []
-    for block in response.content:
+    for block in final_message.content:
         if block.type == "text":
             reply_parts.append(block.text)
-    reply = "".join(reply_parts)
-    usage = response.usage
-
-    print("=== Response ===")
-    print(reply)
+    print("".join(reply_parts))
     print()
-    print("=== Key Fields ===")
-    print(f"usage.input_tokens: {getattr(usage, 'input_tokens', None)}")
-    print(f"usage.output_tokens: {getattr(usage, 'output_tokens', None)}")
-    print(f"usage.total_tokens: {getattr(usage, 'total_tokens', None)}")
-    print(f"stop_reason: {response.stop_reason}")
+    print("=== Final Fields ===")
+    print(
+        f"usage.input_tokens: {getattr(final_message.usage, 'input_tokens', None)}")
+    print(
+        f"usage.output_tokens: {getattr(final_message.usage, 'output_tokens', None)}")
+    print(
+        f"usage.total_tokens: {getattr(final_message.usage, 'total_tokens', None)}")
+    print(f"stop_reason: {final_message.stop_reason}")
 
 
 if __name__ == "__main__":

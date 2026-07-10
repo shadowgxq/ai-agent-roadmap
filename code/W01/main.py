@@ -1,33 +1,17 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
 
-
-def load_env() -> None:
-    """从仓库根目录加载 .env，保持和 test_api.py 一致。"""
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
+from agent_sdk import extract_text, get_client, load_config  # noqa: E402
 
 
 def main() -> None:
-    load_env()
-
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv("ANTHROPIC_BASE_URL",
-                         "https://api.deepseek.com/anthropic")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    config = load_config()
+    base_url = config.base_url
+    model = config.model
 
     system_prompt = "你是一个简洁、准确的中文助理。"
     user_message = " ".join(sys.argv[1:]).strip() or "请用三句话解释什么是 Messages API。"
@@ -52,7 +36,7 @@ def main() -> None:
     print(f"messages: {messages}")
     print()
 
-    client = Anthropic(api_key=api_key, base_url=base_url)
+    client = get_client(config)
     response = client.messages.create(
         model=model,
         system=system_prompt,
@@ -60,11 +44,7 @@ def main() -> None:
         max_tokens=max_tokens,
     )
 
-    reply_parts = []
-    for block in response.content:
-        if block.type == "text":
-            reply_parts.append(block.text)
-    reply = "".join(reply_parts)
+    reply = extract_text(response)
     usage = response.usage
 
     print("=== Response ===")

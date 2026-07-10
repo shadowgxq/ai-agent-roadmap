@@ -1,40 +1,16 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
 
-
-def load_env() -> None:
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
-
-
-def extract_text(message) -> str:
-    parts: list[str] = []
-    for block in message.content:
-        if block.type == "text":
-            parts.append(block.text)
-    return "".join(parts)
+from agent_sdk import extract_text, get_client, load_config  # noqa: E402
 
 
 def main() -> None:
-    load_env()
-
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv("ANTHROPIC_BASE_URL",
-                         "https://api.deepseek.com/anthropic")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    config = load_config()
+    model = config.model
 
     system_prompt = "你是一个简洁、准确的中文助理。"
     user_message = " ".join(sys.argv[1:]).strip() or "请用三句话解释什么是 count_tokens。"
@@ -44,7 +20,7 @@ def main() -> None:
         {"role": "user", "content": user_message},
     ]
 
-    client = Anthropic(api_key=api_key, base_url=base_url)
+    client = get_client(config)
 
     # 预估规则不是“按字符数除以 4”这种土办法，而是让服务端用模型的真实分词规则
     # 计算当前请求体大概会占多少输入 token。这里算的是将要发送的 system + messages。

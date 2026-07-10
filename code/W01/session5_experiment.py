@@ -1,47 +1,27 @@
 from __future__ import annotations
 
-import os
+import sys
 from pathlib import Path
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
 
+from agent_sdk import extract_text, get_client, load_config  # noqa: E402
 from pricing import calc_cost
 
 
 ROOT = Path(__file__).parent
-ENV_PATH = ROOT.parent.parent / ".env"
 NOTES_PATH = ROOT / "NOTES.md"
 
 
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
-
-
-def extract_text(message: object) -> str:
-    parts: list[str] = []
-    for block in getattr(message, "content", []):
-        if getattr(block, "type", None) == "text":
-            parts.append(getattr(block, "text", ""))
-    return "".join(parts)
-
-
 def run() -> list[dict[str, int | float | str | None]]:
-    load_dotenv(ENV_PATH)
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv(
-        "ANTHROPIC_BASE_URL", "https://api.deepseek.com/anthropic"
-    )
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    config = load_config()
+    model = config.model
     system_prompt = "你是一个简洁的中文助理。每次只用一句话回答。"
     max_tokens = 80
     messages: list[dict[str, str]] = []
     cumulative_cost_usd = 0.0
     rows: list[dict[str, int | float | str | None]] = []
-    client = Anthropic(api_key=api_key, base_url=base_url)
+    client = get_client(config)
 
     for round_number in range(1, 11):
         user_message = (

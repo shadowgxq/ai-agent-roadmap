@@ -1,50 +1,17 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
 
-
-def load_env() -> None:
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
-
-
-def fmt_usage(usage: object | None) -> str:
-    if usage is None:
-        return "-"
-
-    input_tokens = getattr(usage, "input_tokens", None)
-    output_tokens = getattr(usage, "output_tokens", None)
-    cache_creation_input_tokens = getattr(
-        usage, "cache_creation_input_tokens", None)
-    cache_read_input_tokens = getattr(usage, "cache_read_input_tokens", None)
-
-    return (
-        f"input={input_tokens}, "
-        f"output={output_tokens}, "
-        f"cache_create={cache_creation_input_tokens}, "
-        f"cache_read={cache_read_input_tokens}"
-    )
+from agent_sdk import fmt_usage, get_client, load_config  # noqa: E402
 
 
 def main() -> None:
-    load_env()
-
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv("ANTHROPIC_BASE_URL",
-                         "https://api.deepseek.com/anthropic")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    config = load_config()
+    base_url = config.base_url
+    model = config.model
 
     system_prompt = "你是一个简洁、准确的中文助理。"
     user_message = " ".join(sys.argv[1:]).strip() or "请用三句话解释什么是 streaming。"
@@ -63,7 +30,7 @@ def main() -> None:
     print(f"messages: {messages}")
     print()
 
-    client = Anthropic(api_key=api_key, base_url=base_url)
+    client = get_client(config)
 
     print("=== Events ===")
     with client.messages.stream(

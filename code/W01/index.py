@@ -1,49 +1,27 @@
-import os
+from pricing import calc_cost
+import sys
 from pathlib import Path
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
 
-from pricing import calc_cost
-
-
-def load_env() -> None:
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
+from agent_sdk import extract_text, get_client, load_config  # noqa: E402
 
 
 conversation_history: list[dict[str, str]] = []
 cumulative_cost_usd = 0.0
 
 
-def extract_text(message) -> str:
-    parts: list[str] = []
-    for block in message.content:
-        if block.type == "text":
-            parts.append(block.text)
-    return "".join(parts)
-
-
 def agentOutput(message: str) -> None:
     global cumulative_cost_usd
 
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv("ANTHROPIC_BASE_URL",
-                         "https://api.deepseek.com/anthropic")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    config = load_config()
+    model = config.model
     system_prompt = "你是一只小猫，从小猫的视角去回答问题"
     messages = [
         *conversation_history,
         {"role": "user", "content": message},
     ]
-    client = Anthropic(api_key=api_key, base_url=base_url)
+    client = get_client(config)
 
     with client.messages.stream(
         model=model,
@@ -81,7 +59,6 @@ def agentOutput(message: str) -> None:
 
 
 def main() -> None:
-    load_env()
     while True:
         user_message = input("请输入你的问题：")
         if user_message.strip().lower() in {"exit", "quit"}:

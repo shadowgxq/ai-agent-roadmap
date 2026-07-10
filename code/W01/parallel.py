@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from anthropic import AsyncAnthropic
-from dotenv import load_dotenv
 
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
 
-ROOT = Path(__file__).parent
-ENV_PATH = ROOT.parent.parent / ".env"
+from agent_sdk import extract_text, get_async_client, load_config  # noqa: E402
 
 
 @dataclass
@@ -20,21 +19,6 @@ class Answer:
     question: str
     text: str
     output_tokens: int | None
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
-
-
-def extract_text(message: object) -> str:
-    parts: list[str] = []
-    for block in getattr(message, "content", []):
-        if getattr(block, "type", None) == "text":
-            parts.append(getattr(block, "text", ""))
-    return "".join(parts)
 
 
 async def ask(
@@ -96,14 +80,10 @@ def print_results(title: str, answers: list[Answer | Exception], elapsed: float)
 
 
 async def run(questions: list[str]) -> None:
-    load_dotenv(ENV_PATH)
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv(
-        "ANTHROPIC_BASE_URL", "https://api.deepseek.com/anthropic"
-    )
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    config = load_config()
+    model = config.model
 
-    async with AsyncAnthropic(api_key=api_key, base_url=base_url) as client:
+    async with get_async_client(config) as client:
         serial_answers, serial_elapsed = await run_serial(client, model, questions)
         parallel_answers, parallel_elapsed = await run_parallel(
             client, model, questions

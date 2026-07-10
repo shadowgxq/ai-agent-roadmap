@@ -1,33 +1,22 @@
 from __future__ import annotations
+from pricing import calc_cost
 
 import json
-import os
+import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from anthropic import AsyncAnthropic
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from pricing import calc_cost
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
+
+from agent_sdk import get_async_client, load_config  # noqa: E402
 
 
-def load_env() -> None:
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
-
-
-load_env()
+config = load_config()
 
 app = FastAPI()
 
@@ -53,10 +42,7 @@ async def index() -> FileResponse:
 
 @app.post("/chat")
 async def chat(body: ChatRequest) -> StreamingResponse:
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv("ANTHROPIC_BASE_URL",
-                         "https://api.deepseek.com/anthropic")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    model = config.model
     system_prompt = "你是一条佛系的鱼"
     session_id = body.session_id or str(uuid.uuid4())
     session = conversation_store.setdefault(session_id, SessionState())
@@ -66,7 +52,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         {"role": "user", "content": body.message},
     ]
 
-    client = AsyncAnthropic(api_key=api_key, base_url=base_url)
+    client = get_async_client(config)
 
     async def event_stream():
         async with client.messages.stream(

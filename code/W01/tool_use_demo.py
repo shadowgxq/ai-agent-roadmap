@@ -1,25 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
+sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
 
-
-def load_env() -> None:
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
+from agent_sdk import (  # noqa: E402
+    extract_assistant_blocks,
+    extract_text,
+    get_client,
+    load_config,
+)
 
 
 def get_weather(location: str) -> dict[str, Any]:
@@ -65,21 +58,9 @@ def run_tool(name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(f"未知工具: {name}")
 
 
-def extract_text(response: Any) -> str:
-    parts: list[str] = []
-    for block in response.content:
-        if block.type == "text":
-            parts.append(block.text)
-    return "".join(parts)
-
-
 def main() -> None:
-    load_env()
-
-    api_key = require_env("ANTHROPIC_API_KEY")
-    base_url = os.getenv("ANTHROPIC_BASE_URL",
-                         "https://api.deepseek.com/anthropic")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    config = load_config()
+    model = config.model
 
     system_prompt = (
         "你是一个会调用工具的中文助理。"
@@ -92,7 +73,7 @@ def main() -> None:
         {"role": "user", "content": user_message},
     ]
 
-    client = Anthropic(api_key=api_key, base_url=base_url)
+    client = get_client(config)
 
     round_no = 1
     while True:
@@ -105,29 +86,10 @@ def main() -> None:
             max_tokens=max_tokens,
         )
 
-        assistant_blocks: list[dict[str, Any]] = []
-        for block in response.content:
-            if block.type == "text":
-                assistant_blocks.append(
-                    {
-                        "type": "text",
-                        "text": block.text,
-                    }
-                )
-            elif block.type == "tool_use":
-                assistant_blocks.append(
-                    {
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input,
-                    }
-                )
-
         messages.append(
             {
                 "role": "assistant",
-                "content": assistant_blocks,
+                "content": extract_assistant_blocks(response),
             }
         )
 

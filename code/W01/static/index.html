@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>W01 SSE Chat</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: #f5f7fb;
+        color: #111827;
+      }
+
+      main {
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 16px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 24px;
+      }
+
+      form {
+        display: grid;
+        gap: 12px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        resize: vertical;
+        box-sizing: border-box;
+        font: inherit;
+      }
+
+      button {
+        width: 120px;
+        height: 40px;
+        border: 0;
+        border-radius: 8px;
+        background: #2563eb;
+        color: white;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+      }
+
+      pre {
+        min-height: 220px;
+        margin: 20px 0 0;
+        padding: 16px;
+        border-radius: 8px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .meta {
+        margin-top: 12px;
+        color: #475569;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>FastAPI + SSE /chat</h1>
+      <form id="chat-form">
+        <textarea id="message" placeholder="输入你的问题"></textarea>
+        <button id="submit-button" type="submit">发送</button>
+      </form>
+      <pre id="output"></pre>
+      <div class="meta" id="meta"></div>
+    </main>
+
+    <script>
+      const form = document.getElementById("chat-form");
+      const messageInput = document.getElementById("message");
+      const submitButton = document.getElementById("submit-button");
+      const output = document.getElementById("output");
+      const meta = document.getElementById("meta");
+      let sessionId = crypto.randomUUID();
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const message = messageInput.value.trim();
+        if (!message) return;
+
+        submitButton.disabled = true;
+        output.textContent = "";
+        meta.textContent = "";
+
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message, session_id: sessionId }),
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split("\n\n");
+          buffer = events.pop() ?? "";
+
+          for (const eventText of events) {
+            if (!eventText.startsWith("data: ")) continue;
+            const payload = JSON.parse(eventText.slice(6));
+
+            if (payload.type === "text_delta") {
+              output.textContent += payload.text;
+            }
+
+            if (payload.type === "message_stop") {
+              sessionId = payload.session_id;
+              meta.textContent =
+                `model=${payload.model}, ` +
+                `session_id=${payload.session_id}, ` +
+                `stop_reason=${payload.stop_reason}, ` +
+                `input_tokens=${payload.usage.input_tokens}, ` +
+                `output_tokens=${payload.usage.output_tokens}, ` +
+                `round_cost_usd=$${payload.round_cost_usd.toFixed(8)}, ` +
+                `cumulative_cost_usd=$${payload.cumulative_cost_usd.toFixed(8)}, ` +
+                `history_length=${payload.history_length}`;
+            }
+          }
+        }
+
+        submitButton.disabled = false;
+      });
+    </script>
+  </body>
+</html>

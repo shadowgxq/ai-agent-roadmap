@@ -94,6 +94,9 @@ async def chat(body: ChatRequest) -> StreamingResponse:
             cache_read_input_tokens = getattr(
                 final_message.usage, "cache_read_input_tokens", None
             )
+            total_input_tokens = (input_tokens or 0) + (
+                cache_read_input_tokens or 0
+            )
             round_cost_usd = calc_cost(
                 model=model,
                 input_tokens=input_tokens,
@@ -110,6 +113,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
                     "cache_read_input_tokens": cache_read_input_tokens,
+                    "total_input_tokens": total_input_tokens,
                 },
                 "round_cost_usd": round_cost_usd,
                 "cumulative_cost_usd": session.cumulative_cost_usd,

@@ -49,14 +49,12 @@ def calc_cost(
     if price is None:
         return 0.0
 
-    total_input_tokens = input_tokens or 0
-    cached_input_tokens = min(cache_read_input_tokens or 0, total_input_tokens)
-    uncached_input_tokens = max(total_input_tokens - cached_input_tokens, 0)
+    uncached_input_tokens = input_tokens or 0
+    cached_input_tokens = cache_read_input_tokens or 0
     total_output_tokens = output_tokens or 0
 
-    input_cost = (
-        uncached_input_tokens / 1_000_000 * price.input_cache_miss_per_million
-        + cached_input_tokens / 1_000_000 * price.input_cache_hit_per_million
-    )
+    input_cost = uncached_input_tokens / 1_000_000 * \
+        price.input_cache_miss_per_million
+    input_cost += cached_input_tokens / 1_000_000 * price.input_cache_hit_per_million
     output_cost = total_output_tokens / 1_000_000 * price.output_per_million
     return input_cost + output_cost

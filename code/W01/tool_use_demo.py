@@ -2,12 +2,9 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 from typing import Any
 
-sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
-
-from agent_sdk import (  # noqa: E402
+from agent_sdk import (
     extract_assistant_blocks,
     extract_text,
     get_client,

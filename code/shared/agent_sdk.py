@@ -1,10 +1,7 @@
 """跨 week 复用的最基础工具：环境加载、配置、SDK 客户端获取、响应解析。
 
-各 week 目录是独立的 uv 工程，用一行 sys.path 引导即可复用：
+所有 week 代码共用 `code/` 根目录的 uv 环境，通过 `agent_sdk` 复用：
 
-    import sys
-    from pathlib import Path
-    sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
     from agent_sdk import load_config, get_client, extract_text
 """
 

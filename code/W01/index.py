@@ -1,10 +1,7 @@
 from pricing import calc_cost
 import sys
-from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
-
-from agent_sdk import extract_text, get_client, load_config  # noqa: E402
+from agent_sdk import extract_text, get_client, load_config
 
 
 conversation_history: list[dict[str, str]] = []

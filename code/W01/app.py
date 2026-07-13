@@ -1,8 +1,7 @@
 from __future__ import annotations
-from pricing import calc_cost
+from W01.pricing import calc_cost
 
 import json
-import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,9 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
-
-from agent_sdk import get_async_client, load_config  # noqa: E402
+from agent_sdk import get_async_client, load_config
 
 
 config = load_config()

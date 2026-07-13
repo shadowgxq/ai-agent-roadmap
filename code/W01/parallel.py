@@ -2,16 +2,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
 import time
 from dataclasses import dataclass
-from pathlib import Path
 
 from anthropic import AsyncAnthropic
 
-sys.path.append(str(Path(__file__).resolve().parent.parent / "shared"))
-
-from agent_sdk import extract_text, get_async_client, load_config  # noqa: E402
+from agent_sdk import extract_text, get_async_client, load_config
 
 
 @dataclass

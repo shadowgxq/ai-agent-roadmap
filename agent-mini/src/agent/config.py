@@ -24,8 +24,10 @@ class AgentSettings(BaseSettings):
     )
     base_url: str = Field(
         default="https://api.deepseek.com/anthropic",
-        validation_alias=AliasChoices("ANTHROPIC_BASE_URL", "DEEPSEEK_BASE_URL"),
+        validation_alias=AliasChoices(
+            "ANTHROPIC_BASE_URL", "DEEPSEEK_BASE_URL"),
     )
-    model: str = Field(default="deepseek-chat", validation_alias="DEEPSEEK_MODEL")
+    model: str = Field(default="deepseek-chat",
+                       validation_alias="DEEPSEEK_MODEL")
     max_turns: int = 30
     max_tool_output_chars: int = 10_000

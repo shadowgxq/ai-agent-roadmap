@@ -1,14 +1,21 @@
+"""维护可直接发送给 Messages API 的完整对话历史。"""
+
 from typing import Any
 
 
 class Context:
+    """保存标准字典格式的 user、assistant 和 tool_result 消息。"""
+
     def __init__(self) -> None:
+        """创建一个空的对话上下文。"""
         self.messages: list[dict[str, Any]] = []
 
     def append_user(self, text: str) -> None:
+        """追加用户输入的普通文本消息。"""
         self.messages.append({"role": "user", "content": text})
 
     def append_assistant(self, content: list[dict[str, Any]]) -> None:
+        """追加模型返回的完整 content blocks，不能只保存 text。"""
         self.messages.append(
             {
                 "role": "assistant",
@@ -17,6 +24,11 @@ class Context:
         )
 
     def append_tool_results(self, tool_results: list[dict[str, Any]]) -> None:
+        """把本轮所有工具结果合并成一条 user 消息。
+
+        Messages API 规定 tool_result 使用 user 角色，并通过 tool_use_id
+        与上一条 assistant 消息里的 tool_use.id 配对。
+        """
         self.messages.append(
             {
                 "role": "user",
@@ -25,6 +37,12 @@ class Context:
         )
 
     def assert_paired(self) -> None:
+        """校验工具调用与结果是否完整、唯一并按协议顺序出现。
+
+        该方法只检查已有历史，不修改消息；发现缺失、重复、越序或无法匹配
+        的 ID 时立即抛出 RuntimeError。
+        """
+        # pending_ids 保存当前等待结果的工具调用；正常完成一轮后必须清空。
         pending_ids: set[str] = set()
         seen_tool_use_ids: set[str] = set()
 
@@ -41,6 +59,7 @@ class Context:
             if not isinstance(content, list):
                 raise RuntimeError("消息 content 必须是字符串或 block 列表")
 
+            # assistant 的 tool_use 开启一组待配对调用。
             if role == "assistant":
                 if pending_ids:
                     raise RuntimeError("上一轮 tool_use 缺少对应的 tool_result")
@@ -61,6 +80,7 @@ class Context:
                     seen_tool_use_ids.add(tool_use_id)
                 continue
 
+            # user 的 tool_result 关闭上一条 assistant 开启的调用。
             tool_results = [
                 block
                 for block in content

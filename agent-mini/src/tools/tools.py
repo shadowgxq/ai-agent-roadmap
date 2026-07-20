@@ -1,3 +1,5 @@
+"""提供用于走通 Tool Use 回路的本地 mock 工具。"""
+
 from typing import Any
 
 from .registry import tool

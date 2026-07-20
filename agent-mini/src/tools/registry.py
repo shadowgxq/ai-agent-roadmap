@@ -1,3 +1,5 @@
+"""把 Python 函数注册为模型可调用工具，并统一校验和执行。"""
+
 from __future__ import annotations
 
 import inspect
@@ -15,7 +17,7 @@ ToolHandler = Callable[..., Any]
 
 @dataclass(frozen=True)
 class RegisteredTool:
-    """注册表内部保存的工具定义。"""
+    """已注册工具的定义和处理函数。"""
 
     name: str
     description: str
@@ -25,7 +27,7 @@ class RegisteredTool:
 
 @dataclass(frozen=True)
 class ToolExecutionResult:
-    """统一表示工具执行结果及错误状态。"""
+    """工具执行结果。"""
 
     content: str
     is_error: bool = False
@@ -67,7 +69,7 @@ def _parse_docstring(handler: ToolHandler) -> tuple[str, dict[str, str]]:
 
 
 def _parameters(handler: ToolHandler) -> list[inspect.Parameter]:
-    """返回工具支持的具名参数，并拒绝不适合 JSON 输入的签名。"""
+    """读取可由 JSON object 传入的具名参数。"""
     parameters = list(inspect.signature(handler).parameters.values())
     unsupported = {
         inspect.Parameter.POSITIONAL_ONLY,
@@ -80,6 +82,7 @@ def _parameters(handler: ToolHandler) -> list[inspect.Parameter]:
 
 
 def _type_hints(handler: ToolHandler) -> dict[str, Any]:
+    """安全读取函数类型标注。"""
     try:
         return get_type_hints(handler)
     except (NameError, TypeError):
@@ -91,6 +94,7 @@ def _is_model_type(annotation: Any) -> bool:
 
 
 def _schema_for(annotation: Any) -> dict[str, Any]:
+    """把类型标注转成 JSON Schema。"""
     if annotation is inspect.Signature.empty or annotation is Any:
         return {}
     try:
@@ -102,18 +106,20 @@ def _schema_for(annotation: Any) -> dict[str, Any]:
 def _build_definition(
     handler: ToolHandler,
 ) -> tuple[str, dict[str, Any]]:
-    """根据函数签名、类型标注和 docstring 生成工具定义。"""
+    """生成工具描述和输入 schema。"""
     description, argument_descriptions = _parse_docstring(handler)
     print('=====_build_definition', description, argument_descriptions)
     parameters = _parameters(handler)
     type_hints = _type_hints(handler)
 
+    # 单个 Pydantic 参数直接使用模型 schema。
     if len(parameters) == 1:
         parameter = parameters[0]
         annotation = type_hints.get(parameter.name, parameter.annotation)
         if _is_model_type(annotation):
             return description, annotation.model_json_schema()
 
+    # 普通参数逐个生成 properties 和 required。
     properties: dict[str, Any] = {}
     required: list[str] = []
     for parameter in parameters:
@@ -140,7 +146,7 @@ def _prepare_arguments(
     handler: ToolHandler,
     input_data: dict[str, Any],
 ) -> dict[str, Any]:
-    """校验模型提供的输入并转换为工具函数参数。"""
+    """校验模型输入并生成工具调用参数。"""
     signature = inspect.signature(handler)
     parameters = _parameters(handler)
     type_hints = _type_hints(handler)
@@ -171,13 +177,14 @@ def _prepare_arguments(
 
 
 def _serialize_result(result: Any) -> str:
+    """把工具返回值转成文本。"""
     if isinstance(result, str):
         return result
     return json.dumps(result, ensure_ascii=False, default=str)
 
 
 class ToolRegistry:
-    """注册工具、导出 API schema，并统一执行工具。"""
+    """管理工具注册、schema 导出和执行。"""
 
     def __init__(self) -> None:
         self._tools: dict[str, RegisteredTool] = {}
@@ -190,7 +197,7 @@ class ToolRegistry:
         description: str | None = None,
         input_schema: dict[str, Any] | None = None,
     ) -> ToolHandler:
-        """注册函数；缺省的描述和 schema 会从函数定义中生成。"""
+        """注册工具，缺省信息从函数定义生成。"""
         tool_name = name or handler.__name__
         if tool_name in self._tools:
             raise ValueError(f"工具已注册: {tool_name}")
@@ -211,7 +218,7 @@ class ToolRegistry:
         description: str | None = None,
         input_schema: dict[str, Any] | None = None,
     ) -> ToolHandler | Callable[[ToolHandler], ToolHandler]:
-        """返回 `@tool` 装饰器。"""
+        """支持 `@tool` 和 `@tool(...)` 两种装饰器写法。"""
         def decorator(function: ToolHandler) -> ToolHandler:
             return self.register(
                 function,
@@ -225,7 +232,7 @@ class ToolRegistry:
         return decorator(handler)
 
     def schemas(self) -> list[dict[str, Any]]:
-        """返回可以直接传给 Messages API 的工具 schema。"""
+        """导出 Messages API 使用的工具 schema。"""
         return [
             {
                 "name": registered.name,
@@ -240,7 +247,7 @@ class ToolRegistry:
         name: str,
         input_data: dict[str, Any],
     ) -> ToolExecutionResult:
-        """执行工具，并把普通返回值和异常统一成结构化结果。"""
+        """执行工具；异常转成 is_error 结果供模型继续处理。"""
         try:
             if not isinstance(input_data, dict):
                 raise TypeError("工具输入必须是 object")
@@ -263,11 +270,12 @@ class ToolRegistry:
             )
 
     async def execute(self, name: str, input_data: dict[str, Any]) -> str:
-        """执行工具并返回可直接放入 tool_result 的文本。"""
+        """执行工具并返回结果文本。"""
         result = await self.execute_with_status(name, input_data)
         return result.content
 
 
+# 供 @tool 和 Agent 共用的默认注册表。
 registry = ToolRegistry()
 tool = registry.tool
 

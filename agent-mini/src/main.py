@@ -1,4 +1,4 @@
-"""演示一次完整的 Messages API Tool Use 回路。"""
+"""W02 复习入口：演示一次固定的 Messages API Tool Use 回路。"""
 
 import asyncio
 from typing import Any
@@ -28,7 +28,7 @@ def extract_text(message: Any) -> str:
 
 
 async def main() -> None:
-    """执行一次 tool_use -> tool_result -> final answer 流程。"""
+    """执行一次模型调用、工具回填和最终回答，不包含通用 Agent 循环。"""
     settings = AgentSettings()
     context = Context()
     context.append_user("北京今天天气怎么样？请使用工具查询。")
@@ -40,6 +40,7 @@ async def main() -> None:
         base_url=settings.base_url,
     ) as client:
         print("===工具", registry.schemas())
+        # 第一次请求要求模型选择工具，并返回 assistant(tool_use)。
         first_response = await client.messages.create(
             model=settings.model,
             max_tokens=300,
@@ -48,6 +49,7 @@ async def main() -> None:
             tools=registry.schemas(),
         )
 
+        # 工具结果之前必须先保存触发它的完整 assistant 消息。
         context.append_assistant(assistant_content(first_response))
 
         if first_response.stop_reason != "tool_use":
@@ -55,6 +57,7 @@ async def main() -> None:
         tool_results = await execute_tools(first_response, registry)
         context.append_tool_results(tool_results)
         context.assert_paired()
+        # 第二次请求让模型读取 tool_result 并组织最终自然语言回答。
         final_response = await client.messages.create(
             model=settings.model,
             max_tokens=300,

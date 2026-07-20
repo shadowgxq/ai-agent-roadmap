@@ -8,6 +8,46 @@ from anthropic.types import Message
 from .context import Context
 
 
+class MaxTurnsExceeded(RuntimeError):
+    """Agent 在限定轮数内没有完成任务。"""
+
+
+async def run(
+    client: AsyncAnthropic,
+    context: Context,
+    registry: Any,
+    *,
+    model: str,
+    system_prompt: str,
+    max_turns: int = 10,
+    max_tokens: int = 300,
+) -> Message:
+    """运行 Agent，直到模型结束或达到最大轮数。"""
+    tools = registry.schemas()
+    for turn in range(1, max_turns + 1):
+        response = await call_llm(
+            client,
+            context,
+            model=model,
+            system_prompt=system_prompt,
+            tools=tools,
+            max_tokens=max_tokens,
+        )
+
+        context.append_assistant(assistant_content(response))
+
+        if response.stop_reason != "tool_use":
+            return response
+
+        tool_results = await execute_tools(response, registry)
+        context.append_tool_results(tool_results)
+        context.assert_paired()
+
+    raise MaxTurnsExceeded(
+        f"Agent 达到最大轮数限制: {max_turns}"
+    )
+
+
 async def call_llm(
     client: AsyncAnthropic,
     context: Context,

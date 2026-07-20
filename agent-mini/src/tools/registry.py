@@ -108,7 +108,6 @@ def _build_definition(
 ) -> tuple[str, dict[str, Any]]:
     """生成工具描述和输入 schema。"""
     description, argument_descriptions = _parse_docstring(handler)
-    print('=====_build_definition', description, argument_descriptions)
     parameters = _parameters(handler)
     type_hints = _type_hints(handler)
 

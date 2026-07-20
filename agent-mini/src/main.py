@@ -8,10 +8,12 @@ from anthropic import AsyncAnthropic
 if __package__:
     # `python -m src.main` 使用包内相对导入。
     from .agent.config import AgentSettings
+    from .agent.context import Context
     from .tools import registry
 else:
     # VS Code 的“运行 Python 文件”会直接执行当前文件。
     from agent.config import AgentSettings
+    from agent.context import Context
     from tools import registry
 
 
@@ -60,12 +62,9 @@ def assistant_content(message: Any) -> list[dict[str, Any]]:
 async def main() -> None:
     """执行一次 tool_use -> tool_result -> final answer 流程。"""
     settings = AgentSettings()
-    messages: list[dict[str, Any]] = [
-        {
-            "role": "user",
-            "content": "北京今天天气怎么样？请使用工具查询。",
-        }
-    ]
+    context = Context()
+    context.append_user("北京今天天气怎么样？请使用工具查询。")
+
     system_prompt = "用户询问天气时必须调用工具，不能猜测工具结果。"
 
     async with AsyncAnthropic(
@@ -77,17 +76,12 @@ async def main() -> None:
             model=settings.model,
             max_tokens=300,
             system=system_prompt,
-            messages=messages,
+            messages=context.messages,
             tools=registry.schemas(),
         )
-        messages.append(
-            {
-                "role": "assistant",
-                "content": assistant_content(first_response),
-            }
-        )
 
-        print(f"第一次响应 stop_reason: {first_response.stop_reason}")
+        context.append_assistant(assistant_content(first_response))
+
         tool_uses = [
             block
             for block in first_response.content
@@ -112,21 +106,16 @@ async def main() -> None:
                     "is_error": execution.is_error,
                 }
             )
-
-        messages.append({"role": "user", "content": tool_results})
+        context.append_tool_results(tool_results)
+        context.assert_paired()
         final_response = await client.messages.create(
             model=settings.model,
             max_tokens=300,
             system=system_prompt,
-            messages=messages,
+            messages=context.messages,
             tools=registry.schemas(),
         )
-        messages.append(
-            {
-                "role": "assistant",
-                "content": assistant_content(final_response),
-            }
-        )
+        context.append_assistant(assistant_content(final_response))
 
         print(f"第二次响应 stop_reason: {final_response.stop_reason}")
         print(f"最终回答: {extract_text(final_response)}")

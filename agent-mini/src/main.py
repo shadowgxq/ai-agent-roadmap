@@ -5,15 +5,18 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+
 if __package__:
     # `python -m src.main` 使用包内相对导入。
     from .agent.config import AgentSettings
     from .agent.context import Context
+    from .agent.loop import assistant_content, execute_tools
     from .tools import registry
 else:
     # VS Code 的“运行 Python 文件”会直接执行当前文件。
     from agent.config import AgentSettings
     from agent.context import Context
+    from agent.loop import assistant_content, execute_tools
     from tools import registry
 
 
@@ -22,41 +25,6 @@ def extract_text(message: Any) -> str:
     return "".join(
         block.text for block in message.content if block.type == "text"
     )
-
-
-def assistant_content(message: Any) -> list[dict[str, Any]]:
-    """把响应 content 转换成下一次请求可发送的消息块。"""
-    content: list[dict[str, Any]] = []
-    for block in message.content:
-        if block.type == "text":
-            content.append({"type": "text", "text": block.text})
-        elif block.type == "tool_use":
-            content.append(
-                {
-                    "type": "tool_use",
-                    "id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                }
-            )
-        elif block.type == "thinking":
-            content.append(
-                {
-                    "type": "thinking",
-                    "thinking": block.thinking,
-                    "signature": block.signature,
-                }
-            )
-        elif block.type == "redacted_thinking":
-            content.append(
-                {
-                    "type": "redacted_thinking",
-                    "data": block.data,
-                }
-            )
-        else:
-            raise RuntimeError(f"暂不支持的 content block: {block.type}")
-    return content
 
 
 async def main() -> None:
@@ -82,30 +50,9 @@ async def main() -> None:
 
         context.append_assistant(assistant_content(first_response))
 
-        tool_uses = [
-            block
-            for block in first_response.content
-            if block.type == "tool_use"
-        ]
-        if first_response.stop_reason != "tool_use" or not tool_uses:
+        if first_response.stop_reason != "tool_use":
             raise RuntimeError("模型没有返回预期的 tool_use")
-
-        tool_results: list[dict[str, Any]] = []
-        for tool_use in tool_uses:
-            print(f"调用工具: {tool_use.name} {tool_use.input}")
-            execution = await registry.execute_with_status(
-                tool_use.name,
-                tool_use.input,
-            )
-            print(f"工具结果: {execution.content}")
-            tool_results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": tool_use.id,
-                    "content": execution.content,
-                    "is_error": execution.is_error,
-                }
-            )
+        tool_results = await execute_tools(first_response, registry)
         context.append_tool_results(tool_results)
         context.assert_paired()
         final_response = await client.messages.create(

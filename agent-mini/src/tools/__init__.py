@@ -1,5 +1,6 @@
 """Tool registry and built-in tools."""
 
+from .fs import register_fs_tools, resolve_path
 from .registry import (
     RegisteredTool,
     ToolExecutionResult,
@@ -8,6 +9,7 @@ from .registry import (
     tool,
 )
 from .tools import get_weather
+from .search import register_search_tools
 
 
 __all__ = [
@@ -17,4 +19,7 @@ __all__ = [
     "get_weather",
     "registry",
     "tool",
+    "register_fs_tools",
+    "resolve_path",
+    "register_search_tools"
 ]

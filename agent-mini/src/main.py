@@ -10,6 +10,7 @@ if __package__:
     from .agent.config import AgentSettings, PROJECT_ROOT
     from .agent.context import Context
     from .agent.loop import run
+    from .agent.prompts import build_system_prompt
     from .tools import (
         register_fs_tools,
         register_search_tools,
@@ -20,6 +21,7 @@ else:
     from agent.config import AgentSettings, PROJECT_ROOT
     from agent.context import Context
     from agent.loop import run
+    from agent.prompts import build_system_prompt
     from tools import (
         register_fs_tools,
         register_search_tools,
@@ -43,12 +45,10 @@ async def main() -> None:
     register_shell_tools(registry, PROJECT_ROOT)
     context = Context()
     context.append_user(
-        "告诉我当前工作目录。"
+        "分析下当前的入口文件是哪个"
     )
 
-    system_prompt = (
-        "你是一个编码AI助理"
-    )
+    system_prompt = build_system_prompt(PROJECT_ROOT)
 
     async with AsyncAnthropic(
         api_key=settings.api_key,

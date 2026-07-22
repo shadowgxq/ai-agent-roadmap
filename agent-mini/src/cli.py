@@ -5,13 +5,13 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from anthropic import APIError, AsyncAnthropic
 
 
 if __package__:
     from .agent.config import AgentSettings
     from .agent.context import Context
-    from .agent.loop import run
+    from .agent.loop import MaxTurnsExceeded, RunStats, run
     from .agent.prompts import build_system_prompt
     from .tools import (
         ToolRegistry,
@@ -22,7 +22,7 @@ if __package__:
 else:
     from agent.config import AgentSettings
     from agent.context import Context
-    from agent.loop import run
+    from agent.loop import MaxTurnsExceeded, RunStats, run
     from agent.prompts import build_system_prompt
     from tools import (
         ToolRegistry,
@@ -75,6 +75,14 @@ def extract_text(message: Any) -> str:
     return text or "(模型未返回文本)"
 
 
+def print_stats(stats: RunStats) -> None:
+    """打印一次 Agent 运行累计的模型用量。"""
+    print(f"总轮数: {stats.turns}")
+    print(f"输入 token: {stats.input_tokens}")
+    print(f"输出 token: {stats.output_tokens}")
+    print(f"总 token: {stats.input_tokens + stats.output_tokens}")
+
+
 async def main() -> None:
     """解析参数、组装依赖并运行 Agent。"""
     args = parse_args()
@@ -97,23 +105,35 @@ async def main() -> None:
     model = args.model or settings.model
     max_turns = args.max_turns or settings.max_turns
 
-    async with AsyncAnthropic(
-        api_key=settings.api_key,
-        base_url=settings.base_url,
-    ) as client:
-        final_response = await run(
-            client,
-            context,
-            registry,
-            model=model,
-            system_prompt=build_system_prompt(workdir),
-            max_turns=max_turns,
-            max_tokens=3000,
-        )
+    try:
+        async with AsyncAnthropic(
+            api_key=settings.api_key,
+            base_url=settings.base_url,
+        ) as client:
+            final_response, stats = await run(
+                client,
+                context,
+                registry,
+                model=model,
+                system_prompt=build_system_prompt(workdir),
+                max_turns=max_turns,
+                max_tokens=3000,
+            )
+    except MaxTurnsExceeded as exc:
+        print(f"运行失败: {exc}")
+        print_stats(exc.stats)
+        return
+    except APIError as exc:
+        print(f"模型请求失败: {exc}")
+        return
 
+    print_stats(stats)
     print(f"最终 stop_reason: {final_response.stop_reason}")
     print(f"最终回答: {extract_text(final_response)}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n运行已由用户中断。")

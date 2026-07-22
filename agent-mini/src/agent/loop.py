@@ -1,5 +1,6 @@
 """连接模型、消息上下文和工具执行的 Agent 核心流程组件。"""
 
+from dataclasses import dataclass
 from typing import Any
 
 from anthropic import AsyncAnthropic
@@ -8,8 +9,22 @@ from anthropic.types import Message
 from .context import Context
 
 
+@dataclass
+class RunStats:
+    """记录一次 Agent 运行期间的模型调用统计。"""
+
+    turns: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
 class MaxTurnsExceeded(RuntimeError):
     """Agent 在限定轮数内没有完成任务。"""
+
+    def __init__(self, max_turns: int, stats: RunStats):
+        super().__init__(f"Agent 达到最大轮数限制: {max_turns}")
+        self.max_turns = max_turns
+        self.stats = stats
 
 
 async def run(
@@ -21,10 +36,12 @@ async def run(
     system_prompt: str,
     max_turns: int = 10,
     max_tokens: int = 300,
-) -> Message:
+) -> tuple[Message, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
     tools = registry.schemas()
+    stats = RunStats()
     for turn in range(1, max_turns + 1):
+        print(f"\n===== 第 {turn}/{max_turns} 轮 =====")
         response = await call_llm(
             client,
             context,
@@ -33,19 +50,33 @@ async def run(
             tools=tools,
             max_tokens=max_tokens,
         )
+        text = message_text(response)
+        if text:
+            print(f"模型文本: {text}")
+
+        stats.turns += 1
+        stats.input_tokens += response.usage.input_tokens
+        stats.output_tokens += response.usage.output_tokens
 
         context.append_assistant(assistant_content(response))
 
         if response.stop_reason != "tool_use":
-            return response
+            return response, stats
 
         tool_results = await execute_tools(response, registry)
         context.append_tool_results(tool_results)
         context.assert_paired()
 
-    raise MaxTurnsExceeded(
-        f"Agent 达到最大轮数限制: {max_turns}"
-    )
+    raise MaxTurnsExceeded(max_turns, stats)
+
+
+def message_text(message: Message) -> str:
+    """提取模型响应中的所有文本块。"""
+    return "".join(
+        block.text
+        for block in message.content
+        if block.type == "text"
+    ).strip()
 
 
 async def call_llm(

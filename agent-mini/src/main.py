@@ -54,7 +54,7 @@ async def main() -> None:
         api_key=settings.api_key,
         base_url=settings.base_url,
     ) as client:
-        final_response = await run(
+        final_response, stats = await run(
             client,
             context,
             registry,
@@ -64,6 +64,10 @@ async def main() -> None:
             max_tokens=3000,
         )
 
+    print(f"总轮数: {stats.turns}")
+    print(f"输入 token: {stats.input_tokens}")
+    print(f"输出 token: {stats.output_tokens}")
+    print(f"总 token: {stats.input_tokens + stats.output_tokens}")
     print(f"最终 stop_reason: {final_response.stop_reason}")
     print(f"最终回答: {extract_text(final_response)}")
 

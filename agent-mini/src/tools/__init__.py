@@ -8,8 +8,8 @@ from .registry import (
     registry,
     tool,
 )
-from .tools import get_weather
 from .search import register_search_tools
+from .tools import get_weather
 
 
 __all__ = [
@@ -21,5 +21,5 @@ __all__ = [
     "tool",
     "register_fs_tools",
     "resolve_path",
-    "register_search_tools"
+    "register_search_tools",
 ]

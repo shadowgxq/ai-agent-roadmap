@@ -1,4 +1,4 @@
-"""使用 read_file 和 edit_file 演示精确修改验证流程。"""
+"""使用 grep 和 read_file 演示代码定位流程。"""
 
 import asyncio
 from typing import Any
@@ -13,7 +13,7 @@ if __package__:
     from .tools import (
         register_fs_tools,
         register_search_tools,
-        registry
+        registry,
     )
 else:
     from agent.config import AgentSettings, PROJECT_ROOT
@@ -22,7 +22,7 @@ else:
     from tools import (
         register_fs_tools,
         register_search_tools,
-        registry
+        registry,
     )
 
 
@@ -34,7 +34,7 @@ def extract_text(message: Any) -> str:
 
 
 async def main() -> None:
-    """创建 Agent 依赖并运行文件精确修改任务。"""
+    """创建 Agent 依赖并运行代码搜索任务。"""
     settings = AgentSettings()
     register_fs_tools(registry, PROJECT_ROOT)
     register_search_tools(registry, PROJECT_ROOT)

@@ -1,6 +1,7 @@
 """连接模型、消息上下文和工具执行的 Agent 核心流程组件。"""
 
 from dataclasses import dataclass
+import json
 from typing import Any
 
 from anthropic import AsyncAnthropic
@@ -16,6 +17,8 @@ class RunStats:
     turns: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
 
 
 class MaxTurnsExceeded(RuntimeError):
@@ -25,6 +28,28 @@ class MaxTurnsExceeded(RuntimeError):
         super().__init__(f"Agent 达到最大轮数限制: {max_turns}")
         self.max_turns = max_turns
         self.stats = stats
+
+
+@dataclass
+class ToolCallTracker:
+    """检测连续重复的完全相同工具调用。"""
+
+    max_consecutive: int = 3
+    _last_signature: tuple[str, str] | None = None
+    _count: int = 0
+
+    def allow(self, name: str, input_data: Any) -> bool:
+        """记录一次调用，达到连续上限后拒绝执行。"""
+        signature = (
+            name,
+            json.dumps(input_data, sort_keys=True, default=str),
+        )
+        if signature == self._last_signature:
+            self._count += 1
+        else:
+            self._last_signature = signature
+            self._count = 1
+        return self._count < self.max_consecutive
 
 
 async def run(
@@ -40,6 +65,7 @@ async def run(
     """运行 Agent，直到模型结束或达到最大轮数。"""
     tools = registry.schemas()
     stats = RunStats()
+    tracker = ToolCallTracker()
     for turn in range(1, max_turns + 1):
         print(f"\n===== 第 {turn}/{max_turns} 轮 =====")
         response = await call_llm(
@@ -57,13 +83,19 @@ async def run(
         stats.turns += 1
         stats.input_tokens += response.usage.input_tokens
         stats.output_tokens += response.usage.output_tokens
+        stats.cache_read_input_tokens += (
+            response.usage.cache_read_input_tokens or 0
+        )
+        stats.cache_creation_input_tokens += (
+            response.usage.cache_creation_input_tokens or 0
+        )
 
         context.append_assistant(assistant_content(response))
 
         if response.stop_reason != "tool_use":
             return response, stats
 
-        tool_results = await execute_tools(response, registry)
+        tool_results = await execute_tools(response, registry, tracker)
         context.append_tool_results(tool_results)
         context.assert_paired()
 
@@ -145,6 +177,7 @@ def assistant_content(message: Message) -> list[dict[str, Any]]:
 async def execute_tools(
     message: Message,
     registry: Any,
+    tracker: ToolCallTracker | None = None,
 ) -> list[dict[str, Any]]:
     """按出现顺序执行所有 tool_use，并生成对应的 tool_result。
 
@@ -158,6 +191,25 @@ async def execute_tools(
     ]
     tool_results: list[dict[str, Any]] = []
     for tool_use in tool_uses:
+        if tracker is not None and not tracker.allow(
+            tool_use.name,
+            tool_use.input,
+        ):
+            content = (
+                "检测到相同工具调用已连续重复 "
+                f"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。"
+            )
+            print(f"拦截重复调用: {tool_use.name} {tool_use.input}")
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": content,
+                    "is_error": True,
+                }
+            )
+            continue
+
         print(f"调用工具: {tool_use.name} {tool_use.input}")
         execution = await registry.execute_with_status(
             tool_use.name,

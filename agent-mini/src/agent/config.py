@@ -31,3 +31,11 @@ class AgentSettings(BaseSettings):
                        validation_alias="DEEPSEEK_MODEL")
     max_turns: int = 30
     max_tool_output_chars: int = 10_000
+    input_price_per_million: float | None = Field(default=None, ge=0)
+    output_price_per_million: float | None = Field(default=None, ge=0)
+    cache_read_price_per_million: float | None = Field(default=None, ge=0)
+    cache_creation_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    price_currency: str = "CNY"

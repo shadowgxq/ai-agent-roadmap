@@ -9,6 +9,7 @@ from .registry import (
     tool,
 )
 from .search import register_search_tools
+from .shell import register_shell_tools
 from .tools import get_weather
 
 
@@ -22,4 +23,5 @@ __all__ = [
     "register_fs_tools",
     "resolve_path",
     "register_search_tools",
+    "register_shell_tools",
 ]

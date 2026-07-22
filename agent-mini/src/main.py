@@ -1,4 +1,4 @@
-"""使用 grep 和 read_file 演示代码定位流程。"""
+"""使用 run_shell 演示异步命令执行流程。"""
 
 import asyncio
 from typing import Any
@@ -13,6 +13,7 @@ if __package__:
     from .tools import (
         register_fs_tools,
         register_search_tools,
+        register_shell_tools,
         registry,
     )
 else:
@@ -22,6 +23,7 @@ else:
     from tools import (
         register_fs_tools,
         register_search_tools,
+        register_shell_tools,
         registry,
     )
 
@@ -34,19 +36,18 @@ def extract_text(message: Any) -> str:
 
 
 async def main() -> None:
-    """创建 Agent 依赖并运行代码搜索任务。"""
+    """创建 Agent 依赖并运行 Shell 命令任务。"""
     settings = AgentSettings()
     register_fs_tools(registry, PROJECT_ROOT)
     register_search_tools(registry, PROJECT_ROOT)
+    register_shell_tools(registry, PROJECT_ROOT)
     context = Context()
     context.append_user(
-        "请先使用 grep 在 src 目录中查找 `async def run` 的定义，"
-        "再使用 read_file 阅读对应文件，并说明 run() 的主要流程。"
+        "告诉我当前工作目录。"
     )
 
     system_prompt = (
-        "定位代码时必须先使用 grep，找到准确文件后再使用 read_file；"
-        "不能根据文件名猜测代码内容。"
+        "你是一个编码AI助理"
     )
 
     async with AsyncAnthropic(

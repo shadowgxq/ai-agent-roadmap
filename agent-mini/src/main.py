@@ -3,7 +3,7 @@
 import asyncio
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
 
 
 if __package__:
@@ -31,10 +31,8 @@ else:
 
 
 def extract_text(message: Any) -> str:
-    """提取响应中所有 text block 的文本。"""
-    return "".join(
-        block.text for block in message.content if block.type == "text"
-    )
+    """提取 Chat Completions 响应中的 assistant 文本。"""
+    return message.choices[0].message.content or ""
 
 
 async def main() -> None:
@@ -50,7 +48,7 @@ async def main() -> None:
 
     system_prompt = build_system_prompt(PROJECT_ROOT)
 
-    async with AsyncAnthropic(
+    async with AsyncOpenAI(
         api_key=settings.api_key,
         base_url=settings.base_url,
     ) as client:
@@ -68,7 +66,7 @@ async def main() -> None:
     print(f"输入 token: {stats.input_tokens}")
     print(f"输出 token: {stats.output_tokens}")
     print(f"总 token: {stats.input_tokens + stats.output_tokens}")
-    print(f"最终 stop_reason: {final_response.stop_reason}")
+    print(f"最终 finish_reason: {final_response.choices[0].finish_reason}")
     print(f"最终回答: {extract_text(final_response)}")
 
 

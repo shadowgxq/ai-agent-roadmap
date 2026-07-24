@@ -4,15 +4,15 @@ from dataclasses import dataclass
 import json
 from typing import Any
 
-from anthropic import AsyncAnthropic
-from anthropic.types import Message
+from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from .context import Context
 
 
 @dataclass
 class RunStats:
-    """记录一次 Agent 运行期间的模型调用统计。"""
+    """记录模型调用统计，input_tokens 不包含缓存命中的输入。"""
 
     turns: int = 0
     input_tokens: int = 0
@@ -53,7 +53,7 @@ class ToolCallTracker:
 
 
 async def run(
-    client: AsyncAnthropic,
+    client: AsyncOpenAI,
     context: Context,
     registry: Any,
     *,
@@ -61,7 +61,7 @@ async def run(
     system_prompt: str,
     max_turns: int = 10,
     max_tokens: int = 300,
-) -> tuple[Message, RunStats]:
+) -> tuple[ChatCompletion, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
     tools = registry.schemas()
     stats = RunStats()
@@ -76,152 +76,141 @@ async def run(
             tools=tools,
             max_tokens=max_tokens,
         )
-        text = message_text(response)
+        message = response.choices[0].message
+        text = message_text(message)
         if text:
             print(f"模型文本: {text}")
 
+        usage = response.usage
+        prompt_details = usage.prompt_tokens_details
+        cached_tokens = (
+            prompt_details.cached_tokens
+            if prompt_details is not None
+            and prompt_details.cached_tokens is not None
+            else 0
+        )
+
         stats.turns += 1
-        stats.input_tokens += response.usage.input_tokens
-        stats.output_tokens += response.usage.output_tokens
-        stats.cache_read_input_tokens += (
-            response.usage.cache_read_input_tokens or 0
-        )
-        stats.cache_creation_input_tokens += (
-            response.usage.cache_creation_input_tokens or 0
-        )
+        stats.input_tokens += max(usage.prompt_tokens - cached_tokens, 0)
+        stats.cache_read_input_tokens += cached_tokens
+        stats.output_tokens += usage.completion_tokens
+        context.append_assistant(assistant_message(message))
 
-        context.append_assistant(assistant_content(response))
-
-        if response.stop_reason != "tool_use":
+        if not message.tool_calls:
             return response, stats
 
-        tool_results = await execute_tools(response, registry, tracker)
+        tool_results = await execute_tools(message, registry, tracker)
         context.append_tool_results(tool_results)
         context.assert_paired()
 
     raise MaxTurnsExceeded(max_turns, stats)
 
 
-def message_text(message: Message) -> str:
-    """提取模型响应中的所有文本块。"""
-    return "".join(
-        block.text
-        for block in message.content
-        if block.type == "text"
-    ).strip()
+def message_text(message: ChatCompletionMessage) -> str:
+    """提取响应中的 assistant 文本。"""
+    return (message.content or "").strip()
+
+
+def openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """把注册表的 Anthropic 风格 schema 转成 OpenAI function schema。"""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["input_schema"],
+            },
+        }
+        for tool in tools
+    ]
 
 
 async def call_llm(
-    client: AsyncAnthropic,
+    client: AsyncOpenAI,
     context: Context,
     *,
     model: str,
     system_prompt: str,
     tools: list[dict[str, Any]],
     max_tokens: int = 300,
-) -> Message:
-    """发起一次非流式模型请求并返回原始响应。
-
-    这里只负责调用 API，不修改 Context、不执行工具，也不判断任务是否结束；
-    这些控制逻辑由上层的 run() 统一编排。
-    """
-    response = await client.messages.create(
+) -> ChatCompletion:
+    """发起一次非流式 Chat Completions 请求。"""
+    response = await client.chat.completions.create(
         model=model,
         max_tokens=max_tokens,
-        system=system_prompt,
-        messages=context.messages,
-        tools=tools,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            *context.messages,
+        ],
+        tools=openai_tools(tools),
     )
     return response
 
 
-def assistant_content(message: Message) -> list[dict[str, Any]]:
-    """把 SDK content blocks 转成 Context 保存的标准字典。
-
-    必须保留完整的 assistant content，包括 tool_use、thinking 及其签名，
-    因为后续模型请求需要重放这条完整消息。
-    """
-    content: list[dict[str, Any]] = []
-    for block in message.content:
-        if block.type == "text":
-            content.append({"type": "text", "text": block.text})
-        elif block.type == "tool_use":
-            content.append(
-                {
-                    "type": "tool_use",
-                    "id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                }
-            )
-        elif block.type == "thinking":
-            content.append(
-                {
-                    "type": "thinking",
-                    "thinking": block.thinking,
-                    "signature": block.signature,
-                }
-            )
-        elif block.type == "redacted_thinking":
-            content.append(
-                {
-                    "type": "redacted_thinking",
-                    "data": block.data,
-                }
-            )
-        else:
-            raise RuntimeError(f"暂不支持的 content block: {block.type}")
-    return content
+def assistant_message(message: ChatCompletionMessage) -> dict[str, Any]:
+    """把 SDK assistant message 转成可回放的标准字典。"""
+    result: dict[str, Any] = {
+        "role": "assistant",
+        "content": message.content,
+    }
+    if message.tool_calls:
+        result["tool_calls"] = [
+            {
+                "id": tool_call.id,
+                "type": "function",
+                "function": {
+                    "name": tool_call.function.name,
+                    "arguments": tool_call.function.arguments,
+                },
+            }
+            for tool_call in message.tool_calls
+        ]
+    return result
 
 
 async def execute_tools(
-    message: Message,
+    message: ChatCompletionMessage,
     registry: Any,
     tracker: ToolCallTracker | None = None,
 ) -> list[dict[str, Any]]:
-    """按出现顺序执行所有 tool_use，并生成对应的 tool_result。
-
-    text、thinking 等非工具 block 会被忽略。注册表会把工具异常转换为
-    is_error=True 的执行结果，因此即使执行失败也能与 tool_use.id 正确配对。
-    """
-    tool_uses = [
-        block
-        for block in message.content
-        if block.type == "tool_use"
-    ]
+    """按顺序执行 function calls，并生成匹配的 tool messages。"""
     tool_results: list[dict[str, Any]] = []
-    for tool_use in tool_uses:
-        if tracker is not None and not tracker.allow(
-            tool_use.name,
-            tool_use.input,
-        ):
-            content = (
-                "检测到相同工具调用已连续重复 "
-                f"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。"
-            )
-            print(f"拦截重复调用: {tool_use.name} {tool_use.input}")
+    for tool_call in message.tool_calls or []:
+        name = tool_call.function.name
+        try:
+            input_data = json.loads(tool_call.function.arguments or "{}")
+            if not isinstance(input_data, dict):
+                raise TypeError("工具输入必须是 object")
+        except (TypeError, json.JSONDecodeError) as exc:
+            content = f"工具 {name} 参数 JSON 无效: {exc}"
+            print(content)
             tool_results.append(
                 {
-                    "type": "tool_result",
-                    "tool_use_id": tool_use.id,
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
                     "content": content,
-                    "is_error": True,
                 }
             )
             continue
 
-        print(f"调用工具: {tool_use.name} {tool_use.input}")
-        execution = await registry.execute_with_status(
-            tool_use.name,
-            tool_use.input,
-        )
-        print(f"工具结果: {execution.content}")
+        if tracker is not None and not tracker.allow(name, input_data):
+            content = (
+                "检测到相同工具调用已连续重复 "
+                f"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。"
+            )
+            print(f"拦截重复调用: {name} {input_data}")
+        else:
+            print(f"调用工具: {name} {input_data}")
+            execution = await registry.execute_with_status(name, input_data)
+            content = execution.content
+            print(f"工具结果: {content}")
+
         tool_results.append(
             {
-                "type": "tool_result",
-                "tool_use_id": tool_use.id,
-                "content": execution.content,
-                "is_error": execution.is_error,
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": content,
             }
         )
     return tool_results

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,15 +20,30 @@ class AgentSettings(BaseSettings):
     )
 
     api_key: str = Field(
-        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY")
+        validation_alias=AliasChoices(
+            "CODEX_API_KEY",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "DEEPSEEK_API_KEY",
+        )
     )
     base_url: str = Field(
-        default="https://api.deepseek.com/anthropic",
+        default="http://165.154.255.250:8080/v1",
         validation_alias=AliasChoices(
-            "ANTHROPIC_BASE_URL", "DEEPSEEK_BASE_URL"),
+            "CODEX_BASE_URL",
+            "OPENAI_BASE_URL",
+            "ANTHROPIC_BASE_URL",
+            "DEEPSEEK_BASE_URL",
+        ),
     )
-    model: str = Field(default="deepseek-chat",
-                       validation_alias="DEEPSEEK_MODEL")
+    model: str = Field(
+        default="gpt-5.6-luna",
+        validation_alias=AliasChoices(
+            "CODEX_MODEL",
+            "OPENAI_MODEL",
+            "DEEPSEEK_MODEL",
+        ),
+    )
     max_turns: int = 30
     max_tool_output_chars: int = 10_000
     input_price_per_million: float | None = Field(default=None, ge=0)
@@ -38,4 +53,11 @@ class AgentSettings(BaseSettings):
         default=None,
         ge=0,
     )
-    price_currency: str = "CNY"
+    price_currency: str = "USD"
+
+    @field_validator("base_url")
+    @classmethod
+    def ensure_openai_v1(cls, value: str) -> str:
+        """把网关根地址规范成 OpenAI SDK 需要的 `/v1` 地址。"""
+        value = value.rstrip("/")
+        return value if value.endswith("/v1") else f"{value}/v1"

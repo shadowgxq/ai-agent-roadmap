@@ -5,31 +5,19 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from anthropic import APIError, AsyncAnthropic
+from openai import APIError
 
 
 if __package__:
     from .agent.config import AgentSettings
-    from .agent.context import Context
-    from .agent.loop import MaxTurnsExceeded, RunStats, run
-    from .agent.prompts import build_system_prompt
-    from .tools import (
-        ToolRegistry,
-        register_fs_tools,
-        register_search_tools,
-        register_shell_tools,
-    )
+    from .agent.cost import estimate_cost
+    from .agent.loop import MaxTurnsExceeded, RunStats
+    from .agent.runtime import run_coding_agent
 else:
     from agent.config import AgentSettings
-    from agent.context import Context
-    from agent.loop import MaxTurnsExceeded, RunStats, run
-    from agent.prompts import build_system_prompt
-    from tools import (
-        ToolRegistry,
-        register_fs_tools,
-        register_search_tools,
-        register_shell_tools,
-    )
+    from agent.cost import estimate_cost
+    from agent.loop import MaxTurnsExceeded, RunStats
+    from agent.runtime import run_coding_agent
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,11 +56,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def extract_text(message: Any) -> str:
-    """提取模型响应中的文本 block。"""
-    text = "".join(
-        block.text for block in message.content if block.type == "text"
-    )
-    return text or "(模型未返回文本)"
+    """提取 Chat Completions 响应中的 assistant 文本。"""
+    return message.choices[0].message.content or "(模型未返回文本)"
 
 
 def print_stats(stats: RunStats) -> None:
@@ -91,102 +76,30 @@ def print_stats(stats: RunStats) -> None:
     print(f"总 token: {total_tokens}")
 
 
-def estimate_cost(
-    stats: RunStats,
-    input_price_per_million: float,
-    output_price_per_million: float,
-    cache_read_price_per_million: float = 0,
-    cache_creation_price_per_million: float = 0,
-) -> float:
-    """根据 token 用量和每百万 token 单价估算费用。"""
-    input_cost = (
-        stats.input_tokens / 1_000_000
-        * input_price_per_million
-    )
-    output_cost = (
-        stats.output_tokens / 1_000_000
-        * output_price_per_million
-    )
-    cache_read_cost = (
-        stats.cache_read_input_tokens / 1_000_000
-        * cache_read_price_per_million
-    )
-    cache_creation_cost = (
-        stats.cache_creation_input_tokens / 1_000_000
-        * cache_creation_price_per_million
-    )
-    return input_cost + output_cost + cache_read_cost + cache_creation_cost
-
-
 def print_cost(stats: RunStats, settings: AgentSettings) -> None:
     """价格配置完整时打印预估费用。"""
-    if (
-        settings.input_price_per_million is None
-        or settings.output_price_per_million is None
-    ):
-        print("预估费用: 未配置模型单价")
+    cost = estimate_cost(stats, settings)
+    if cost is None:
+        print("预估费用: 未配置完整的模型单价")
         return
 
-    if (
-        stats.cache_read_input_tokens > 0
-        and settings.cache_read_price_per_million is None
-    ):
-        print("预估费用: 检测到缓存读取用量，但未配置缓存读取单价")
-        return
-
-    if (
-        stats.cache_creation_input_tokens > 0
-        and settings.cache_creation_price_per_million is None
-    ):
-        print("预估费用: 检测到缓存写入用量，但未配置缓存写入单价")
-        return
-
-    cost = estimate_cost(
-        stats,
-        settings.input_price_per_million,
-        settings.output_price_per_million,
-        settings.cache_read_price_per_million or 0,
-        settings.cache_creation_price_per_million or 0,
-    )
     print(f"预估费用: {settings.price_currency} {cost:.6f}")
 
 
 async def main() -> None:
-    """解析参数、组装依赖并运行 Agent。"""
+    """解析命令行参数，运行 Agent 并展示结果。"""
     args = parse_args()
     workdir = args.workdir.resolve()
-    if not workdir.is_dir():
-        raise NotADirectoryError(f"工作目录不存在或不是目录: {workdir}")
-
     settings = AgentSettings()
-    registry = ToolRegistry()
-    register_fs_tools(registry, workdir)
-    register_search_tools(registry, workdir)
-    register_shell_tools(
-        registry,
-        workdir,
-        max_output_chars=settings.max_tool_output_chars,
-    )
-
-    context = Context()
-    context.append_user(args.task)
-    model = args.model or settings.model
-    max_turns = args.max_turns or settings.max_turns
 
     try:
-        async with AsyncAnthropic(
-            api_key=settings.api_key,
-            base_url=settings.base_url,
-        ) as client:
-            final_response, stats = await run(
-                client,
-                context,
-                registry,
-                model=model,
-                system_prompt=build_system_prompt(workdir),
-                max_turns=max_turns,
-                max_tokens=3000,
-            )
+        final_response, stats = await run_coding_agent(
+            task=args.task,
+            workdir=workdir,
+            settings=settings,
+            model=args.model,
+            max_turns=args.max_turns,
+        )
     except MaxTurnsExceeded as exc:
         print(f"运行失败: {exc}")
         print_stats(exc.stats)
@@ -198,7 +111,7 @@ async def main() -> None:
 
     print_stats(stats)
     print_cost(stats, settings)
-    print(f"最终 stop_reason: {final_response.stop_reason}")
+    print(f"最终 finish_reason: {final_response.choices[0].finish_reason}")
     print(f"最终回答: {extract_text(final_response)}")
 
 

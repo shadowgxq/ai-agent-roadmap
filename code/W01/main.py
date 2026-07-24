@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import sys
 
-from agent_sdk import extract_text, get_client, load_config
+from agent_sdk import (
+    extract_chat_text,
+    fmt_chat_usage,
+    get_codex_client,
+    load_codex_config,
+)
 
 
 def main() -> None:
-    config = load_config()
+    config = load_codex_config()
     base_url = config.base_url
     model = config.model
 
@@ -14,13 +19,14 @@ def main() -> None:
     user_message = " ".join(sys.argv[1:]).strip() or "请用三句话解释什么是 Messages API。"
     max_tokens = 200
 
-    # 这里统一切到 Anthropic Messages API 风格：
-    # - messages: 只放 user / assistant 历史
-    # - system: 顶层独立参数
+    # 这里使用 OpenAI-compatible Chat Completions 风格：
+    # - system: 作为 messages 的一条 system 消息
+    # - messages: 保存完整的对话历史
     # - max_tokens: 输出上限
     # - usage: token 统计
-    # - stop_reason: 停止原因
+    # - finish_reason: 停止原因
     messages = [
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_message},
     ]
 
@@ -33,25 +39,22 @@ def main() -> None:
     print(f"messages: {messages}")
     print()
 
-    client = get_client(config)
-    response = client.messages.create(
+    client = get_codex_client(config)
+    response = client.chat.completions.create(
         model=model,
-        system=system_prompt,
         messages=messages,
         max_tokens=max_tokens,
     )
 
-    reply = extract_text(response)
+    reply = extract_chat_text(response)
     usage = response.usage
 
     print("=== Response ===")
     print(reply)
     print()
     print("=== Key Fields ===")
-    print(f"usage.input_tokens: {getattr(usage, 'input_tokens', None)}")
-    print(f"usage.output_tokens: {getattr(usage, 'output_tokens', None)}")
-    print(f"usage.total_tokens: {getattr(usage, 'total_tokens', None)}")
-    print(f"stop_reason: {response.stop_reason}")
+    print(f"usage: {fmt_chat_usage(usage)}")
+    print(f"finish_reason: {response.choices[0].finish_reason}")
 
 
 if __name__ == "__main__":

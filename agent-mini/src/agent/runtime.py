@@ -14,7 +14,7 @@ from ..tools import (
 from .config import AgentSettings
 from .context import Context
 from .loop import RunStats, run
-from .prompts import build_system_prompt
+from .prompts import build_system_prompt, build_task_message
 
 
 async def run_coding_agent(
@@ -41,7 +41,7 @@ async def run_coding_agent(
     )
 
     context = Context()
-    context.append_user(task)
+    context.append_user(build_task_message(task, workdir))
     async with AsyncOpenAI(
         api_key=settings.api_key,
         base_url=settings.base_url,
@@ -51,7 +51,7 @@ async def run_coding_agent(
             context,
             registry,
             model=model if model is not None else settings.model,
-            system_prompt=build_system_prompt(workdir),
+            system_prompt=build_system_prompt(),
             max_turns=(
                 max_turns
                 if max_turns is not None

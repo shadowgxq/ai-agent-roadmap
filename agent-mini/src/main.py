@@ -10,7 +10,7 @@ if __package__:
     from .agent.config import AgentSettings, PROJECT_ROOT
     from .agent.context import Context
     from .agent.loop import run
-    from .agent.prompts import build_system_prompt
+    from .agent.prompts import build_system_prompt, build_task_message
     from .tools import (
         register_fs_tools,
         register_search_tools,
@@ -21,7 +21,7 @@ else:
     from agent.config import AgentSettings, PROJECT_ROOT
     from agent.context import Context
     from agent.loop import run
-    from agent.prompts import build_system_prompt
+    from agent.prompts import build_system_prompt, build_task_message
     from tools import (
         register_fs_tools,
         register_search_tools,
@@ -43,10 +43,10 @@ async def main() -> None:
     register_shell_tools(registry, PROJECT_ROOT)
     context = Context()
     context.append_user(
-        "分析下当前的入口文件是哪个"
+        build_task_message("分析下当前的入口文件是哪个", PROJECT_ROOT)
     )
 
-    system_prompt = build_system_prompt(PROJECT_ROOT)
+    system_prompt = build_system_prompt()
 
     async with AsyncOpenAI(
         api_key=settings.api_key,

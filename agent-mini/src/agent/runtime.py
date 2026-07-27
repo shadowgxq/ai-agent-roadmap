@@ -13,6 +13,7 @@ from ..tools import (
 )
 from .config import AgentSettings
 from .context import Context
+from .cost import estimate_cost
 from .loop import RunStats, run
 from .prompts import build_system_prompt, build_task_message
 
@@ -25,6 +26,7 @@ async def run_coding_agent(
     model: str | None = None,
     max_turns: int | None = None,
     max_tokens: int = 3000,
+    max_cost_usd: float | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """组装依赖并在指定目录运行一次 Coding Agent。"""
     workdir = workdir.resolve()
@@ -45,6 +47,7 @@ async def run_coding_agent(
     async with AsyncOpenAI(
         api_key=settings.api_key,
         base_url=settings.base_url,
+        max_retries=0,
     ) as client:
         return await run(
             client,
@@ -58,4 +61,6 @@ async def run_coding_agent(
                 else settings.max_turns
             ),
             max_tokens=max_tokens,
+            cost_estimator=lambda stats: estimate_cost(stats, settings),
+            max_cost_usd=max_cost_usd,
         )

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from src.agent.config import AgentSettings
 from src.agent.cost import estimate_cost
-from src.agent.loop import MaxTurnsExceeded
+from src.agent.loop import CostLimitExceeded, MaxTurnsExceeded
 from src.agent.runtime import run_coding_agent
 
 
@@ -161,6 +161,7 @@ async def run_case(
                 task=case.task,
                 workdir=workspace,
                 settings=settings,
+                max_cost_usd=case.max_cost_usd,
             )
             turns = stats.turns
             estimated_cost = estimate_cost(stats, settings)
@@ -175,6 +176,15 @@ async def run_case(
                 case.verify_cmd,
                 case.timeout_s,
             )
+    except CostLimitExceeded as exc:
+        return EvalResult(
+            case_name=case_name,
+            status="fail",
+            turns=exc.stats.turns,
+            duration_s=perf_counter() - started_at,
+            cost_usd=exc.actual_cost_usd,
+            reason=str(exc),
+        )
     except MaxTurnsExceeded as exc:
         estimated_cost = estimate_cost(exc.stats, settings)
         return EvalResult(
@@ -211,16 +221,6 @@ async def run_case(
     )
     result.turns = turns
     result.cost_usd = cost_usd
-
-    if cost_usd > case.max_cost_usd:
-        budget_reason = (
-            f"费用 ${cost_usd:.6f} 超过限制 "
-            f"${case.max_cost_usd:.6f}"
-        )
-        result.status = "fail"
-        result.reason = "\n".join(
-            reason for reason in (result.reason, budget_reason) if reason
-        )
 
     return result
 

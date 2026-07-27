@@ -1,10 +1,13 @@
 """连接模型、消息上下文和工具执行的 Agent 核心流程组件。"""
 
-from dataclasses import dataclass
+import asyncio
 import json
+import random
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from .context import Context
@@ -124,6 +127,24 @@ class MaxTurnsExceeded(RuntimeError):
         self.stats = stats
 
 
+class CostLimitExceeded(RuntimeError):
+    """Agent 的累计模型费用超过单任务预算。"""
+
+    def __init__(
+        self,
+        max_cost_usd: float,
+        actual_cost_usd: float,
+        stats: RunStats,
+    ):
+        super().__init__(
+            f"Agent 费用 ${actual_cost_usd:.6f} 超过限制 "
+            f"${max_cost_usd:.6f}"
+        )
+        self.max_cost_usd = max_cost_usd
+        self.actual_cost_usd = actual_cost_usd
+        self.stats = stats
+
+
 @dataclass
 class ToolCallTracker:
     """检测连续重复的完全相同工具调用。"""
@@ -155,8 +176,16 @@ async def run(
     system_prompt: str,
     max_turns: int = 10,
     max_tokens: int = 300,
+    cost_estimator: Callable[[RunStats], float | None] | None = None,
+    max_cost_usd: float | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
+    if max_cost_usd is not None:
+        if max_cost_usd <= 0:
+            raise ValueError("max_cost_usd 必须大于 0")
+        if cost_estimator is None:
+            raise ValueError("设置 max_cost_usd 时必须提供 cost_estimator")
+
     tools = registry.schemas()
     stats = RunStats()
     tracker = ToolCallTracker()
@@ -184,6 +213,18 @@ async def run(
             token_usage.cache_creation_input_tokens
         )
         stats.output_tokens += token_usage.output_tokens
+
+        if max_cost_usd is not None and cost_estimator is not None:
+            current_cost = cost_estimator(stats)
+            if current_cost is None:
+                raise ValueError("缺少完整的模型价格配置，无法执行费用熔断")
+            if current_cost > max_cost_usd:
+                raise CostLimitExceeded(
+                    max_cost_usd=max_cost_usd,
+                    actual_cost_usd=current_cost,
+                    stats=stats,
+                )
+
         context.append_assistant(assistant_message(message))
 
         if not message.tool_calls:
@@ -216,6 +257,17 @@ def openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def is_retryable_llm_error(exc: Exception) -> bool:
+    """只允许网络错误、限流和服务端错误进入重试。"""
+    if isinstance(exc, APIConnectionError):
+        return True
+
+    return (
+        isinstance(exc, APIStatusError)
+        and (exc.status_code == 429 or exc.status_code >= 500)
+    )
+
+
 async def call_llm(
     client: AsyncOpenAI,
     context: Context,
@@ -224,18 +276,34 @@ async def call_llm(
     system_prompt: str,
     tools: list[dict[str, Any]],
     max_tokens: int = 300,
+    max_attempts: int = 3,
+    base_delay: float = 1.0,
 ) -> ChatCompletion:
-    """发起一次非流式 Chat Completions 请求。"""
-    response = await client.chat.completions.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            *context.messages,
-        ],
-        tools=openai_tools(tools),
-    )
-    return response
+
+    for attempt in range(max_attempts):
+        try:
+            return await client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    *context.messages,
+                ],
+                tools=openai_tools(tools),
+            )
+        except (APIConnectionError, APIStatusError) as exc:
+            is_last_attempt = attempt == max_attempts - 1
+            if not is_retryable_llm_error(exc) or is_last_attempt:
+                raise
+
+            delay = base_delay * 2**attempt + random.uniform(0, 0.5)
+            print(
+                f"模型请求失败，{delay:.2f} 秒后重试 "
+                f"({attempt + 2}/{max_attempts}): {type(exc).__name__}"
+            )
+            await asyncio.sleep(delay)
+
+    raise RuntimeError("模型重试循环意外结束")
 
 
 def assistant_message(message: ChatCompletionMessage) -> dict[str, Any]:
@@ -263,8 +331,12 @@ async def execute_tools(
     message: ChatCompletionMessage,
     registry: Any,
     tracker: ToolCallTracker | None = None,
+    tool_timeout: float = 300.0,
 ) -> list[dict[str, Any]]:
     """按顺序执行 function calls，并生成匹配的 tool messages。"""
+    if tool_timeout <= 0:
+        raise ValueError("tool_timeout 必须大于 0")
+
     tool_results: list[dict[str, Any]] = []
     for tool_call in message.tool_calls or []:
         name = tool_call.function.name
@@ -292,8 +364,16 @@ async def execute_tools(
             print(f"拦截重复调用: {name} {input_data}")
         else:
             print(f"调用工具: {name} {input_data}")
-            execution = await registry.execute_with_status(name, input_data)
-            content = execution.content
+            try:
+                execution = await asyncio.wait_for(
+                    registry.execute_with_status(name, input_data),
+                    timeout=tool_timeout,
+                )
+                content = execution.content
+            except TimeoutError:
+                content = (
+                    f"工具 {name} 执行超时（超过 {tool_timeout:g} 秒）"
+                )
             print(f"工具结果: {content}")
 
         tool_results.append(

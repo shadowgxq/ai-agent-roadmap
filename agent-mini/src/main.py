@@ -51,6 +51,7 @@ async def main() -> None:
     async with AsyncOpenAI(
         api_key=settings.api_key,
         base_url=settings.base_url,
+        max_retries=0,
     ) as client:
         final_response, stats = await run(
             client,

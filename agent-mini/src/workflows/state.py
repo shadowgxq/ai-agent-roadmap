@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 WorkflowStatus = Literal[
     "pending",
     "routing",
+    "parallelizing",
+    "voting",
     "planning",
     "implementing",
     "reviewing",

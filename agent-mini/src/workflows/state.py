@@ -8,6 +8,7 @@ WorkflowStatus = Literal[
     "routing",
     "parallelizing",
     "voting",
+    "orchestrating",
     "planning",
     "implementing",
     "reviewing",

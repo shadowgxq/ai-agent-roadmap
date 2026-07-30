@@ -9,6 +9,7 @@ def estimate_cost(
     settings: AgentSettings,
 ) -> float | None:
     """估算运行费用；缺少实际用到的 token 单价时返回 None。"""
+    stats = stats.aggregate()
     if (
         settings.input_price_per_million is None
         or settings.output_price_per_million is None

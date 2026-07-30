@@ -1,0 +1,537 @@
+{
+  "schema_version": 2,
+  "event_count": 29,
+  "events": [
+    {
+      "timestamp": "2026-07-30T13:46:07.680+08:00",
+      "level": "INFO",
+      "event": "run.started",
+      "message": "详细日志: /home/gxq/ai-agent-roadmap/agent-mini/logs/agent.json",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "main",
+        "role": "main"
+      },
+      "data": {
+        "task": "请分析 src 目录的整体模块划分、主要调用链和每个模块的职责。这个任务需要阅读多个文件，请使用探索型 SubAgent 完成调查，然后根据它的总结给出最终回答。",
+        "workdir": "/home/gxq/ai-agent-roadmap/agent-mini/src/workflows",
+        "log_file": "/home/gxq/ai-agent-roadmap/agent-mini/logs/agent.json",
+        "model": "gpt-5.6-luna",
+        "max_turns": 30
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:07.704+08:00",
+      "level": "INFO",
+      "event": "agent.started",
+      "message": "Agent 开始: main",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "main",
+        "role": "main"
+      },
+      "data": {
+        "model": "gpt-5.6-luna",
+        "max_turns": 30,
+        "max_tokens": 3000,
+        "message_count": 1,
+        "tools": [
+          "read_file",
+          "list_dir",
+          "write_file",
+          "edit_file",
+          "grep",
+          "run_shell",
+          "spawn_subagent"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:07.705+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 1/30 轮 =====",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "max_turns": 30
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:12.748+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: spawn_subagent",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "spawn_subagent",
+        "arguments": {
+          "task": "请在工作目录 /home/gxq/ai-agent-roadmap/agent-mini/src/workflows 下，全面调查 src 目录（必要时查看项目根目录配置）的模块划分、关键文件、主要调用链和各模块职责。请阅读多个文件，追踪入口到核心流程及输出/异常路径，最后给出结构化、简短但具体的总结，并注明依据的文件路径。只读，不修改文件。"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:12.750+08:00",
+      "level": "INFO",
+      "event": "agent.started",
+      "message": "Agent 开始: subagent-04671fba",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main"
+      },
+      "data": {
+        "model": "gpt-5.6-luna",
+        "max_turns": 15,
+        "max_tokens": 1000,
+        "message_count": 1,
+        "tools": [
+          "read_file",
+          "list_dir",
+          "grep"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:12.750+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 1/15 轮 =====",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 1
+      },
+      "data": {
+        "max_turns": 15
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:15.868+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: list_dir",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "arguments": {
+          "path": "/home/gxq/ai-agent-roadmap/agent-mini/src/workflows"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:15.869+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: list_dir (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "status": "ok",
+        "content": "[FILE] __init__.py\n[DIR] __pycache__\n[FILE] chaining.py\n[FILE] chaining_demo.py\n[FILE] evaluator_optimizer.py\n[FILE] evaluator_optimizer_demo.py\n[FILE] orchestrator_workers.py\n[FILE] orchestrator_workers_demo.py\n[FILE] parallelization.py\n[FILE] parallelization_demo.py\n[FILE] routing.py\n[FILE] routing_demo.py\n[FILE] runtime.py\n[FILE] state.py"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:15.870+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: list_dir",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "arguments": {
+          "path": "/home/gxq/ai-agent-roadmap/agent-mini/src"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:15.871+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: list_dir (error)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "status": "error",
+        "content": "工具 list_dir 执行失败: ValueError: 路径超出工作目录：/home/gxq/ai-agent-roadmap/agent-mini/src"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:15.871+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: list_dir",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "arguments": {
+          "path": "/home/gxq/ai-agent-roadmap/agent-mini"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:15.871+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: list_dir (error)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "status": "error",
+        "content": "工具 list_dir 执行失败: ValueError: 路径超出工作目录：/home/gxq/ai-agent-roadmap/agent-mini"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:15.872+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 2/15 轮 =====",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "max_turns": 15
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.013+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "state.py",
+          "limit": 400
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.015+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "from typing import Literal\n\nfrom pydantic import BaseModel, ConfigDict, Field\n\n\nWorkflowStatus = Literal[\n    \"pending\",\n    \"routing\",\n    \"parallelizing\",\n    \"voting\",\n    \"orchestrating\",\n    \"planning\",\n    \"implementing\",\n    \"reviewing\",\n    \"summarizing\",\n    \"completed\",\n    \"failed\",\n]\n\n\nclass WorkflowState(BaseModel):\n    \"\"\"Workflow 在执行过程中的共享状态。\"\"\"\n\n    model_config = ConfigDict(validate_assignment=True)\n\n    task: str = Field(min_length=1)\n    plan: str = \"\"\n    code: str = \"\"\n    summary: str = \"\"\n    review_feedback: list[str] = Field(default_factory=list)\n    iteration: int = Field(default=0, ge=0)\n    status: WorkflowStatus = \"pending\""
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.015+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "runtime.py",
+          "limit": 400
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.016+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"Workflow 节点共享的模型调用与观测能力。\"\"\"\n\nfrom dataclasses import dataclass\n\nfrom openai import AsyncOpenAI\nfrom openai.types.chat import ChatCompletion\n\nfrom ..agent.loop import extract_usage_tokens\n\n\n@dataclass\nclass WorkflowStats:\n    \"\"\"累计一次 Workflow 运行中的模型调用与 token 用量。\"\"\"\n\n    calls: int = 0\n    input_tokens: int = 0\n    output_tokens: int = 0\n    cache_read_input_tokens: int = 0\n    cache_creation_input_tokens: int = 0\n\n    @property\n    def total_tokens(self) -> int:\n        \"\"\"返回普通输入、缓存输入和输出 token 总数。\"\"\"\n        return (\n            self.input_tokens\n            + self.output_tokens\n            + self.cache_read_input_tokens\n            + self.cache_creation_input_tokens\n        )\n\n    def record(self, response: ChatCompletion) -> None:\n        \"\"\"把一次模型响应的 usage 累加到统计中。\"\"\"\n        usage = extract_usage_tokens(response.usage)\n        self.calls += 1\n        self.input_tokens += usage.input_tokens\n        self.output_tokens += usage.output_tokens\n        self.cache_read_input_tokens += usage.cache_read_input_tokens\n        self.cache_creation_input_tokens += (\n            usage.cache_creation_input_tokens\n        )\n\n\nclass WorkflowRuntime:\n    \"\"\"为 Workflow 节点提供统一的文本生成入口。\"\"\"\n\n    def __init__(\n        self,\n        client: AsyncOpenAI,\n        model: str,\n        *,\n        stats: WorkflowStats | None = None,\n    ) -> None:\n        self.client = client\n        self.model = model\n        self.stats = stats or WorkflowStats()\n\n    async def complete(\n        self,\n        *,\n        step_name: str,\n        system_prompt: str,\n        user_prompt: str,\n        max_tokens: int,\n    ) -> str:\n        \"\"\"执行一次无工具的模型调用，并记录用量和输出摘要。\"\"\"\n        response = await self.client.chat.completions.create(\n            model=self.model,\n            max_tokens=max_tokens,\n            messages=[\n                {\"role\": \"system\", \"content\": system_prompt},\n                {\"role\": \"user\", \"content\": user_prompt},\n            ],\n        )\n        output = (response.choices[0].message.content or \"\").strip()\n        self.stats.record(response)\n        self._log_step(step_name, response, output)\n        return output\n\n    @staticmethod\n    def _log_step(\n        step_name: str,\n        response: ChatCompletion,\n        output: str,\n    ) -> None:\n        \"\"\"打印单个节点的 token 用量和输出摘要。\"\"\"\n        usage = extract_usage_tokens(response.usage)\n        preview = \" \".join(output.split())\n        if len(preview) > 120:\n            preview = f\"{preview[:120]}...\"\n        print(\n            f\"[workflow] {step_name}: \"\n            f\"input_tokens={usage.input_tokens}, \"\n            f\"output_tokens={usage.output_tokens}, \"\n            f\"output={preview or '(空)'}\"\n        )"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.016+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "chaining.py",
+          "limit": 400
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.017+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "from .runtime import WorkflowRuntime\nfrom .state import WorkflowState\n\n\nclass WorkflowGateError(ValueError):\n    \"\"\"Workflow 的确定性检查未通过。\"\"\"\n\n\nasync def plan_step(\n    runtime: WorkflowRuntime,\n    state: WorkflowState,\n    *,\n    max_tokens: int = 1000,\n) -> None:\n    \"\"\"执行计划步骤，生成计划并更新状态。\"\"\"\n    try:\n        state.status = \"planning\"\n        state.plan = await runtime.complete(\n            step_name=\"plan\",\n            system_prompt=(\n                \"你负责把任务拆成清晰、可执行的步骤，\"\n                \"只输出实施计划，不直接编写代码。\"\n            ),\n            user_prompt=state.task,\n            max_tokens=max_tokens,\n        )\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n\ndef validate_plan(\n    state: WorkflowState,\n    *,\n    max_chars: int = 6000,\n) -> None:\n    \"\"\"确保计划可供后续实现步骤使用。\"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars 必须大于 0\")\n\n    if not state.plan.strip():\n        state.status = \"failed\"\n        raise WorkflowGateError(\"计划不能为空\")\n\n    if len(state.plan) > max_chars:\n        state.status = \"failed\"\n        raise WorkflowGateError(\n            f\"计划长度不能超过 {max_chars} 个字符\"\n        )\n\n\nasync def implement_step(\n    runtime: WorkflowRuntime,\n    state: WorkflowState,\n    *,\n    max_tokens: int = 2000,\n) -> None:\n    \"\"\"根据已验证的计划生成代码实现。\"\"\"\n    try:\n        state.status = \"implementing\"\n        state.code = await runtime.complete(\n            step_name=\"implement\",\n            system_prompt=(\n                \"你负责根据已经确认的实施计划完成代码实现。\"\n                \"只输出最终代码，不要重新制定计划。\"\n            ),\n            user_prompt=(\n                f\"原始任务：\\n{state.task}\\n\\n\"\n                f\"实施计划：\\n{state.plan}\"\n            ),\n            max_tokens=max_tokens,\n        )\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n\nasync def summarize_step(\n    runtime: WorkflowRuntime,\n    state: WorkflowState,\n    *,\n    max_tokens: int = 800,\n) -> None:\n    \"\"\"总结最终代码并把 Workflow 标记为完成。\"\"\"\n    try:\n        state.status = \"summarizing\"\n        state.summary = await runtime.complete(\n            step_name=\"summarize\",\n            system_prompt=(\n                \"你负责总结代码实现结果。\"\n                \"说明完成了什么、关键实现和需要注意的事项，\"\n                \"不要重新输出完整代码。\"\n            ),\n            user_prompt=(\n                f\"原始任务：\\n{state.task}\\n\\n\"\n                f\"最终代码：\\n{state.code}\"\n            ),\n            max_tokens=max_tokens,\n        )\n        state.status = \"completed\"\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n\nasync def run_chaining(\n    runtime: WorkflowRuntime,\n    state: WorkflowState,\n    *,\n    plan_max_chars: int = 6000,\n) -> WorkflowState:\n    \"\"\"按固定顺序运行完整的 Prompt Chaining Workflow。\"\"\"\n    await plan_step(runtime, state)\n    validate_plan(state, max_chars=plan_max_chars)\n    await implement_step(runtime, state)\n    await summarize_step(runtime, state)\n    return state"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.018+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "parallelization.py",
+          "limit": 500
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.019+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "import asyncio\nimport json\nfrom collections import Counter\nfrom typing import Literal\n\nfrom pydantic import BaseModel, Field, ValidationError\n\nfrom .runtime import WorkflowRuntime\nfrom .state import WorkflowState\n\n\nclass ParallelTask(BaseModel):\n    \"\"\"一个可以独立执行的模型任务。\"\"\"\n\n    name: str = Field(min_length=1)\n    system_prompt: str = Field(min_length=1)\n    user_prompt: str = Field(min_length=1)\n    max_tokens: int = Field(default=1200, gt=0)\n\n\nclass ParallelResult(BaseModel):\n    \"\"\"单个并行任务的执行结果。\"\"\"\n\n    name: str\n    output: str\n\n\nclass ParallelizationState(WorkflowState):\n    \"\"\"Parallelization Workflow 保存的 Worker 中间结果。\"\"\"\n\n    worker_results: list[ParallelResult] = Field(default_factory=list)\n\n\nVoteChoice = Literal[\"approve\", \"reject\"]\n\n\nclass VoteDecision(BaseModel):\n    \"\"\"单个 Voter 返回的结构化判断。\"\"\"\n\n    choice: VoteChoice\n    reason: str = Field(min_length=1)\n\n\nclass VoteResult(VoteDecision):\n    \"\"\"带有 Voter 身份的投票结果。\"\"\"\n\n    voter: str = Field(min_length=1)\n\n\nclass VotingState(WorkflowState):\n    \"\"\"Voting Workflow 保存的独立投票和多数决定。\"\"\"\n\n    votes: list[VoteResult] = Field(default_factory=list)\n    vote_decision: VoteChoice | None = None\n\n\nclass StructuredVoteError(RuntimeError):\n    \"\"\"Voter 多次未能返回有效的结构化投票结果。\"\"\"\n\n\ndef create_review_tasks(\n    task: str,\n    *,\n    max_tokens: int = 1200,\n) -> list[ParallelTask]:\n    \"\"\"把一次代码评审确定性地拆成三个互不依赖的检查维度。\"\"\"\n    return [\n        ParallelTask(\n            name=\"correctness\",\n            system_prompt=(\n                \"你是代码正确性评审者。只检查功能逻辑、边界情况、\"\n                \"错误处理以及是否满足任务要求，并给出具体依据。\"\n            ),\n            user_prompt=task,\n            max_tokens=max_tokens,\n        ),\n        ParallelTask(\n            name=\"security\",\n            system_prompt=(\n                \"你是代码安全评审者。只检查输入信任边界、注入、\"\n                \"权限、敏感信息和资源滥用风险，并给出具体依据。\"\n            ),\n            user_prompt=task,\n            max_tokens=max_tokens,\n        ),\n        ParallelTask(\n            name=\"maintainability\",\n            system_prompt=(\n                \"你是代码可维护性评审者。只检查可读性、复杂度、\"\n                \"重复逻辑、接口设计和后续修改风险，并给出具体依据。\"\n            ),\n            user_prompt=task,\n            max_tokens=max_tokens,\n        ),\n    ]\n\n\nasync def run_worker(\n    runtime: WorkflowRuntime,\n    task: ParallelTask,\n) -> ParallelResult:\n    \"\"\"执行一个独立模型任务，并保留任务名称与输出的对应关系。\"\"\"\n    output = await runtime.complete(\n        step_name=f\"worker-{task.name}\",\n        system_prompt=task.system_prompt,\n        user_prompt=task.user_prompt,\n        max_tokens=task.max_tokens,\n    )\n    return ParallelResult(name=task.name, output=output)\n\n\nasync def run_workers(\n    runtime: WorkflowRuntime,\n    tasks: list[ParallelTask],\n) -> list[ParallelResult]:\n    \"\"\"严格模式并发执行全部任务，任意 Worker 失败时直接抛出异常。\"\"\"\n    if not tasks:\n        raise ValueError(\"并行任务列表不能为空\")\n\n    names = [task.name for task in tasks]\n    if len(names) != len(set(names)):\n        raise ValueError(\"并行任务名称不能重复\")\n\n    results = await asyncio.gather(\n        *(run_worker(runtime, task) for task in tasks)\n    )\n    return list(results)\n\n\nasync def aggregate_results(\n    runtime: WorkflowRuntime,\n    state: ParallelizationState,\n    results: list[ParallelResult],\n    *,\n    max_tokens: int = 1600,\n) -> str:\n    \"\"\"去重并整合多个 Worker 的独立分析结果。\"\"\"\n    if not results:\n        raise ValueError(\"没有可汇总的 Worker 结果\")\n\n    serialized_results = json.dumps(\n        [result.model_dump() for result in results],\n        ensure_ascii=False,\n        indent=2,\n    )\n    state.status = \"summarizing\"\n    return await runtime.complete(\n        step_name=\"aggregator\",\n        system_prompt=(\n            \"你负责汇总多个独立代码评审者的结果。\"\n            \"合并重复问题，保留具体依据，明确存在冲突的判断，\"\n            \"并按严重程度组织最终评审结论。\"\n            \"只能依据 Worker 提供的内容，不要虚构新的代码问题。\"\n        ),\n        user_prompt=(\n            f\"原始评审任务：\\n{state.task}\\n\\n\"\n            f\"Worker 结果：\\n{serialized_results}\"\n        ),\n        max_tokens=max_tokens,\n    )\n\n\nasync def run_parallelization(\n    runtime: WorkflowRuntime,\n    state: ParallelizationState,\n    *,\n    worker_max_tokens: int = 1200,\n    aggregator_max_tokens: int = 1600,\n) -> ParallelizationState:\n    \"\"\"并发执行三个评审 Worker，再串行汇总全部结果。\"\"\"\n    try:\n        state.status = \"parallelizing\"\n        tasks = create_review_tasks(\n            state.task,\n            max_tokens=worker_max_tokens,\n        )\n        state.worker_results = await run_workers(runtime, tasks)\n        state.summary = await aggregate_results(\n            runtime,\n            state,\n            state.worker_results,\n            max_tokens=aggregator_max_tokens,\n        )\n        state.status = \"completed\"\n        return state\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n\ndef create_voting_tasks(\n    task: str,\n    *,\n    voter_count: int = 3,\n    max_tokens: int = 600,\n) -> list[ParallelTask]:\n    \"\"\"创建奇数个使用相同验收标准的独立 Voter。\"\"\"\n    if voter_count < 3 or voter_count % 2 == 0:\n        raise ValueError(\"voter_count 必须是大于等于 3 的奇数\")\n\n    system_prompt = (\n        \"你是独立验收者。严格根据任务中明确给出的要求，\"\n        \"判断当前方案或代码是否可以接受。\"\n        \"存在功能错误、遗漏要求或明确风险时选择 reject，\"\n        \"全部明确要求均满足时选择 approve。\"\n    )\n    return [\n        ParallelTask(\n            name=f\"judge-{index}\",\n            system_prompt=system_prompt,\n            user_prompt=task,\n            max_tokens=max_tokens,\n        )\n        for index in range(1, voter_count + 1)\n    ]\n\n\nasync def run_voter(\n    runtime: WorkflowRuntime,\n    task: ParallelTask,\n    *,\n    max_parse_attempts: int = 2,\n) -> VoteResult:\n    \"\"\"执行一个独立 Voter，并重试无效的结构化输出。\"\"\"\n    if max_parse_attempts <= 0:\n        raise ValueError(\"max_parse_attempts 必须大于 0\")\n\n    schema = json.dumps(\n        VoteDecision.model_json_schema(),\n        ensure_ascii=False,\n    )\n    base_prompt = (\n        f\"待判断任务：\\n{task.user_prompt}\\n\\n\"\n        f\"JSON Schema：\\n{schema}\"\n    )\n    previous_output = \"\"\n    parse_error = \"\"\n\n    for attempt in range(1, max_parse_attempts + 1):\n        if attempt == 1:\n            user_prompt = base_prompt\n        else:\n            user_prompt = (\n                f\"{base_prompt}\\n\\n\"\n                f\"上一次输出：\\n{previous_output}\\n\\n\"\n                f\"解析错误：\\n{parse_error}\\n\\n\"\n                \"请修正格式并重新输出完整 JSON。\"\n            )\n\n        output = await runtime.complete(\n            step_name=f\"voter-{task.name}-parse-{attempt}\",\n            system_prompt=(\n                f\"{task.system_prompt}\"\n                \"必须严格按照 JSON Schema 返回 JSON，\"\n                \"不要输出 Markdown 或其他解释。\"\n            ),\n            user_prompt=user_prompt,\n            max_tokens=task.max_tokens,\n        )\n        try:\n            decision = VoteDecision.model_validate_json(output)\n        except ValidationError as exc:\n            previous_output = output\n            parse_error = str(exc)\n            continue\n\n        return VoteResult(voter=task.name, **decision.model_dump())\n\n    raise StructuredVoteError(\n        f\"{task.name} 连续 {max_parse_attempts} 次返回无效结果\"\n    )\n\n\nasync def run_voters(\n    runtime: WorkflowRuntime,\n    tasks: list[ParallelTask],\n    *,\n    max_parse_attempts: int = 2,\n) -> list[VoteResult]:\n    \"\"\"并发执行奇数个 Voter，不接受残缺的投票集合。\"\"\"\n    if len(tasks) < 3 or len(tasks) % 2 == 0:\n        raise ValueError(\"Voter 数量必须是大于等于 3 的奇数\")\n\n    names = [task.name for task in tasks]\n    if len(names) != len(set(names)):\n        raise ValueError(\"Voter 名称不能重复\")\n\n    votes = await asyncio.gather(\n        *(\n            run_voter(\n                runtime,\n                task,\n                max_parse_attempts=max_parse_attempts,\n            )\n            for task in tasks\n        )\n    )\n    return list(votes)\n\n\ndef decide_vote(votes: list[VoteResult]) -> VoteChoice:\n    \"\"\"使用 Python 计算多数票，不让模型改变最终决定。\"\"\"\n    if len(votes) < 3 or len(votes) % 2 == 0:\n        raise ValueError(\"投票结果数量必须是大于等于 3 的奇数\")\n\n    counts = Counter(vote.choice for vote in votes)\n    if counts[\"approve\"] > counts[\"reject\"]:\n        return \"approve\"\n    return \"reject\"\n\n\ndef summarize_votes(\n    votes: list[VoteResult],\n    decision: VoteChoice,\n) -> str:\n    \"\"\"确定性地汇总票数和每个 Voter 的判断理由。\"\"\"\n    counts = Counter(vote.choice for vote in votes)\n    lines = [\n        f\"最终决定: {decision}\",\n        (\n            \"票数: \"\n            f\"approve={counts['approve']}, \"\n            f\"reject={counts['reject']}\"\n        ),\n    ]\n    lines.extend(\n        f\"- {vote.voter}: {vote.choice} - {vote.reason}\"\n        for vote in votes\n    )\n    return \"\\n\".join(lines)\n\n\nasync def run_voting(\n    runtime: WorkflowRuntime,\n    state: VotingState,\n    *,\n    voter_count: int = 3,\n    voter_max_tokens: int = 600,\n    max_parse_attempts: int = 2,\n) -> VotingState:\n    \"\"\"并发收集独立判断，再由 Python 计算多数票。\"\"\"\n    try:\n        state.status = \"voting\"\n        tasks = create_voting_tasks(\n            state.task,\n            voter_count=voter_count,\n            max_tokens=voter_max_tokens,\n        )\n        state.votes = await run_voters(\n            runtime,\n            tasks,\n            max_parse_attempts=max_parse_attempts,\n        )\n        decision = decide_vote(state.votes)\n        state.vote_decision = decision\n        state.summary = summarize_votes(\n            state.votes,\n            decision,\n        )\n        state.status = \"completed\"\n        return state\n    except Exception:\n        state.status = \"failed\"\n        raise"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.020+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "routing.py",
+          "limit": 500
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.021+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "import json\nfrom collections.abc import Awaitable, Callable\nfrom typing import Literal\n\nfrom pydantic import BaseModel, Field, ValidationError\n\nfrom .runtime import WorkflowRuntime\nfrom .state import WorkflowState\n\n\nRouteName = Literal[\n    \"code_generation\",\n    \"code_review\",\n    \"bug_fix\",\n    \"explanation\",\n]\n\n\nclass RouteDecision(BaseModel):\n    \"\"\"Router 返回的、经过类型约束的路由决定。\"\"\"\n\n    route: RouteName\n    reason: str = Field(min_length=1)\n\n\nclass RoutingState(WorkflowState):\n    \"\"\"Routing Workflow 在共享状态之外需要保存的路由信息。\"\"\"\n\n    route: RouteName | None = None\n    route_reason: str = \"\"\n\n\nclass StructuredRouteError(RuntimeError):\n    \"\"\"Router 多次未能返回有效的结构化路由结果。\"\"\"\n\n\nasync def router(\n    runtime: WorkflowRuntime,\n    state: RoutingState,\n    *,\n    max_tokens: int = 400,\n    max_parse_attempts: int = 2,\n) -> RouteDecision:\n    \"\"\"把任务分类到一个受 Python 限制的合法分支。\"\"\"\n    if max_parse_attempts <= 0:\n        raise ValueError(\"max_parse_attempts 必须大于 0\")\n\n    state.status = \"routing\"\n    schema = json.dumps(\n        RouteDecision.model_json_schema(),\n        ensure_ascii=False,\n    )\n    base_prompt = (\n        f\"待分类任务：\\n{state.task}\\n\\n\"\n        f\"JSON Schema：\\n{schema}\"\n    )\n    previous_output = \"\"\n    parse_error = \"\"\n\n    for attempt in range(1, max_parse_attempts + 1):\n        if attempt == 1:\n            user_prompt = base_prompt\n        else:\n            user_prompt = (\n                f\"{base_prompt}\\n\\n\"\n                f\"上一次输出：\\n{previous_output}\\n\\n\"\n                f\"解析错误：\\n{parse_error}\\n\\n\"\n                \"请修正格式并重新输出完整 JSON。\"\n            )\n\n        output = await runtime.complete(\n            step_name=f\"router-parse-{attempt}\",\n            system_prompt=(\n                \"你是任务路由器，只负责判断用户任务的主要意图。\"\n                \"code_generation 表示从需求生成新代码；\"\n                \"code_review 表示只检查现有代码并提出问题；\"\n                \"bug_fix 表示定位并修复已有代码中的问题；\"\n                \"explanation 表示解释概念、代码或技术原理。\"\n                \"当任务同时包含多个动作时，选择最能代表最终交付目标的路线。\"\n                \"必须严格按照 JSON Schema 返回 JSON，\"\n                \"不要执行任务，也不要输出 Markdown 或额外解释。\"\n            ),\n            user_prompt=user_prompt,\n            max_tokens=max_tokens,\n        )\n\n        try:\n            decision = RouteDecision.model_validate_json(output)\n        except ValidationError as exc:\n            previous_output = output\n            parse_error = str(exc)\n            continue\n\n        state.route = decision.route\n        state.route_reason = decision.reason\n        return decision\n\n    state.status = \"failed\"\n    raise StructuredRouteError(\n        f\"router 连续 {max_parse_attempts} 次返回无效结果\"\n    )\n\n\nasync def handle_code_generation(\n    runtime: WorkflowRuntime,\n    state: RoutingState,\n) -> None:\n    \"\"\"根据需求生成新代码，并把结果保存到 code。\"\"\"\n    state.status = \"implementing\"\n    state.code = await runtime.complete(\n        step_name=\"code-generation\",\n        system_prompt=(\n            \"你负责根据用户需求生成完整、可运行的代码。\"\n            \"只完成任务要求，不进行代码评审或额外解释。\"\n        ),\n        user_prompt=state.task,\n        max_tokens=2000,\n    )\n\n\nasync def handle_code_review(\n    runtime: WorkflowRuntime,\n    state: RoutingState,\n) -> None:\n    \"\"\"只评审任务中提供的代码，并把意见保存到 summary。\"\"\"\n    state.status = \"reviewing\"\n    state.summary = await runtime.complete(\n        step_name=\"code-review\",\n        system_prompt=(\n            \"你是独立代码评审者。检查正确性、边界情况和完整性，\"\n            \"给出具体问题和原因；不要修改或重写代码。\"\n        ),\n        user_prompt=state.task,\n        max_tokens=1200,\n    )\n\n\nasync def handle_bug_fix(\n    runtime: WorkflowRuntime,\n    state: RoutingState,\n) -> None:\n    \"\"\"根据问题描述修复已有代码，并把结果保存到 code。\"\"\"\n    state.status = \"implementing\"\n    state.code = await runtime.complete(\n        step_name=\"bug-fix\",\n        system_prompt=(\n            \"你负责定位并修复用户提供的代码问题。\"\n            \"保留正确行为，只输出修复后的完整代码。\"\n        ),\n        user_prompt=state.task,\n        max_tokens=2000,\n    )\n\n\nasync def handle_explanation(\n    runtime: WorkflowRuntime,\n    state: RoutingState,\n) -> None:\n    \"\"\"解释技术问题，并把回答保存到 summary。\"\"\"\n    state.status = \"summarizing\"\n    state.summary = await runtime.complete(\n        step_name=\"explanation\",\n        system_prompt=(\n            \"你负责清晰、准确地解释代码和技术概念。\"\n            \"围绕用户问题回答，不生成无关实现。\"\n        ),\n        user_prompt=state.task,\n        max_tokens=1200,\n    )\n\n\nRouteHandler = Callable[\n    [WorkflowRuntime, RoutingState],\n    Awaitable[None],\n]\n\n\nROUTE_HANDLERS: dict[RouteName, RouteHandler] = {\n    \"code_generation\": handle_code_generation,\n    \"code_review\": handle_code_review,\n    \"bug_fix\": handle_bug_fix,\n    \"explanation\": handle_explanation,\n}\n\n\nasync def run_routing(\n    runtime: WorkflowRuntime,\n    state: RoutingState,\n    *,\n    max_parse_attempts: int = 2,\n) -> RoutingState:\n    \"\"\"先让模型分类，再由 Python 执行与 route 对应的固定 handler。\"\"\"\n    try:\n        decision = await router(\n            runtime,\n            state,\n            max_parse_attempts=max_parse_attempts,\n        )\n        handler = ROUTE_HANDLERS.get(decision.route)\n        if handler is None:\n            raise RuntimeError(f\"未注册的 route: {decision.route}\")\n\n        await handler(runtime, state)\n        state.status = \"completed\"\n        return state\n    except Exception:\n        state.status = \"failed\"\n        raise"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.021+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "orchestrator_workers.py",
+          "limit": 500
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.023+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "import asyncio\nimport json\n\nfrom pydantic import BaseModel, Field, ValidationError, field_validator\n\nfrom .parallelization import ParallelResult\nfrom .runtime import WorkflowRuntime\nfrom .state import WorkflowState\n\n\nclass WorkerAssignment(BaseModel):\n    \"\"\"Orchestrator 为一个独立 Worker 生成的任务说明。\"\"\"\n\n    name: str = Field(\n        min_length=1,\n        max_length=50,\n        pattern=r\"^[a-z][a-z0-9_-]*$\",\n    )\n    instruction: str = Field(min_length=1)\n\n    @field_validator(\"instruction\")\n    @classmethod\n    def validate_instruction(cls, value: str) -> str:\n        \"\"\"拒绝只有空白字符的 Worker 指令。\"\"\"\n        value = value.strip()\n        if not value:\n            raise ValueError(\"Worker instruction 不能为空\")\n        return value\n\n\nclass OrchestrationPlan(BaseModel):\n    \"\"\"经过结构化验证的动态任务拆分结果。\"\"\"\n\n    assignments: list[WorkerAssignment] = Field(min_length=1)\n    synthesis_goal: str = Field(min_length=1)\n\n    @field_validator(\"synthesis_goal\")\n    @classmethod\n    def validate_synthesis_goal(cls, value: str) -> str:\n        \"\"\"拒绝只有空白字符的汇总目标。\"\"\"\n        value = value.strip()\n        if not value:\n            raise ValueError(\"synthesis_goal 不能为空\")\n        return value\n\n\nclass OrchestratorState(WorkflowState):\n    \"\"\"Orchestrator-Workers Workflow 的计划和中间结果。\"\"\"\n\n    orchestration_plan: OrchestrationPlan | None = None\n    worker_results: list[ParallelResult] = Field(default_factory=list)\n\n\nclass StructuredOrchestrationError(RuntimeError):\n    \"\"\"Orchestrator 多次未能返回可执行的结构化计划。\"\"\"\n\n\ndef validate_orchestration_plan(\n    plan: OrchestrationPlan,\n    *,\n    max_workers: int,\n) -> None:\n    \"\"\"检查依赖运行参数、无法只靠 JSON Schema 表达的约束。\"\"\"\n    if max_workers <= 0:\n        raise ValueError(\"max_workers 必须大于 0\")\n\n    if len(plan.assignments) > max_workers:\n        raise ValueError(\n            f\"Worker 数量不能超过 {max_workers}，\"\n            f\"当前为 {len(plan.assignments)}\"\n        )\n\n    names = [assignment.name for assignment in plan.assignments]\n    if len(names) != len(set(names)):\n        raise ValueError(\"Worker 名称不能重复\")\n\n\nasync def orchestrate(\n    runtime: WorkflowRuntime,\n    state: OrchestratorState,\n    *,\n    max_workers: int = 5,\n    max_tokens: int = 1200,\n    max_parse_attempts: int = 2,\n) -> OrchestrationPlan:\n    \"\"\"让模型动态拆分任务，并由 Python 验证计划边界。\"\"\"\n    if max_workers <= 0:\n        raise ValueError(\"max_workers 必须大于 0\")\n    if max_tokens <= 0:\n        raise ValueError(\"max_tokens 必须大于 0\")\n    if max_parse_attempts <= 0:\n        raise ValueError(\"max_parse_attempts 必须大于 0\")\n\n    state.status = \"orchestrating\"\n    schema = json.dumps(\n        OrchestrationPlan.model_json_schema(),\n        ensure_ascii=False,\n    )\n    base_prompt = (\n        f\"原始任务：\\n{state.task}\\n\\n\"\n        f\"最多允许 {max_workers} 个 Worker。\\n\\n\"\n        f\"JSON Schema：\\n{schema}\"\n    )\n    previous_output = \"\"\n    plan_error = \"\"\n\n    for attempt in range(1, max_parse_attempts + 1):\n        if attempt == 1:\n            user_prompt = base_prompt\n        else:\n            user_prompt = (\n                f\"{base_prompt}\\n\\n\"\n                f\"上一次输出：\\n{previous_output}\\n\\n\"\n                f\"计划错误：\\n{plan_error}\\n\\n\"\n                \"请修正计划并重新输出完整 JSON。\"\n            )\n\n        try:\n            output = await runtime.complete(\n                step_name=f\"orchestrator-parse-{attempt}\",\n                system_prompt=(\n                    \"你是任务编排者，只负责把复杂任务拆成可以独立执行的子任务。\"\n                    \"每个 assignment 必须目标明确、范围不重叠，\"\n                    \"并包含 Worker 独立完成它所需的上下文。\"\n                    \"不要执行原始任务，不要生成 system prompt、工具或权限配置。\"\n                    \"简单任务应使用较少 Worker，不要为了达到上限强行拆分。\"\n                    \"synthesis_goal 用于说明最终应如何组合全部 Worker 结果。\"\n                    \"必须严格按照 JSON Schema 返回 JSON，\"\n                    \"不要输出 Markdown 或其他解释。\"\n                ),\n                user_prompt=user_prompt,\n                max_tokens=max_tokens,\n            )\n        except Exception:\n            state.status = \"failed\"\n            raise\n\n        try:\n            plan = OrchestrationPlan.model_validate_json(output)\n            validate_orchestration_plan(\n                plan,\n                max_workers=max_workers,\n            )\n        except (ValidationError, ValueError) as exc:\n            previous_output = output\n            plan_error = str(exc)\n            continue\n\n        state.orchestration_plan = plan\n        return plan\n\n    state.status = \"failed\"\n    raise StructuredOrchestrationError(\n        f\"orchestrator 连续 {max_parse_attempts} 次返回无效计划\"\n    )\n\n\nasync def run_assignment(\n    runtime: WorkflowRuntime,\n    state: OrchestratorState,\n    assignment: WorkerAssignment,\n    *,\n    synthesis_goal: str,\n    max_tokens: int = 1600,\n) -> ParallelResult:\n    \"\"\"使用固定执行约束完成一个动态生成的 Worker 子任务。\"\"\"\n    if max_tokens <= 0:\n        raise ValueError(\"max_tokens 必须大于 0\")\n\n    output = await runtime.complete(\n        step_name=f\"worker-{assignment.name}\",\n        system_prompt=(\n            \"你是 Orchestrator-Workers Workflow 中的执行 Worker。\"\n            \"只完成分配给你的子任务，不重新拆分任务，\"\n            \"不代替其他 Worker，也不编造未提供的上下文。\"\n            \"输出应当具体、完整，并便于后续 Synthesizer 使用。\"\n        ),\n        user_prompt=(\n            f\"原始任务：\\n{state.task}\\n\\n\"\n            f\"你的子任务：\\n{assignment.instruction}\\n\\n\"\n            f\"最终汇总目标：\\n{synthesis_goal}\"\n        ),\n        max_tokens=max_tokens,\n    )\n    return ParallelResult(\n        name=assignment.name,\n        output=output,\n    )\n\n\nasync def run_assignments(\n    runtime: WorkflowRuntime,\n    state: OrchestratorState,\n    plan: OrchestrationPlan,\n    *,\n    max_tokens: int = 1600,\n) -> list[ParallelResult]:\n    \"\"\"严格模式并发执行计划中的全部 Worker 子任务。\"\"\"\n    if max_tokens <= 0:\n        raise ValueError(\"max_tokens 必须大于 0\")\n    if not plan.assignments:\n        raise ValueError(\"Worker assignments 不能为空\")\n\n    names = [assignment.name for assignment in plan.assignments]\n    if len(names) != len(set(names)):\n        raise ValueError(\"Worker 名称不能重复\")\n\n    state.status = \"parallelizing\"\n    try:\n        results = await asyncio.gather(\n            *(\n                run_assignment(\n                    runtime,\n                    state,\n                    assignment,\n                    synthesis_goal=plan.synthesis_goal,\n                    max_tokens=max_tokens,\n                )\n                for assignment in plan.assignments\n            )\n        )\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n    state.worker_results = list(results)\n    return state.worker_results\n\n\ndef validate_worker_results(\n    plan: OrchestrationPlan,\n    results: list[ParallelResult],\n) -> None:\n    \"\"\"确保每个 assignment 都有且只有一个对应结果。\"\"\"\n    expected_names = [assignment.name for assignment in plan.assignments]\n    actual_names = [result.name for result in results]\n\n    if len(expected_names) != len(set(expected_names)):\n        raise ValueError(\"计划中的 Worker 名称不能重复\")\n    if len(actual_names) != len(set(actual_names)):\n        raise ValueError(\"Worker 结果名称不能重复\")\n    if (\n        len(actual_names) != len(expected_names)\n        or set(actual_names) != set(expected_names)\n    ):\n        missing = sorted(set(expected_names) - set(actual_names))\n        unexpected = sorted(set(actual_names) - set(expected_names))\n        raise ValueError(\n            \"Worker 结果与计划不匹配：\"\n            f\"missing={missing}, unexpected={unexpected}\"\n        )\n    empty_results = [\n        result.name for result in results if not result.output.strip()\n    ]\n    if empty_results:\n        raise ValueError(f\"Worker 输出不能为空：{empty_results}\")\n\n\nasync def synthesize(\n    runtime: WorkflowRuntime,\n    state: OrchestratorState,\n    plan: OrchestrationPlan,\n    results: list[ParallelResult],\n    *,\n    max_tokens: int = 2000,\n) -> str:\n    \"\"\"按照计划的汇总目标整合完整的 Worker 结果。\"\"\"\n    if max_tokens <= 0:\n        raise ValueError(\"max_tokens 必须大于 0\")\n    validate_worker_results(plan, results)\n\n    assignments_by_name = {\n        assignment.name: assignment.instruction\n        for assignment in plan.assignments\n    }\n    synthesis_inputs = [\n        {\n            \"name\": result.name,\n            \"instruction\": assignments_by_name[result.name],\n            \"output\": result.output,\n        }\n        for result in results\n    ]\n    serialized_inputs = json.dumps(\n        synthesis_inputs,\n        ensure_ascii=False,\n        indent=2,\n    )\n\n    state.status = \"summarizing\"\n    try:\n        return await runtime.complete(\n            step_name=\"synthesizer\",\n            system_prompt=(\n                \"你是 Orchestrator-Workers Workflow 的结果综合者。\"\n                \"严格按照 synthesis_goal 组合 Worker 输出，\"\n                \"解决重复和表述冲突，形成直接回应原始任务的完整结果。\"\n                \"只能依据提供的 Worker 输出，不要虚构新事实，\"\n                \"不要重新拆分任务或要求 Worker 继续工作。\"\n            ),\n            user_prompt=(\n                f\"原始任务：\\n{state.task}\\n\\n\"\n                f\"汇总目标：\\n{plan.synthesis_goal}\\n\\n\"\n                f\"Worker 任务与结果：\\n{serialized_inputs}\"\n            ),\n            max_tokens=max_tokens,\n        )\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n\nasync def run_orchestrator_workers(\n    runtime: WorkflowRuntime,\n    state: OrchestratorState,\n    *,\n    max_workers: int = 5,\n    orchestrator_max_tokens: int = 1200,\n    worker_max_tokens: int = 1600,\n    synthesizer_max_tokens: int = 2000,\n    max_parse_attempts: int = 2,\n) -> OrchestratorState:\n    \"\"\"动态拆分任务，并发执行 Worker，再综合最终结果。\"\"\"\n    try:\n        plan = await orchestrate(\n            runtime,\n            state,\n            max_workers=max_workers,\n            max_tokens=orchestrator_max_tokens,\n            max_parse_attempts=max_parse_attempts,\n        )\n        results = await run_assignments(\n            runtime,\n            state,\n            plan,\n            max_tokens=worker_max_tokens,\n        )\n        state.summary = await synthesize(\n            runtime,\n            state,\n            plan,\n            results,\n            max_tokens=synthesizer_max_tokens,\n        )\n        state.status = \"completed\"\n        return state\n    except Exception:\n        state.status = \"failed\"\n        raise"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.024+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "evaluator_optimizer.py",
+          "limit": 500
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.025+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "import json\nfrom typing import Self\n\nfrom pydantic import BaseModel, ValidationError, model_validator\n\nfrom .runtime import WorkflowRuntime\nfrom .state import WorkflowState\n\n\nclass ReviewVerdict(BaseModel):\n    \"\"\"Reviewer 对当前代码的结构化评审结果。\"\"\"\n\n    passed: bool\n    issues: list[str]\n\n    @model_validator(mode=\"after\")\n    def validate_consistency(self) -> Self:\n        \"\"\"确保通过状态与问题列表表达同一个评审结论。\"\"\"\n        if self.passed and self.issues:\n            raise ValueError(\"评审通过时 issues 必须为空\")\n        if not self.passed and not self.issues:\n            raise ValueError(\"评审未通过时 issues 至少包含一个问题\")\n        return self\n\n\nclass StructuredReviewError(RuntimeError):\n    \"\"\"Reviewer 多次未能返回有效的结构化结果。\"\"\"\n\n\nasync def coder(\n    runtime: WorkflowRuntime,\n    state: WorkflowState,\n    *,\n    max_tokens: int = 2000,\n) -> None:\n    \"\"\"首次生成代码，或者根据评审意见优化代码。\"\"\"\n    state.status = \"implementing\"\n    try:\n        if state.review_feedback:\n            issues = \"\\n\".join(\n                f\"- {issue}\" for issue in state.review_feedback\n            )\n            system_prompt = (\n                \"你负责根据评审意见修复当前代码。\"\n                \"保留正确实现，只修改存在问题的部分，\"\n                \"只输出修改后的完整代码。\"\n            )\n            user_prompt = (\n                f\"原始任务：\\n{state.task}\\n\\n\"\n                f\"当前代码：\\n{state.code}\\n\\n\"\n                f\"评审意见：\\n{issues}\"\n            )\n        else:\n            system_prompt = (\n                \"你负责根据任务要求生成完整、可运行的代码。\"\n                \"只输出代码，不要输出 Markdown 代码块或解释。\"\n            )\n            user_prompt = state.task\n\n        state.code = await runtime.complete(\n            step_name=f\"coder-{state.iteration}\",\n            system_prompt=system_prompt,\n            user_prompt=user_prompt,\n            max_tokens=max_tokens,\n        )\n\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n\nasync def reviewer(\n    runtime: WorkflowRuntime,\n    state: WorkflowState,\n    *,\n    max_tokens: int = 800,\n    max_parse_attempts: int = 2,\n) -> ReviewVerdict:\n    \"\"\"独立评审当前代码，返回结构化评审结果。\"\"\"\n    if max_parse_attempts <= 0:\n        raise ValueError(\"max_parse_attempts 必须大于 0\")\n\n    try:\n        state.status = \"reviewing\"\n\n        schema = json.dumps(\n            ReviewVerdict.model_json_schema(),\n            ensure_ascii=False,\n        )\n        base_prompt = (\n            f\"原始任务：\\n{state.task}\\n\\n\"\n            f\"当前代码：\\n{state.code}\\n\\n\"\n            f\"JSON Schema：\\n{schema}\"\n        )\n\n        previous_output = \"\"\n        parse_error = \"\"\n\n        for attempt in range(1, max_parse_attempts + 1):\n            if attempt == 1:\n                user_prompt = base_prompt\n            else:\n                user_prompt = (\n                    f\"{base_prompt}\\n\\n\"\n                    f\"上一次输出：\\n{previous_output}\\n\\n\"\n                    f\"解析错误：\\n{parse_error}\\n\\n\"\n                    \"请修正格式并重新输出完整 JSON。\"\n                )\n\n            output = await runtime.complete(\n                step_name=(\n                    f\"reviewer-{state.iteration}\"\n                    f\"-parse-{attempt}\"\n                ),\n                system_prompt=(\n                    \"你是一名独立代码验收者。\"\n                    \"原始任务中的每一条要求、约束和示例都属于强制验收标准。\"\n                    \"请逐项检查当前代码，不得遗漏任何要求。\"\n                    \"重点检查功能正确性、输入校验、边界情况、\"\n                    \"算法约束、精度要求、输出格式和是否修改输入。\"\n                    \"对于任务提供的示例，请根据代码逻辑逐个推演结果。\"\n                    \"不要因为代码看起来合理就判定通过。\"\n                    \"只有所有明确要求均满足时，passed 才能为 true，\"\n                    \"并且此时 issues 必须为空。\"\n                    \"只要存在未满足、实现错误或无法从代码中确认的要求，\"\n                    \"passed 就必须为 false，\"\n                    \"issues 必须具体说明违反了哪项要求以及对应代码原因。\"\n                    \"不要添加原始任务没有要求的个人偏好或风格要求。\"\n                    \"不要修改代码，只进行验收。\"\n                    \"必须严格按照 JSON Schema 返回 JSON，\"\n                    \"不要输出 Markdown 或其他解释。\"\n                ),\n                user_prompt=user_prompt,\n                max_tokens=max_tokens,\n            )\n\n            try:\n                verdict = ReviewVerdict.model_validate_json(output)\n            except ValidationError as exc:\n                previous_output = output\n                parse_error = str(exc)\n                continue\n\n            state.review_feedback = verdict.issues\n            return verdict\n\n        raise StructuredReviewError(\n            f\"reviewer 连续 {max_parse_attempts} 次返回无效结果\"\n        )\n\n    except Exception:\n        state.status = \"failed\"\n        raise\n\n\nasync def run_evaluator_optimizer(\n    runtime: WorkflowRuntime,\n    state: WorkflowState,\n    *,\n    max_iterations: int = 3,\n) -> WorkflowState:\n    \"\"\"生成或评审候选代码，并在有限轮次内根据反馈优化。\"\"\"\n    if max_iterations <= 0:\n        raise ValueError(\"max_iterations 必须大于 0\")\n\n    while state.iteration < max_iterations:\n        state.iteration += 1\n\n        if not state.code or state.review_feedback:\n            await coder(runtime, state)\n\n        verdict = await reviewer(runtime, state)\n\n        if verdict.passed:\n            state.status = \"completed\"\n            return state\n\n    state.status = \"failed\"\n    return state"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.026+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 3/15 轮 =====",
+      "trace": {
+        "run_id": "5160d00ae202489092dd170f4746af93",
+        "agent_id": "subagent-04671fba",
+        "role": "subagent",
+        "parent_agent_id": "main",
+        "turn": 3
+      },
+      "data": {
+        "max_turns": 15
+      }
+    },
+    {
+      "timestamp": "2026-07-30T13:46:21.058+08:00",
+      "level": "WARNING",
+      "event": "run.interrupted",
+      "message": "运行已由用户中断。"
+    }
+  ]
+}

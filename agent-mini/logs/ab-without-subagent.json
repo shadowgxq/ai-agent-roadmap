@@ -1,0 +1,1236 @@
+{
+  "schema_version": 2,
+  "event_count": 69,
+  "events": [
+    {
+      "timestamp": "2026-07-30T14:01:03.795+08:00",
+      "level": "INFO",
+      "event": "run.started",
+      "message": "详细日志: /home/gxq/ai-agent-roadmap/agent-mini/logs/ab-without-subagent.json",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main"
+      },
+      "data": {
+        "task": "分析这个项目从 CLI 接收用户任务，到模型调用、工具执行、Context 更新、费用统计和最终日志输出的完整数据流。必须根据实际代码说明关键模块及函数职责、它们之间的调用关系、工具调用结果如何返回模型，以及 Agent 的主要停止出口。请引用相关文件路径和函数名作为依据。只进行分析，不修改任何文件。",
+        "workdir": "/home/gxq/ai-agent-roadmap/agent-mini",
+        "log_file": "/home/gxq/ai-agent-roadmap/agent-mini/logs/ab-without-subagent.json",
+        "model": "gpt-5.6-luna",
+        "max_turns": 20,
+        "enable_subagent": false
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:03.815+08:00",
+      "level": "INFO",
+      "event": "agent.started",
+      "message": "Agent 开始: main",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main"
+      },
+      "data": {
+        "model": "gpt-5.6-luna",
+        "max_turns": 20,
+        "max_tokens": 3000,
+        "message_count": 1,
+        "tools": [
+          "read_file",
+          "list_dir",
+          "write_file",
+          "edit_file",
+          "grep",
+          "run_shell"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:03.815+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 1/20 轮 =====",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "max_turns": 20
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:17.716+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: list_dir",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "arguments": {
+          "path": ""
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:17.717+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: list_dir (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "list_dir",
+        "status": "ok",
+        "content": "[FILE] .env\n[FILE] .env.example\n[FILE] .gitignore\n[DIR] .pytest_cache\n[FILE] .python-version\n[DIR] .venv\n[DIR] evals\n[DIR] logs\n[FILE] pyproject.toml\n[DIR] src\n[FILE] uv.lock"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:17.718+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: grep",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "grep",
+        "arguments": {
+          "path": "",
+          "pattern": "argparse|click|typer|commander|process\\.argv|sys\\.argv"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:17.732+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: grep (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "grep",
+        "status": "ok",
+        "content": "evals/run.py:3:import argparse\nevals/run.py:29:def parse_args() -> argparse.Namespace:\nevals/run.py:31:    parser = argparse.ArgumentParser(description=\"运行全部 agent-mini eval cases。\")\nlogs/ab-without-subagent.json:114:          \"pattern\": \"argparse|click|typer|commander|process\\\\.argv|sys\\\\.argv\"\nsrc/cli.py:3:import argparse\nsrc/cli.py:29:def parse_args() -> argparse.Namespace:\nsrc/cli.py:31:    parser = argparse.ArgumentParser(\nsrc/workflows/chaining_demo.py:3:import argparse\nsrc/workflows/chaining_demo.py:14:def parse_args() -> argparse.Namespace:\nsrc/workflows/chaining_demo.py:16:    parser = argparse.ArgumentParser(\nsrc/workflows/evaluator_optimizer_demo.py:3:import argparse\nsrc/workflows/evaluator_optimizer_demo.py:15:def parse_args() -> argparse.Namespace:\nsrc/workflows/evaluator_optimizer_demo.py:17:    parser = argparse.ArgumentParser(\nsrc/workflows/orchestrator_workers_demo.py:3:import argparse\nsrc/workflows/orchestrator_workers_demo.py:16:def parse_args() -> argparse.Namespace:\nsrc/workflows/orchestrator_workers_demo.py:18:    parser = argparse.ArgumentParser(\nsrc/workflows/parallelization_demo.py:3:import argparse\nsrc/workflows/parallelization_demo.py:18:def parse_args() -> argparse.Namespace:\nsrc/workflows/parallelization_demo.py:20:    parser = argparse.ArgumentParser(\nsrc/workflows/routing_demo.py:3:import argparse\nsrc/workflows/routing_demo.py:13:def parse_args() -> argparse.Namespace:\nsrc/workflows/routing_demo.py:15:    parser = argparse.ArgumentParser("
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:17.732+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: grep",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "grep",
+        "arguments": {
+          "path": "",
+          "pattern": "tool|context|cost|usage|token|stop|finish|final"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:17.739+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: grep (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 1
+      },
+      "data": {
+        "tool": "grep",
+        "status": "ok",
+        "content": "pyproject.toml:13:[tool.uv]\nevals/run.py:9:from contextlib import contextmanager\nevals/run.py:19:from src.agent.cost import estimate_cost\nevals/run.py:49:    cost_usd: float = 0.0\nevals/run.py:59:    max_cost_usd: float = Field(default=5, gt=0)\nevals/run.py:92:@contextmanager\nevals/run.py:158:    cost_usd = 0.0\nevals/run.py:164:                \"Eval 的 max_cost_usd 要求价格配置使用 USD\"\nevals/run.py:179:                max_cost_usd=case.max_cost_usd,\nevals/run.py:182:            estimated_cost = estimate_cost(stats, settings)\nevals/run.py:183:            if estimated_cost is None:\nevals/run.py:187:            cost_usd = estimated_cost\nevals/run.py:200:            cost_usd=exc.actual_cost_usd,\nevals/run.py:204:        estimated_cost = estimate_cost(exc.stats, settings)\nevals/run.py:210:            cost_usd=estimated_cost or 0.0,\nevals/run.py:219:            cost_usd=cost_usd,\nevals/run.py:228:            cost_usd=cost_usd,\nevals/run.py:238:    result.cost_usd = cost_usd\nevals/run.py:250:        f\"cost=${result.cost_usd:.6f}\"\nevals/run.py:261:                \"cost_usd\": result.cost_usd,\nevals/run.py:290:    cost = sum(result.cost_usd for result in results)\nevals/run.py:293:        \"Eval 汇总: %s, turns=%s, duration=%.2fs, cost=$%.6f\",\nevals/run.py:297:        cost,\nevals/run.py:306:                \"cost_usd\": cost,\nevals/buggy_project/src/checkout.py:21:    \"\"\"Return subtotal, discount, tax, shipping, and final total for a cart.\"\"\"\nevals/cases/age_boundary/case.yaml:4:max_cost_usd: 0.5\nevals/cases/checkout/case.yaml:4:max_cost_usd: 0.5\nevals/cases/checkout/repo/src/checkout.py:21:    \"\"\"Return subtotal, discount, tax, shipping, and final total for a cart.\"\"\"\nevals/cases/exception_handling/case.yaml:4:max_cost_usd: 0.5\nevals/cases/pagination_boundary/case.yaml:4:max_cost_usd: 0.5\nevals/cases/string_normalization/case.yaml:4:max_cost_usd: 0.5\nlogs/ab-without-subagent.json:37:        \"max_tokens\": 3000,\nlogs/ab-without-subagent.json:39:        \"tools\": [\nlogs/ab-without-subagent.json:67:      \"event\": \"agent.tool_started\",\nlogs/ab-without-subagent.json:76:        \"tool\": \"list_dir\",\nlogs/ab-without-subagent.json:85:      \"event\": \"agent.tool_completed\",\nlogs/ab-without-subagent.json:94:        \"tool\": \"list_dir\",\nlogs/ab-without-subagent.json:102:      \"event\": \"agent.tool_started\",\nlogs/ab-without-subagent.json:111:        \"tool\": \"grep\",\nlogs/ab-without-subagent.json:121:      \"event\": \"agent.tool_completed\",\nlogs/ab-without-subagent.json:130:        \"tool\": \"grep\",\nlogs/ab-without-subagent.json:138:      \"event\": \"agent.tool_started\",\nlogs/ab-without-subagent.json:147:        \"tool\": \"grep\",\nlogs/ab-without-subagent.json:150:          \"pattern\": \"tool|context|cost|usage|token|stop|finish|final\"\nlogs/agent.json:36:        \"max_tokens\": 3000,\nlogs/agent.json:38:        \"tools\": [\nlogs/agent.json:67:      \"event\": \"agent.tool_started\",\nlogs/agent.json:76:        \"tool\": \"spawn_subagent\",\nlogs/agent.json:96:        \"max_tokens\": 1000,\nlogs/agent.json:98:        \"tools\": [\nlogs/agent.json:124:      \"event\": \"agent.tool_started\",\nlogs/agent.json:134:        \"tool\": \"list_dir\",\nlogs/agent.json:143:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:153:        \"tool\": \"list_dir\",\nlogs/agent.json:161:      \"event\": \"agent.tool_started\",\nlogs/agent.json:171:        \"tool\": \"list_dir\",\nlogs/agent.json:180:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:190:        \"tool\": \"list_dir\",\nlogs/agent.json:198:      \"event\": \"agent.tool_started\",\nlogs/agent.json:208:        \"tool\": \"list_dir\",\nlogs/agent.json:217:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:227:        \"tool\": \"list_dir\",\nlogs/agent.json:251:      \"event\": \"agent.tool_started\",\nlogs/agent.json:261:        \"tool\": \"read_file\",\nlogs/agent.json:271:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:281:        \"tool\": \"read_file\",\nlogs/agent.json:289:      \"event\": \"agent.tool_started\",\nlogs/agent.json:299:        \"tool\": \"read_file\",\nlogs/agent.json:309:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:319:        \"tool\": \"read_file\",\nlogs/agent.json:321:        \"content\": \"\\\"\\\"\\\"Workflow 节点共享的模型调用与观测能力。\\\"\\\"\\\"\\n\\nfrom dataclasses import dataclass\\n\\nfrom openai import AsyncOpenAI\\nfrom openai.types.chat import ChatCompletion\\n\\nfrom ..agent.loop import extract_usage_tokens\\n\\n\\n@dataclass\\nclass WorkflowStats:\\n    \\\"\\\"\\\"累计一次 Workflow 运行中的模型调用与 token 用量。\\\"\\\"\\\"\\n\\n    calls: int = 0\\n    input_tokens: int = 0\\n    output_tokens: int = 0\\n    cache_read_input_tokens: int = 0\\n    cache_creation_input_tokens: int = 0\\n\\n    @property\\n    def total...(行内容已截断)\nlogs/agent.json:327:      \"event\": \"agent.tool_started\",\nlogs/agent.json:337:        \"tool\": \"read_file\",\nlogs/agent.json:347:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:357:        \"tool\": \"read_file\",\nlogs/agent.json:359:        \"content\": \"from .runtime import WorkflowRuntime\\nfrom .state import WorkflowState\\n\\n\\nclass WorkflowGateError(ValueError):\\n    \\\"\\\"\\\"Workflow 的确定性检查未通过。\\\"\\\"\\\"\\n\\n\\nasync def plan_step(\\n    runtime: WorkflowRuntime,\\n    state: WorkflowState,\\n    *,\\n    max_tokens: int = 1000,\\n) -> None:\\n    \\\"\\\"\\\"执行计划步骤，生成计划并更新状态。\\\"\\\"\\\"\\n    try:\\n        state.status = \\\"planning\\\"\\n        state.plan = await runtime.complete(\\n            step_name=\\\"plan\\\",\\n            system_prompt=(\\n      ...(行内容已截断)\nlogs/agent.json:365:      \"event\": \"agent.tool_started\",\nlogs/agent.json:375:        \"tool\": \"read_file\",\nlogs/agent.json:385:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:395:        \"tool\": \"read_file\",\nlogs/agent.json:397:        \"content\": \"import asyncio\\nimport json\\nfrom collections import Counter\\nfrom typing import Literal\\n\\nfrom pydantic import BaseModel, Field, ValidationError\\n\\nfrom .runtime import WorkflowRuntime\\nfrom .state import WorkflowState\\n\\n\\nclass ParallelTask(BaseModel):\\n    \\\"\\\"\\\"一个可以独立执行的模型任务。\\\"\\\"\\\"\\n\\n    name: str = Field(min_length=1)\\n    system_prompt: str = Field(min_length=1)\\n    user_prompt: str = Field(min_length=1)\\n    max_tokens: int = Field(default=1200, gt=0)\\n\\n\\nclass Pa...(行内容已截断)\nlogs/agent.json:403:      \"event\": \"agent.tool_started\",\nlogs/agent.json:413:        \"tool\": \"read_file\",\nlogs/agent.json:423:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:433:        \"tool\": \"read_file\",\nlogs/agent.json:435:        \"content\": \"import json\\nfrom collections.abc import Awaitable, Callable\\nfrom typing import Literal\\n\\nfrom pydantic import BaseModel, Field, ValidationError\\n\\nfrom .runtime import WorkflowRuntime\\nfrom .state import WorkflowState\\n\\n\\nRouteName = Literal[\\n    \\\"code_generation\\\",\\n    \\\"code_review\\\",\\n    \\\"bug_fix\\\",\\n    \\\"explanation\\\",\\n]\\n\\n\\nclass RouteDecision(BaseModel):\\n    \\\"\\\"\\\"Router 返回的、经过类型约束的路由决定。\\\"\\\"\\\"\\n\\n    route: RouteName\\n    reason: str = Field(min_length=1)\\n...(行内容已截断)\nlogs/agent.json:441:      \"event\": \"agent.tool_started\",\nlogs/agent.json:451:        \"tool\": \"read_file\",\nlogs/agent.json:461:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:471:        \"tool\": \"read_file\",\nlogs/agent.json:473:        \"content\": \"import asyncio\\nimport json\\n\\nfrom pydantic import BaseModel, Field, ValidationError, field_validator\\n\\nfrom .parallelization import ParallelResult\\nfrom .runtime import WorkflowRuntime\\nfrom .state import WorkflowState\\n\\n\\nclass WorkerAssignment(BaseModel):\\n    \\\"\\\"\\\"Orchestrator 为一个独立 Worker 生成的任务说明。\\\"\\\"\\\"\\n\\n    name: str = Field(\\n        min_length=1,\\n        max_length=50,\\n        pattern=r\\\"^[a-z][a-z0-9_-]*$\\\",\\n    )\\n    instruction: str = Field(min_length=1)\\...(行内容已截断)\nlogs/agent.json:479:      \"event\": \"agent.tool_started\",\nlogs/agent.json:489:        \"tool\": \"read_file\",\nlogs/agent.json:499:      \"event\": \"agent.tool_completed\",\nlogs/agent.json:509:        \"tool\": \"read_file\",\nlogs/agent.json:511:        \"content\": \"import json\\nfrom typing import Self\\n\\nfrom pydantic import BaseModel, ValidationError, model_validator\\n\\nfrom .runtime import WorkflowRuntime\\nfrom .state import WorkflowState\\n\\n\\nclass ReviewVerdict(BaseModel):\\n    \\\"\\\"\\\"Reviewer 对当前代码的结构化评审结果。\\\"\\\"\\\"\\n\\n    passed: bool\\n    issues: list[str]\\n\\n    @model_validator(mode=\\\"after\\\")\\n    def validate_consistency(self) -> Self:\\n        \\\"\\\"\\\"确保通过状态与问题列表表达同一个评审结论。\\\"\\\"\\\"\\n        if self.passed and self.issues:\\n          ...(行内容已截断)\nsrc/cli.py:14:    from .agent.cost import estimate_cost\nsrc/cli.py:20:    from agent.cost import estimate_cost\nsrc/cli.py:88:    main_tokens = (\nsrc/cli.py:89:        stats.input_tokens\n...(搜索结果已达到上限)"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:17.740+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 2/20 轮 =====",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "max_turns": 20
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.421+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: list_dir",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "list_dir",
+        "arguments": {
+          "path": "src"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.422+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: list_dir (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "list_dir",
+        "status": "ok",
+        "content": "[FILE] __init__.py\n[DIR] __pycache__\n[DIR] agent\n[FILE] cli.py\n[FILE] main.py\n[DIR] tools\n[DIR] workflows"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.422+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: list_dir",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "list_dir",
+        "arguments": {
+          "path": "src/agent"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.423+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: list_dir (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "list_dir",
+        "status": "ok",
+        "content": "[FILE] __init__.py\n[DIR] __pycache__\n[FILE] config.py\n[FILE] context.py\n[FILE] cost.py\n[FILE] logging_config.py\n[FILE] loop.py\n[FILE] prompts.py\n[FILE] runtime.py"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.424+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/cli.py",
+          "limit": 220
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.425+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"agent-mini 的命令行入口。\"\"\"\n\nimport argparse\nimport asyncio\nfrom pathlib import Path\nfrom typing import Any\nfrom uuid import uuid4\n\nfrom openai import APIError\n\n\nif __package__:\n    from .agent.config import AgentSettings\n    from .agent.cost import estimate_cost\n    from .agent.loop import MaxTurnsExceeded, RunStats\n    from .agent.runtime import run_coding_agent\n    from .agent.logging_config import configure_logging, get_logger\nelse:\n    from agent.config import AgentSettings\n    from agent.cost import estimate_cost\n    from agent.loop import MaxTurnsExceeded, RunStats\n    from agent.runtime import run_coding_agent\n    from agent.logging_config import configure_logging, get_logger\n\n\nlogger = get_logger(\"cli\")\n\n\ndef parse_args() -> argparse.Namespace:\n    \"\"\"解析 Coding Agent 的命令行参数。\"\"\"\n    parser = argparse.ArgumentParser(\n        description=\"在指定项目中运行 Coding Agent。\",\n    )\n\n    parser.add_argument(\n        \"task\",\n        help=\"交给 Agent 完成的任务。\",\n    )\n    parser.add_argument(\n        \"--dir\",\n        dest=\"workdir\",\n        type=Path,\n        default=Path.cwd(),\n        help=\"Agent 操作的项目目录，默认为当前目录。\",\n    )\n    parser.add_argument(\n        \"--model\",\n        default=None,\n        help=\"覆盖环境配置中的模型名称。\",\n    )\n    parser.add_argument(\n        \"--max-turns\",\n        type=int,\n        default=None,\n        help=\"覆盖 Agent 最大循环轮数。\",\n    )\n    parser.add_argument(\n        \"--no-subagent\",\n        action=\"store_false\",\n        dest=\"enable_subagent\",\n        help=\"禁用探索型 SubAgent，用于对比实验。\",\n    )\n    parser.add_argument(\n        \"--log-file\",\n        type=Path,\n        default=None,\n        help=\"JSON 运行日志；默认 logs/agent.json，每次运行覆盖写入。\",\n    )\n\n    args = parser.parse_args()\n    if args.max_turns is not None and args.max_turns < 1:\n        parser.error(\"--max-turns 必须大于 0\")\n    return args\n\n\ndef extract_text(message: Any) -> str:\n    \"\"\"提取 Chat Completions 响应中的 assistant 文本。\"\"\"\n    return message.choices[0].message.content or \"(模型未返回文本)\"\n\n\ndef log_stats(\n    stats: RunStats,\n    *,\n    trace: dict[str, str] | None = None,\n) -> None:\n    \"\"\"记录一次 Agent 运行累计的模型用量。\"\"\"\n    total_stats = stats.aggregate()\n    main_tokens = (\n        stats.input_tokens\n        + stats.cache_read_input_tokens\n        + stats.cache_creation_input_tokens\n        + stats.output_tokens\n    )\n    total_tokens = (\n        total_stats.input_tokens\n        + total_stats.cache_read_input_tokens\n        + total_stats.cache_creation_input_tokens\n        + total_stats.output_tokens\n    )\n    subagent_turns = total_stats.turns - stats.turns\n    subagent_input_tokens = total_stats.input_tokens - stats.input_tokens\n    subagent_cache_read_tokens = (\n        total_stats.cache_read_input_tokens\n        - stats.cache_read_input_tokens\n    )\n    subagent_cache_creation_tokens = (\n        total_stats.cache_creation_input_tokens\n        - stats.cache_creation_input_tokens\n    )\n    subagent_output_tokens = total_stats.output_tokens - stats.output_tokens\n    subagent_tokens = total_tokens - main_tokens\n    logger.info(\n        (\n            \"运行统计: main_turns=%s, subagent_runs=%s, \"\n            \"subagent_turns=%s, main_tokens=%s, \"\n            \"subagent_tokens=%s, total_tokens=%s\"\n        ),\n        stats.turns,\n        len(stats.subagent_runs),\n        subagent_turns,\n        main_tokens,\n        subagent_tokens,\n        total_tokens,\n        extra={\n            \"event\": \"run.usage\",\n            \"trace\": trace,\n            \"data\": {\n                \"main\": {\n                    \"turns\": stats.turns,\n                    \"input_tokens\": stats.input_tokens,\n                    \"cache_read_input_tokens\": (\n                        stats.cache_read_input_tokens\n                    ),\n                    \"cache_creation_input_tokens\": (\n                        stats.cache_creation_input_tokens\n                    ),\n                    \"output_tokens\": stats.output_tokens,\n                    \"total_tokens\": main_tokens,\n                },\n                \"subagents\": {\n                    \"runs\": len(stats.subagent_runs),\n                    \"turns\": subagent_turns,\n                    \"input_tokens\": subagent_input_tokens,\n                    \"cache_read_input_tokens\": subagent_cache_read_tokens,\n                    \"cache_creation_input_tokens\": (\n                        subagent_cache_creation_tokens\n                    ),\n                    \"output_tokens\": subagent_output_tokens,\n                    \"total_tokens\": subagent_tokens,\n                },\n                \"total\": {\n                    \"turns\": total_stats.turns,\n                    \"input_tokens\": total_stats.input_tokens,\n                    \"cache_read_input_tokens\": (\n                        total_stats.cache_read_input_tokens\n                    ),\n                    \"cache_creation_input_tokens\": (\n                        total_stats.cache_creation_input_tokens\n                    ),\n                    \"output_tokens\": total_stats.output_tokens,\n                    \"total_tokens\": total_tokens,\n                },\n            },\n        },\n    )\n\n\ndef log_cost(\n    stats: RunStats,\n    settings: AgentSettings,\n    *,\n    trace: dict[str, str] | None = None,\n) -> None:\n    \"\"\"价格配置完整时打印预估费用。\"\"\"\n    cost = estimate_cost(stats, settings)\n    if cost is None:\n        logger.info(\n            \"预估费用: 未配置完整的模型单价\",\n            extra={\"event\": \"run.cost_unavailable\", \"trace\": trace},\n        )\n        return\n\n    logger.info(\n        \"预估费用: %s %.6f\",\n        settings.price_currency,\n        cost,\n        extra={\n            \"event\": \"run.cost\",\n            \"trace\": trace,\n            \"data\": {\"currency\": settings.price_currency, \"amount\": cost},\n        },\n    )\n\n\nasync def main() -> None:\n    \"\"\"解析命令行参数，运行 Agent 并展示结果。\"\"\"\n    args = parse_args()\n    workdir = args.workdir.resolve()\n    settings = AgentSettings()\n    run_id = uuid4().hex\n    trace = {\"run_id\": run_id, \"agent_id\": \"main\", \"role\": \"main\"}\n    log_file = configure_logging(args.log_file or settings.log_file)\n    logger.info(\n        \"详细日志: %s\",\n        log_file,\n        extra={\n            \"event\": \"run.started\",\n            \"trace\": trace,\n            \"data\": {\n                \"task\": args.task,\n                \"workdir\": str(workdir),\n                \"log_file\": str(log_file),\n                \"model\": args.model or settings.model,\n                \"max_turns\": args.max_turns or settings.max_turns,\n                \"enable_subagent\": args.enable_subagent,\n            },\n        },\n    )\n\n    try:"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.425+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/loop.py",
+          "limit": 400
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.426+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"连接模型、消息上下文和工具执行的 Agent 核心流程组件。\"\"\"\n\nimport asyncio\nimport json\nimport random\nimport time\nfrom collections.abc import Callable\nfrom dataclasses import dataclass, field\nfrom typing import Any\nfrom uuid import uuid4\n\nfrom openai import APIConnectionError, APIStatusError, AsyncOpenAI\nfrom openai.types.chat import ChatCompletion, ChatCompletionMessage\n\nfrom .context import Context\nfrom .logging_config import get_logger\n\n\nlogger = get_logger(\"agent.loop\")\n\n\n@dataclass(frozen=True)\nclass AgentTrace:\n    \"\"\"标识一次运行中的主 Agent 或 SubAgent。\"\"\"\n\n    run_id: str\n    agent_id: str\n    role: str\n    parent_agent_id: str | None = None\n\n    def event_context(self, turn: int | None = None) -> dict[str, Any]:\n        \"\"\"生成附加到结构化日志事件的关联字段。\"\"\"\n        context: dict[str, Any] = {\n            \"run_id\": self.run_id,\n            \"agent_id\": self.agent_id,\n            \"role\": self.role,\n        }\n        if self.parent_agent_id is not None:\n            context[\"parent_agent_id\"] = self.parent_agent_id\n        if turn is not None:\n            context[\"turn\"] = turn\n        return context\n\n\n@dataclass\nclass RunStats:\n    \"\"\"记录模型调用统计，input_tokens 不包含缓存读写的输入。\"\"\"\n\n    turns: int = 0\n    input_tokens: int = 0\n    output_tokens: int = 0\n    cache_read_input_tokens: int = 0\n    cache_creation_input_tokens: int = 0\n    subagent_runs: list[\"RunStats\"] = field(default_factory=list)\n\n    def aggregate(self) -> \"RunStats\":\n        \"\"\"返回当前 Agent 及所有子 Agent 的汇总统计。\"\"\"\n        total = RunStats(\n            turns=self.turns,\n            input_tokens=self.input_tokens,\n            output_tokens=self.output_tokens,\n            cache_read_input_tokens=self.cache_read_input_tokens,\n            cache_creation_input_tokens=self.cache_creation_input_tokens,\n        )\n        for child in self.subagent_runs:\n            child_total = child.aggregate()\n            total.turns += child_total.turns\n            total.input_tokens += child_total.input_tokens\n            total.output_tokens += child_total.output_tokens\n            total.cache_read_input_tokens += (\n                child_total.cache_read_input_tokens\n            )\n            total.cache_creation_input_tokens += (\n                child_total.cache_creation_input_tokens\n            )\n        return total\n\n\n@dataclass(frozen=True)\nclass UsageTokens:\n    \"\"\"Normalized token usage shared by supported provider formats.\"\"\"\n\n    input_tokens: int = 0\n    output_tokens: int = 0\n    cache_read_input_tokens: int = 0\n    cache_creation_input_tokens: int = 0\n\n\ndef _usage_value(source: Any, *names: str) -> Any:\n    \"\"\"Read the first available field from a dict or SDK object.\"\"\"\n    if source is None:\n        return None\n\n    for name in names:\n        if isinstance(source, dict) and name in source:\n            return source[name]\n\n        value = getattr(source, name, None)\n        if value is not None:\n            return value\n\n        extra = getattr(source, \"model_extra\", None)\n        if isinstance(extra, dict) and name in extra:\n            return extra[name]\n\n    return None\n\n\ndef _token_count(value: Any) -> int:\n    \"\"\"Convert an optional token field to a non-negative integer.\"\"\"\n    if value is None:\n        return 0\n    try:\n        return max(int(value), 0)\n    except (TypeError, ValueError):\n        return 0\n\n\ndef extract_usage_tokens(usage: Any) -> UsageTokens:\n    \"\"\"Normalize OpenAI-style and Anthropic-style usage fields.\"\"\"\n    details = _usage_value(usage, \"prompt_tokens_details\")\n\n    cache_read = _token_count(\n        _usage_value(usage, \"cache_read_input_tokens\", \"cache_read_tokens\")\n    )\n    if cache_read == 0:\n        cache_read = _token_count(\n            _usage_value(\n                details,\n                \"cache_read_input_tokens\",\n                \"cache_read_tokens\",\n                \"cached_tokens\",\n            )\n        )\n\n    cache_creation = _token_count(\n        _usage_value(\n            usage,\n            \"cache_creation_input_tokens\",\n            \"cache_creation_tokens\",\n            \"cache_write_input_tokens\",\n        )\n    )\n    if cache_creation == 0:\n        cache_creation = _token_count(\n            _usage_value(\n                details,\n                \"cache_creation_input_tokens\",\n                \"cache_creation_tokens\",\n                \"cache_write_input_tokens\",\n            )\n        )\n\n    explicit_input = _usage_value(usage, \"input_tokens\")\n    prompt_tokens = _token_count(_usage_value(usage, \"prompt_tokens\"))\n    if explicit_input is not None:\n        input_tokens = _token_count(explicit_input)\n    else:\n        # OpenAI-style prompt_tokens commonly includes cached input.\n        input_tokens = max(prompt_tokens - cache_read - cache_creation, 0)\n\n    output_tokens = _token_count(\n        _usage_value(usage, \"output_tokens\", \"completion_tokens\")\n    )\n    return UsageTokens(\n        input_tokens=input_tokens,\n        output_tokens=output_tokens,\n        cache_read_input_tokens=cache_read,\n        cache_creation_input_tokens=cache_creation,\n    )\n\n\nclass MaxTurnsExceeded(RuntimeError):\n    \"\"\"Agent 在限定轮数内没有完成任务。\"\"\"\n\n    def __init__(self, max_turns: int, stats: RunStats):\n        super().__init__(f\"Agent 达到最大轮数限制: {max_turns}\")\n        self.max_turns = max_turns\n        self.stats = stats\n\n\nclass CostLimitExceeded(RuntimeError):\n    \"\"\"Agent 的累计模型费用超过单任务预算。\"\"\"\n\n    def __init__(\n        self,\n        max_cost_usd: float,\n        actual_cost_usd: float,\n        stats: RunStats,\n    ):\n        super().__init__(\n            f\"Agent 费用 ${actual_cost_usd:.6f} 超过限制 \"\n            f\"${max_cost_usd:.6f}\"\n        )\n        self.max_cost_usd = max_cost_usd\n        self.actual_cost_usd = actual_cost_usd\n        self.stats = stats\n\n\n@dataclass\nclass ToolCallTracker:\n    \"\"\"检测连续重复的完全相同工具调用。\"\"\"\n\n    max_consecutive: int = 3\n    _last_signature: tuple[str, str] | None = None\n    _count: int = 0\n\n    def allow(self, name: str, input_data: Any) -> bool:\n        \"\"\"记录一次调用，达到连续上限后拒绝执行。\"\"\"\n        signature = (\n            name,\n            json.dumps(input_data, sort_keys=True, default=str),\n        )\n        if signature == self._last_signature:\n            self._count += 1\n        else:\n            self._last_signature = signature\n            self._count = 1\n        return self._count < self.max_consecutive\n\n\nasync def run(\n    client: AsyncOpenAI,\n    context: Context,\n    registry: Any,\n    *,\n    model: str,\n    system_prompt: str,\n    max_turns: int = 10,\n    max_tokens: int = 300,\n    cost_estimator: Callable[[RunStats], float | None] | None = None,\n    max_cost_usd: float | None = None,\n    stats: RunStats | None = None,\n    trace: AgentTrace | None = None,\n) -> tuple[ChatCompletion, RunStats]:\n    \"\"\"运行 Agent，直到模型结束或达到最大轮数。\"\"\"\n    if max_cost_usd is not None:\n        if max_cost_usd <= 0:\n            raise ValueError(\"max_cost_usd 必须大于 0\")\n        if cost_estimator is None:\n            raise ValueError(\"设置 max_cost_usd 时必须提供 cost_estimator\")\n\n    if trace is None:\n        trace = AgentTrace(\n            run_id=uuid4().hex,\n            agent_id=\"main\",\n            role=\"main\",\n        )\n\n    tools = registry.schemas()\n    if stats is None:\n        stats = RunStats()\n    tracker = ToolCallTracker()\n    logger.info(\n        \"Agent 开始: %s\",\n        trace.agent_id,\n        extra={\n            \"event\": \"agent.started\",\n            \"trace\": trace.event_context(),\n            \"data\": {\n                \"model\": model,\n                \"max_turns\": max_turns,\n                \"max_tokens\": max_tokens,\n                \"message_count\": len(context.messages),\n                \"tools\": [tool[\"name\"] for tool in tools],\n            },\n        },\n    )\n    for turn in range(1, max_turns + 1):\n        logger.info(\n            \"===== 第 %s/%s 轮 =====\",\n            turn,\n            max_turns,\n            extra={\n                \"event\": \"agent.turn_started\",\n                \"trace\": trace.event_context(turn),\n                \"data\": {\"max_turns\": max_turns},\n            },\n        )\n        response = await call_llm(\n            client,\n            context,\n            model=model,\n            system_prompt=system_prompt,\n            tools=tools,\n            max_tokens=max_tokens,\n            trace=trace,\n            turn=turn,\n        )\n        message = response.choices[0].message\n        text = message_text(message)\n        if text:\n            logger.info(\n                \"模型返回文本\",\n                extra={\n                    \"event\": \"agent.model_text\",\n                    \"trace\": trace.event_context(turn),\n                    \"console_message\": f\"模型文本: {text}\",\n                    \"data\": {\"text\": text},\n                },\n            )\n\n        token_usage = extract_usage_tokens(response.usage)\n\n        stats.turns += 1\n        stats.input_tokens += token_usage.input_tokens\n        stats.cache_read_input_tokens += token_usage.cache_read_input_tokens\n        stats.cache_creation_input_tokens += (\n            token_usage.cache_creation_input_tokens\n        )\n        stats.output_tokens += token_usage.output_tokens\n\n        if max_cost_usd is not None and cost_estimator is not None:\n            current_cost = cost_estimator(stats)\n            if current_cost is None:\n                raise ValueError(\"缺少完整的模型价格配置，无法执行费用熔断\")\n            if current_cost > max_cost_usd:\n                raise CostLimitExceeded(\n                    max_cost_usd=max_cost_usd,\n                    actual_cost_usd=current_cost,\n                    stats=stats,\n                )\n\n        context.append_assistant(assistant_message(message))\n\n        if not message.tool_calls:\n            logger.info(\n                \"Agent 完成: %s\",\n                trace.agent_id,\n                extra={\n                    \"event\": \"agent.completed\",\n                    \"trace\": trace.event_context(turn),\n                    \"data\": {\n                        \"turns\": stats.turns,\n                        \"finish_reason\": response.choices[0].finish_reason,\n                    },\n                },\n            )\n            return response, stats\n\n        tool_results = await execute_tools(\n            message,\n            registry,\n            tracker,\n            trace=trace,\n            turn=turn,\n        )\n        context.append_tool_results(tool_results)\n        context.assert_paired()\n\n    logger.error(\n        \"Agent 达到最大轮数: %s\",\n        max_turns,\n        extra={\n            \"event\": \"agent.max_turns_exceeded\",\n            \"trace\": trace.event_context(max_turns),\n            \"data\": {\"max_turns\": max_turns},\n        },\n    )\n    raise MaxTurnsExceeded(max_turns, stats)\n\n\ndef message_text(message: ChatCompletionMessage) -> str:\n    \"\"\"提取响应中的 assistant 文本。\"\"\"\n    return (message.content or \"\").strip()\n\n\ndef openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:\n    \"\"\"把注册表的 Anthropic 风格 schema 转成 OpenAI function schema。\"\"\"\n    return [\n        {\n            \"type\": \"function\",\n            \"function\": {\n                \"name\": tool[\"name\"],\n                \"description\": tool[\"description\"],\n                \"parameters\": tool[\"input_schema\"],\n            },\n        }\n        for tool in tools\n    ]\n\n\ndef is_retryable_llm_error(exc: Exception) -> bool:\n    \"\"\"只允许网络错误、限流和服务端错误进入重试。\"\"\"\n    if isinstance(exc, APIConnectionError):\n        return True\n\n    return (\n        isinstance(exc, APIStatusError)\n        and (exc.status_code == 429 or exc.status_code >= 500)\n    )\n\n\nasync def call_llm(\n    client: AsyncOpenAI,\n    context: Context,\n    *,\n    model: str,\n    system_prompt: str,\n    tools: list[dict[str, Any]],"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.427+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/context.py",
+          "limit": 300
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.428+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"维护可直接发送给 Chat Completions API 的完整对话历史。\"\"\"\n\nfrom typing import Any\n\n\nclass Context:\n    \"\"\"保存 user、assistant 和 tool 消息，并校验工具调用配对。\"\"\"\n\n    def __init__(self) -> None:\n        self.messages: list[dict[str, Any]] = []\n\n    def append_user(self, text: str) -> None:\n        \"\"\"追加用户文本消息。\"\"\"\n        self.messages.append({\"role\": \"user\", \"content\": text})\n\n    def append_assistant(self, message: dict[str, Any]) -> None:\n        \"\"\"追加完整 assistant 消息，包括 tool_calls。\"\"\"\n        self.messages.append(message)\n\n    def append_tool_results(self, tool_results: list[dict[str, Any]]) -> None:\n        \"\"\"追加与上一条 assistant tool_calls 对应的 tool 消息。\"\"\"\n        self.messages.extend(tool_results)\n\n    def assert_paired(self) -> None:\n        \"\"\"校验每个 assistant tool_call 都有唯一匹配的 tool result。\"\"\"\n        pending_ids: set[str] = set()\n        seen_ids: set[str] = set()\n\n        for message in self.messages:\n            role = message.get(\"role\")\n            if role not in {\"user\", \"assistant\", \"tool\"}:\n                raise RuntimeError(f\"未知消息角色: {role}\")\n\n            if role == \"assistant\":\n                if pending_ids:\n                    raise RuntimeError(\"上一轮 tool_calls 缺少对应的 tool result\")\n                for tool_call in message.get(\"tool_calls\") or []:\n                    tool_call_id = tool_call.get(\"id\")\n                    if not isinstance(tool_call_id, str) or not tool_call_id:\n                        raise RuntimeError(\"tool_call 缺少有效 id\")\n                    if tool_call_id in seen_ids:\n                        raise RuntimeError(f\"tool_call id 重复: {tool_call_id}\")\n                    pending_ids.add(tool_call_id)\n                    seen_ids.add(tool_call_id)\n                continue\n\n            if role == \"user\":\n                if pending_ids:\n                    raise RuntimeError(\"tool_calls 后出现了普通 user 消息\")\n                continue\n\n            tool_call_id = message.get(\"tool_call_id\")\n            if not isinstance(tool_call_id, str) or not tool_call_id:\n                raise RuntimeError(\"tool result 缺少有效 tool_call_id\")\n            if tool_call_id not in pending_ids:\n                raise RuntimeError(\n                    f\"tool result 没有匹配的 tool_call: {tool_call_id}\"\n                )\n            pending_ids.remove(tool_call_id)\n\n        if pending_ids:\n            missing = \", \".join(sorted(pending_ids))\n            raise RuntimeError(f\"对话结束时仍有未配对的 tool_call: {missing}\")"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.428+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/cost.py",
+          "limit": 300
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.429+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 2
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"根据模型用量与价格配置估算 Agent 运行费用。\"\"\"\n\nfrom .config import AgentSettings\nfrom .loop import RunStats\n\n\ndef estimate_cost(\n    stats: RunStats,\n    settings: AgentSettings,\n) -> float | None:\n    \"\"\"估算运行费用；缺少实际用到的 token 单价时返回 None。\"\"\"\n    stats = stats.aggregate()\n    if (\n        settings.input_price_per_million is None\n        or settings.output_price_per_million is None\n    ):\n        return None\n\n    if (\n        stats.cache_read_input_tokens > 0\n        and settings.cache_read_price_per_million is None\n    ):\n        return None\n\n    if (\n        stats.cache_creation_input_tokens > 0\n        and settings.cache_creation_price_per_million is None\n    ):\n        return None\n\n    return (\n        stats.input_tokens * settings.input_price_per_million\n        + stats.output_tokens * settings.output_price_per_million\n        + stats.cache_read_input_tokens\n        * (settings.cache_read_price_per_million or 0)\n        + stats.cache_creation_input_tokens\n        * (settings.cache_creation_price_per_million or 0)\n    ) / 1_000_000"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:01:33.430+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 3/20 轮 =====",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "max_turns": 20
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.568+08:00",
+      "level": "INFO",
+      "event": "agent.model_text",
+      "message": "模型返回文本",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "text": "我已确认主入口在 `src/cli.py`，核心循环在 `src/agent/loop.py`，Context 与费用分别由独立模块维护。接下来补齐模型请求、工具注册/执行、运行时封装以及 CLI 异常和最终输出部分，确保调用链和停止条件都以实际实现为准。"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.569+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/loop.py",
+          "offset": 300,
+          "limit": 420
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.570+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "                },\n            )\n\n        token_usage = extract_usage_tokens(response.usage)\n\n        stats.turns += 1\n        stats.input_tokens += token_usage.input_tokens\n        stats.cache_read_input_tokens += token_usage.cache_read_input_tokens\n        stats.cache_creation_input_tokens += (\n            token_usage.cache_creation_input_tokens\n        )\n        stats.output_tokens += token_usage.output_tokens\n\n        if max_cost_usd is not None and cost_estimator is not None:\n            current_cost = cost_estimator(stats)\n            if current_cost is None:\n                raise ValueError(\"缺少完整的模型价格配置，无法执行费用熔断\")\n            if current_cost > max_cost_usd:\n                raise CostLimitExceeded(\n                    max_cost_usd=max_cost_usd,\n                    actual_cost_usd=current_cost,\n                    stats=stats,\n                )\n\n        context.append_assistant(assistant_message(message))\n\n        if not message.tool_calls:\n            logger.info(\n                \"Agent 完成: %s\",\n                trace.agent_id,\n                extra={\n                    \"event\": \"agent.completed\",\n                    \"trace\": trace.event_context(turn),\n                    \"data\": {\n                        \"turns\": stats.turns,\n                        \"finish_reason\": response.choices[0].finish_reason,\n                    },\n                },\n            )\n            return response, stats\n\n        tool_results = await execute_tools(\n            message,\n            registry,\n            tracker,\n            trace=trace,\n            turn=turn,\n        )\n        context.append_tool_results(tool_results)\n        context.assert_paired()\n\n    logger.error(\n        \"Agent 达到最大轮数: %s\",\n        max_turns,\n        extra={\n            \"event\": \"agent.max_turns_exceeded\",\n            \"trace\": trace.event_context(max_turns),\n            \"data\": {\"max_turns\": max_turns},\n        },\n    )\n    raise MaxTurnsExceeded(max_turns, stats)\n\n\ndef message_text(message: ChatCompletionMessage) -> str:\n    \"\"\"提取响应中的 assistant 文本。\"\"\"\n    return (message.content or \"\").strip()\n\n\ndef openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:\n    \"\"\"把注册表的 Anthropic 风格 schema 转成 OpenAI function schema。\"\"\"\n    return [\n        {\n            \"type\": \"function\",\n            \"function\": {\n                \"name\": tool[\"name\"],\n                \"description\": tool[\"description\"],\n                \"parameters\": tool[\"input_schema\"],\n            },\n        }\n        for tool in tools\n    ]\n\n\ndef is_retryable_llm_error(exc: Exception) -> bool:\n    \"\"\"只允许网络错误、限流和服务端错误进入重试。\"\"\"\n    if isinstance(exc, APIConnectionError):\n        return True\n\n    return (\n        isinstance(exc, APIStatusError)\n        and (exc.status_code == 429 or exc.status_code >= 500)\n    )\n\n\nasync def call_llm(\n    client: AsyncOpenAI,\n    context: Context,\n    *,\n    model: str,\n    system_prompt: str,\n    tools: list[dict[str, Any]],\n    max_tokens: int = 300,\n    max_attempts: int = 3,\n    base_delay: float = 1.0,\n    trace: AgentTrace | None = None,\n    turn: int | None = None,\n) -> ChatCompletion:\n\n    for attempt in range(max_attempts):\n        try:\n            return await client.chat.completions.create(\n                model=model,\n                max_tokens=max_tokens,\n                messages=[\n                    {\"role\": \"system\", \"content\": system_prompt},\n                    *context.messages,\n                ],\n                tools=openai_tools(tools),\n            )\n        except (APIConnectionError, APIStatusError) as exc:\n            is_last_attempt = attempt == max_attempts - 1\n            if not is_retryable_llm_error(exc) or is_last_attempt:\n                raise\n\n            delay = base_delay * 2**attempt + random.uniform(0, 0.5)\n            logger.warning(\n                \"模型请求失败，%.2f 秒后重试 (%s/%s): %s\",\n                delay,\n                attempt + 2,\n                max_attempts,\n                type(exc).__name__,\n                extra={\n                    \"event\": \"agent.model_retry\",\n                    \"trace\": (\n                        trace.event_context(\n                            turn) if trace is not None else None\n                    ),\n                    \"data\": {\n                        \"delay_s\": delay,\n                        \"attempt\": attempt + 2,\n                        \"max_attempts\": max_attempts,\n                        \"error_type\": type(exc).__name__,\n                    },\n                },\n            )\n            await asyncio.sleep(delay)\n\n    raise RuntimeError(\"模型重试循环意外结束\")\n\n\ndef assistant_message(message: ChatCompletionMessage) -> dict[str, Any]:\n    \"\"\"把 SDK assistant message 转成可回放的标准字典。\"\"\"\n    result: dict[str, Any] = {\n        \"role\": \"assistant\",\n        \"content\": message.content,\n    }\n    if message.tool_calls:\n        result[\"tool_calls\"] = [\n            {\n                \"id\": tool_call.id,\n                \"type\": \"function\",\n                \"function\": {\n                    \"name\": tool_call.function.name,\n                    \"arguments\": tool_call.function.arguments,\n                },\n            }\n            for tool_call in message.tool_calls\n        ]\n    return result\n\n\nasync def execute_tools(\n    message: ChatCompletionMessage,\n    registry: Any,\n    tracker: ToolCallTracker | None = None,\n    tool_timeout: float = 300.0,\n    *,\n    trace: AgentTrace | None = None,\n    turn: int | None = None,\n) -> list[dict[str, Any]]:\n    \"\"\"按顺序执行 function calls，并生成匹配的 tool messages。\"\"\"\n    if tool_timeout <= 0:\n        raise ValueError(\"tool_timeout 必须大于 0\")\n\n    tool_results: list[dict[str, Any]] = []\n    tool_calls = message.tool_calls or []\n    for tool_call in tool_calls:\n        name = tool_call.function.name\n        trace_context = (\n            trace.event_context(turn) if trace is not None else None\n        )\n        try:\n            input_data = json.loads(tool_call.function.arguments or \"{}\")\n            if not isinstance(input_data, dict):\n                raise TypeError(\"工具输入必须是 object\")\n        except (TypeError, json.JSONDecodeError) as exc:\n            content = f\"工具 {name} 参数 JSON 无效: {exc}\"\n            logger.error(\n                content,\n                extra={\n                    \"event\": \"agent.tool_invalid_arguments\",\n                    \"trace\": trace_context,\n                    \"data\": {\n                        \"tool\": name,\n                        \"status\": \"invalid_arguments\",\n                        \"error\": str(exc),\n                    },\n                },\n            )\n            tool_results.append(\n                {\n                    \"role\": \"tool\",\n                    \"tool_call_id\": tool_call.id,\n                    \"content\": content,\n                }\n            )\n            continue\n\n        if tracker is not None and not tracker.allow(name, input_data):\n            content = (\n                \"检测到相同工具调用已连续重复 \"\n                f\"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。\"\n            )\n            logger.warning(\n                \"拦截重复调用: %s %s\",\n                name,\n                input_data,\n                extra={\n                    \"event\": \"agent.tool_blocked\",\n                    \"trace\": trace_context,\n                    \"data\": {\n                        \"tool\": name,\n                        \"status\": \"blocked\",\n                        \"arguments\": input_data,\n                    },\n                },\n            )\n        else:\n            logger.info(\n                \"工具开始: %s\",\n                name,\n                extra={\n                    \"event\": \"agent.tool_started\",\n                    \"trace\": trace_context,\n                    \"console_message\": f\"调用工具: {name} {input_data}\",\n                    \"data\": {\n                        \"tool\": name,\n                        \"arguments\": input_data,\n                    },\n                },\n            )\n            try:\n                execution = await asyncio.wait_for(\n                    registry.execute_with_status(name, input_data),\n                    timeout=tool_timeout,\n                )\n                content = execution.content\n                status = \"error\" if execution.is_error else \"ok\"\n            except TimeoutError:\n                content = (\n                    f\"工具 {name} 执行超时（超过 {tool_timeout:g} 秒）\"\n                )\n                status = \"timeout\"\n            logger.info(\n                \"工具完成: %s (%s)\",\n                name,\n                status,\n                extra={\n                    \"event\": \"agent.tool_completed\",\n                    \"trace\": trace_context,\n                    \"console_message\": f\"工具结果: {content}\",\n                    \"data\": {\n                        \"tool\": name,\n                        \"status\": status,\n                        \"content\": content,\n                    },\n                },\n            )\n\n        tool_results.append(\n            {\n                \"role\": \"tool\",\n                \"tool_call_id\": tool_call.id,\n                \"content\": content,\n            }\n        )\n    return tool_results"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.571+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/runtime.py",
+          "limit": 420
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.572+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"组装并运行一次 Coding Agent。\"\"\"\n\nfrom pathlib import Path\nfrom uuid import uuid4\n\nfrom openai import AsyncOpenAI\nfrom openai.types.chat import ChatCompletion\n\nfrom ..tools import (\n    ToolRegistry,\n    register_fs_tools,\n    register_search_tools,\n    register_shell_tools,\n    register_subagent_tool,\n)\nfrom .config import AgentSettings\nfrom .context import Context\nfrom .cost import estimate_cost\nfrom .loop import AgentTrace, RunStats, run\nfrom .prompts import build_system_prompt, build_task_message\n\n\nasync def run_coding_agent(\n    task: str,\n    workdir: Path,\n    settings: AgentSettings,\n    *,\n    model: str | None = None,\n    max_turns: int | None = None,\n    max_tokens: int = 3000,\n    max_cost_usd: float | None = None,\n    run_id: str | None = None,\n    enable_subagent: bool = True,\n) -> tuple[ChatCompletion, RunStats]:\n    \"\"\"组装依赖并在指定目录运行一次 Coding Agent。\"\"\"\n    workdir = workdir.resolve()\n    if not workdir.is_dir():\n        raise NotADirectoryError(f\"工作目录不存在或不是目录: {workdir}\")\n    selected_model = model if model is not None else settings.model\n    trace = AgentTrace(\n        run_id=run_id or uuid4().hex,\n        agent_id=\"main\",\n        role=\"main\",\n    )\n    main_stats = RunStats()\n\n    registry = ToolRegistry()\n    register_fs_tools(registry, workdir)\n    register_search_tools(registry, workdir)\n    register_shell_tools(\n        registry,\n        workdir,\n        max_output_chars=settings.max_tool_output_chars,\n    )\n\n    context = Context()\n    context.append_user(build_task_message(task, workdir))\n    async with AsyncOpenAI(\n        api_key=settings.api_key,\n        base_url=settings.base_url,\n        max_retries=0,\n    ) as client:\n        if enable_subagent:\n            register_subagent_tool(\n                registry,\n                client=client,\n                workdir=workdir,\n                model=selected_model,\n                parent_trace=trace,\n                parent_stats=main_stats,\n            )\n        return await run(\n            client,\n            context,\n            registry,\n            model=selected_model,\n            system_prompt=build_system_prompt(),\n            max_turns=(\n                max_turns\n                if max_turns is not None\n                else settings.max_turns\n            ),\n            max_tokens=max_tokens,\n            cost_estimator=lambda stats: estimate_cost(stats, settings),\n            max_cost_usd=max_cost_usd,\n            stats=main_stats,\n            trace=trace,\n        )"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.573+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/config.py",
+          "limit": 260
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.574+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"加载 agent-mini 的模型与运行配置。\"\"\"\n\nfrom pathlib import Path\n\nfrom pydantic import AliasChoices, Field, field_validator\nfrom pydantic_settings import BaseSettings, SettingsConfigDict\n\n\nPROJECT_ROOT = Path(__file__).resolve().parents[2]\n\n\nclass AgentSettings(BaseSettings):\n    \"\"\"从环境变量或 .env 文件读取 Agent 配置。\"\"\"\n\n    model_config = SettingsConfigDict(\n        # 父目录配置先加载，项目自己的 .env 可以覆盖它。\n        env_file=(PROJECT_ROOT.parent / \".env\", PROJECT_ROOT / \".env\"),\n        env_file_encoding=\"utf-8\",\n        extra=\"ignore\",\n    )\n\n    api_key: str = Field(\n        validation_alias=AliasChoices(\n            \"CODEX_API_KEY\",\n            \"OPENAI_API_KEY\",\n            \"ANTHROPIC_API_KEY\",\n            \"DEEPSEEK_API_KEY\",\n        )\n    )\n    base_url: str = Field(\n        default=\"http://165.154.255.250:8080/v1\",\n        validation_alias=AliasChoices(\n            \"CODEX_BASE_URL\",\n            \"OPENAI_BASE_URL\",\n            \"ANTHROPIC_BASE_URL\",\n            \"DEEPSEEK_BASE_URL\",\n        ),\n    )\n    model: str = Field(\n        default=\"gpt-5.6-luna\",\n        validation_alias=AliasChoices(\n            \"CODEX_MODEL\",\n            \"OPENAI_MODEL\",\n            \"DEEPSEEK_MODEL\",\n        ),\n    )\n    log_file: Path = PROJECT_ROOT / \"logs\" / \"agent.json\"\n    max_turns: int = 30\n    max_tool_output_chars: int = 10_000\n    input_price_per_million: float | None = Field(default=None, ge=0)\n    output_price_per_million: float | None = Field(default=None, ge=0)\n    cache_read_price_per_million: float | None = Field(default=None, ge=0)\n    cache_creation_price_per_million: float | None = Field(\n        default=None,\n        ge=0,\n    )\n    price_currency: str = \"USD\"\n\n    @field_validator(\"base_url\")\n    @classmethod\n    def ensure_openai_v1(cls, value: str) -> str:\n        \"\"\"把网关根地址规范成 OpenAI SDK 需要的 `/v1` 地址。\"\"\"\n        value = value.rstrip(\"/\")\n        return value if value.endswith(\"/v1\") else f\"{value}/v1\""
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.574+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: list_dir",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "list_dir",
+        "arguments": {
+          "path": "src/tools"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.576+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: list_dir (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "list_dir",
+        "status": "ok",
+        "content": "[FILE] __init__.py\n[DIR] __pycache__\n[FILE] fs.py\n[FILE] registry.py\n[FILE] search.py\n[FILE] shell.py\n[FILE] spawn_subagent.py\n[FILE] tools.py"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.576+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/cli.py",
+          "offset": 180,
+          "limit": 240
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.578+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "        )\n        return\n\n    logger.info(\n        \"预估费用: %s %.6f\",\n        settings.price_currency,\n        cost,\n        extra={\n            \"event\": \"run.cost\",\n            \"trace\": trace,\n            \"data\": {\"currency\": settings.price_currency, \"amount\": cost},\n        },\n    )\n\n\nasync def main() -> None:\n    \"\"\"解析命令行参数，运行 Agent 并展示结果。\"\"\"\n    args = parse_args()\n    workdir = args.workdir.resolve()\n    settings = AgentSettings()\n    run_id = uuid4().hex\n    trace = {\"run_id\": run_id, \"agent_id\": \"main\", \"role\": \"main\"}\n    log_file = configure_logging(args.log_file or settings.log_file)\n    logger.info(\n        \"详细日志: %s\",\n        log_file,\n        extra={\n            \"event\": \"run.started\",\n            \"trace\": trace,\n            \"data\": {\n                \"task\": args.task,\n                \"workdir\": str(workdir),\n                \"log_file\": str(log_file),\n                \"model\": args.model or settings.model,\n                \"max_turns\": args.max_turns or settings.max_turns,\n                \"enable_subagent\": args.enable_subagent,\n            },\n        },\n    )\n\n    try:\n        final_response, stats = await run_coding_agent(\n            task=args.task,\n            workdir=workdir,\n            settings=settings,\n            model=args.model,\n            max_turns=args.max_turns,\n            run_id=run_id,\n            enable_subagent=args.enable_subagent,\n        )\n    except MaxTurnsExceeded as exc:\n        logger.error(\n            \"运行失败: %s\",\n            exc,\n            extra={\"event\": \"run.max_turns_exceeded\", \"trace\": trace},\n        )\n        log_stats(exc.stats, trace=trace)\n        log_cost(exc.stats, settings, trace=trace)\n        return\n    except APIError as exc:\n        logger.error(\n            \"模型请求失败: %s\",\n            exc,\n            extra={\"event\": \"run.api_error\", \"trace\": trace},\n        )\n        return\n\n    log_stats(stats, trace=trace)\n    log_cost(stats, settings, trace=trace)\n    finish_reason = final_response.choices[0].finish_reason\n    answer = extract_text(final_response)\n    logger.info(\n        \"运行完成\",\n        extra={\n            \"event\": \"run.completed\",\n            \"trace\": trace,\n            \"console_message\": f\"最终回答: {answer}\",\n            \"data\": {\"finish_reason\": finish_reason, \"answer\": answer},\n        },\n    )\n\n\nif __name__ == \"__main__\":\n    try:\n        asyncio.run(main())\n    except KeyboardInterrupt:\n        logger.warning(\n            \"运行已由用户中断。\",\n            extra={\"event\": \"run.interrupted\"},\n        )"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.579+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/main.py",
+          "limit": 120
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.580+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 3
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"使用 run_shell 演示异步命令执行流程。\"\"\"\n\nimport asyncio\nfrom typing import Any\n\nfrom openai import AsyncOpenAI\n\n\nif __package__:\n    from .agent.config import AgentSettings, PROJECT_ROOT\n    from .agent.context import Context\n    from .agent.loop import run\n    from .agent.prompts import build_system_prompt, build_task_message\n    from .agent.logging_config import configure_logging, get_logger\n    from .tools import (\n        register_fs_tools,\n        register_search_tools,\n        register_shell_tools,\n        registry,\n    )\nelse:\n    from agent.config import AgentSettings, PROJECT_ROOT\n    from agent.context import Context\n    from agent.loop import run\n    from agent.prompts import build_system_prompt, build_task_message\n    from agent.logging_config import configure_logging, get_logger\n    from tools import (\n        register_fs_tools,\n        register_search_tools,\n        register_shell_tools,\n        registry,\n    )\n\n\nlogger = get_logger(\"main\")\n\n\ndef extract_text(message: Any) -> str:\n    \"\"\"提取 Chat Completions 响应中的 assistant 文本。\"\"\"\n    return message.choices[0].message.content or \"\"\n\n\nasync def main() -> None:\n    \"\"\"创建 Agent 依赖并运行 Shell 命令任务。\"\"\"\n    settings = AgentSettings()\n    log_file = configure_logging(settings.log_file)\n    logger.info(\n        \"详细日志: %s\",\n        log_file,\n        extra={\n            \"event\": \"run.started\",\n            \"data\": {\n                \"workdir\": str(PROJECT_ROOT),\n                \"log_file\": str(log_file),\n                \"model\": settings.model,\n                \"max_turns\": settings.max_turns,\n            },\n        },\n    )\n    register_fs_tools(registry, PROJECT_ROOT)\n    register_search_tools(registry, PROJECT_ROOT)\n    register_shell_tools(registry, PROJECT_ROOT)\n    context = Context()\n    context.append_user(\n        build_task_message(\"分析下当前的入口文件是哪个\", PROJECT_ROOT)\n    )\n\n    system_prompt = build_system_prompt()\n\n    async with AsyncOpenAI(\n        api_key=settings.api_key,\n        base_url=settings.base_url,\n        max_retries=0,\n    ) as client:\n        final_response, stats = await run(\n            client,\n            context,\n            registry,\n            model=settings.model,\n            system_prompt=system_prompt,\n            max_turns=settings.max_turns,\n            max_tokens=3000,\n        )\n\n    answer = extract_text(final_response)\n    logger.info(\n        \"最终回答: %s\",\n        answer,\n        extra={\n            \"event\": \"run.completed\",\n            \"data\": {\n                \"turns\": stats.turns,\n                \"input_tokens\": stats.input_tokens,\n                \"output_tokens\": stats.output_tokens,\n                \"total_tokens\": stats.input_tokens + stats.output_tokens,\n                \"finish_reason\": final_response.choices[0].finish_reason,\n                \"answer\": answer,\n            },\n        },\n    )\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:12.581+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 4/20 轮 =====",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "max_turns": 20
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.017+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/tools/registry.py",
+          "limit": 320
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.018+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"把 Python 函数注册为模型可调用工具，并统一校验和执行。\"\"\"\n\nfrom __future__ import annotations\n\nimport inspect\nimport json\nimport re\nfrom copy import deepcopy\nfrom dataclasses import dataclass\nfrom typing import Any, Callable, get_type_hints\n\nfrom pydantic import BaseModel, TypeAdapter\n\n\nToolHandler = Callable[..., Any]\n\n\n@dataclass(frozen=True)\nclass RegisteredTool:\n    \"\"\"已注册工具的定义和处理函数。\"\"\"\n\n    name: str\n    description: str\n    input_schema: dict[str, Any]\n    handler: ToolHandler\n\n\n@dataclass(frozen=True)\nclass ToolExecutionResult:\n    \"\"\"工具执行结果。\"\"\"\n\n    content: str\n    is_error: bool = False\n\n\ndef _parse_docstring(handler: ToolHandler) -> tuple[str, dict[str, str]]:\n    \"\"\"从 docstring 提取工具描述和参数描述。\"\"\"\n    doc = inspect.getdoc(handler) or \"\"\n    description_lines: list[str] = []\n    argument_descriptions: dict[str, str] = {}\n    in_args = False\n    current_argument: str | None = None\n\n    for raw_line in doc.splitlines():\n        line = raw_line.strip()\n        if line in {\"Args:\", \"Arguments:\", \"Parameters:\"}:\n            in_args = True\n            current_argument = None\n            continue\n        if line in {\"Returns:\", \"Raises:\", \"Examples:\", \"Example:\"}:\n            in_args = False\n            current_argument = None\n            continue\n\n        if not in_args:\n            if line:\n                description_lines.append(line)\n            continue\n\n        match = re.match(r\"^(\\w+)(?:\\s*\\([^)]*\\))?\\s*:\\s*(.*)$\", line)\n        if match:\n            current_argument = match.group(1)\n            argument_descriptions[current_argument] = match.group(2)\n        elif current_argument and line:\n            argument_descriptions[current_argument] += f\" {line}\"\n\n    description = \" \".join(description_lines).strip() or handler.__name__\n    return description, argument_descriptions\n\n\ndef _parameters(handler: ToolHandler) -> list[inspect.Parameter]:\n    \"\"\"读取可由 JSON object 传入的具名参数。\"\"\"\n    parameters = list(inspect.signature(handler).parameters.values())\n    unsupported = {\n        inspect.Parameter.POSITIONAL_ONLY,\n        inspect.Parameter.VAR_POSITIONAL,\n        inspect.Parameter.VAR_KEYWORD,\n    }\n    if any(parameter.kind in unsupported for parameter in parameters):\n        raise TypeError(\"工具函数只支持普通具名参数和关键字参数\")\n    return parameters\n\n\ndef _type_hints(handler: ToolHandler) -> dict[str, Any]:\n    \"\"\"安全读取函数类型标注。\"\"\"\n    try:\n        return get_type_hints(handler)\n    except (NameError, TypeError):\n        return {}\n\n\ndef _is_model_type(annotation: Any) -> bool:\n    return inspect.isclass(annotation) and issubclass(annotation, BaseModel)\n\n\ndef _schema_for(annotation: Any) -> dict[str, Any]:\n    \"\"\"把类型标注转成 JSON Schema。\"\"\"\n    if annotation is inspect.Signature.empty or annotation is Any:\n        return {}\n    try:\n        return TypeAdapter(annotation).json_schema()\n    except Exception:\n        return {}\n\n\ndef _build_definition(\n    handler: ToolHandler,\n) -> tuple[str, dict[str, Any]]:\n    \"\"\"生成工具描述和输入 schema。\"\"\"\n    description, argument_descriptions = _parse_docstring(handler)\n    parameters = _parameters(handler)\n    type_hints = _type_hints(handler)\n\n    # 单个 Pydantic 参数直接使用模型 schema。\n    if len(parameters) == 1:\n        parameter = parameters[0]\n        annotation = type_hints.get(parameter.name, parameter.annotation)\n        if _is_model_type(annotation):\n            return description, annotation.model_json_schema()\n\n    # 普通参数逐个生成 properties 和 required。\n    properties: dict[str, Any] = {}\n    required: list[str] = []\n    for parameter in parameters:\n        annotation = type_hints.get(parameter.name, parameter.annotation)\n        property_schema = _schema_for(annotation)\n        parameter_description = argument_descriptions.get(parameter.name)\n        if parameter_description:\n            property_schema[\"description\"] = parameter_description\n        properties[parameter.name] = property_schema\n\n        if parameter.default is inspect.Signature.empty:\n            required.append(parameter.name)\n\n    input_schema: dict[str, Any] = {\n        \"type\": \"object\",\n        \"properties\": properties,\n    }\n    if required:\n        input_schema[\"required\"] = required\n    return description, input_schema\n\n\ndef _prepare_arguments(\n    handler: ToolHandler,\n    input_data: dict[str, Any],\n) -> dict[str, Any]:\n    \"\"\"校验模型输入并生成工具调用参数。\"\"\"\n    signature = inspect.signature(handler)\n    parameters = _parameters(handler)\n    type_hints = _type_hints(handler)\n\n    if len(parameters) == 1:\n        parameter = parameters[0]\n        annotation = type_hints.get(parameter.name, parameter.annotation)\n        if _is_model_type(annotation):\n            return {parameter.name: annotation.model_validate(input_data)}\n\n    known_names = {parameter.name for parameter in parameters}\n    unexpected = sorted(set(input_data) - known_names)\n    if unexpected:\n        raise TypeError(f\"未知工具参数: {', '.join(unexpected)}\")\n\n    arguments: dict[str, Any] = {}\n    for parameter in parameters:\n        if parameter.name not in input_data:\n            continue\n        annotation = type_hints.get(parameter.name, parameter.annotation)\n        value = input_data[parameter.name]\n        if annotation is not inspect.Signature.empty and annotation is not Any:\n            value = TypeAdapter(annotation).validate_python(value)\n        arguments[parameter.name] = value\n\n    signature.bind(**arguments)\n    return arguments\n\n\ndef _serialize_result(result: Any) -> str:\n    \"\"\"把工具返回值转成文本。\"\"\"\n    if isinstance(result, str):\n        return result\n    return json.dumps(result, ensure_ascii=False, default=str)\n\n\nclass ToolRegistry:\n    \"\"\"管理工具注册、schema 导出和执行。\"\"\"\n\n    def __init__(self) -> None:\n        self._tools: dict[str, RegisteredTool] = {}\n\n    def register(\n        self,\n        handler: ToolHandler,\n        *,\n        name: str | None = None,\n        description: str | None = None,\n        input_schema: dict[str, Any] | None = None,\n    ) -> ToolHandler:\n        \"\"\"注册工具，缺省信息从函数定义生成。\"\"\"\n        tool_name = name or handler.__name__\n        if tool_name in self._tools:\n            raise ValueError(f\"工具已注册: {tool_name}\")\n        generated_description, generated_schema = _build_definition(handler)\n        self._tools[tool_name] = RegisteredTool(\n            name=tool_name,\n            description=description or generated_description,\n            input_schema=input_schema or generated_schema,\n            handler=handler,\n        )\n        return handler\n\n    def tool(\n        self,\n        handler: ToolHandler | None = None,\n        *,\n        name: str | None = None,\n        description: str | None = None,\n        input_schema: dict[str, Any] | None = None,\n    ) -> ToolHandler | Callable[[ToolHandler], ToolHandler]:\n        \"\"\"支持 `@tool` 和 `@tool(...)` 两种装饰器写法。\"\"\"\n        def decorator(function: ToolHandler) -> ToolHandler:\n            return self.register(\n                function,\n                name=name,\n                description=description,\n                input_schema=input_schema,\n            )\n\n        if handler is None:\n            return decorator\n        return decorator(handler)\n\n    def schemas(self) -> list[dict[str, Any]]:\n        \"\"\"导出 Messages API 使用的工具 schema。\"\"\"\n        return [\n            {\n                \"name\": registered.name,\n                \"description\": registered.description,\n                \"input_schema\": deepcopy(registered.input_schema),\n            }\n            for registered in self._tools.values()\n        ]\n\n    async def execute_with_status(\n        self,\n        name: str,\n        input_data: dict[str, Any],\n    ) -> ToolExecutionResult:\n        \"\"\"执行工具；异常转成 is_error 结果供模型继续处理。\"\"\"\n        try:\n            if not isinstance(input_data, dict):\n                raise TypeError(\"工具输入必须是 object\")\n            if name not in self._tools:\n                raise KeyError(f\"未注册工具: {name}\")\n\n            registered = self._tools[name]\n            arguments = _prepare_arguments(registered.handler, input_data)\n            result = registered.handler(**arguments)\n            if inspect.isawaitable(result):\n                result = await result\n            return ToolExecutionResult(content=_serialize_result(result))\n        except Exception as exc:\n            return ToolExecutionResult(\n                content=(\n                    f\"工具 {name} 执行失败: \"\n                    f\"{type(exc).__name__}: {exc}\"\n                ),\n                is_error=True,\n            )\n\n    async def execute(self, name: str, input_data: dict[str, Any]) -> str:\n        \"\"\"执行工具并返回结果文本。\"\"\"\n        result = await self.execute_with_status(name, input_data)\n        return result.content\n\n\n# 供 @tool 和 Agent 共用的默认注册表。\nregistry = ToolRegistry()\ntool = registry.tool\n\n\n__all__ = [\n    \"RegisteredTool\",\n    \"ToolExecutionResult\",\n    \"ToolRegistry\",\n    \"registry\",\n    \"tool\",\n]"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.019+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/tools/__init__.py",
+          "limit": 240
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.021+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"Tool registry and built-in tools.\"\"\"\n\nfrom .fs import register_fs_tools, register_readonly_fs_tools, resolve_path\nfrom .registry import (\n    RegisteredTool,\n    ToolExecutionResult,\n    ToolRegistry,\n    registry,\n    tool,\n)\nfrom .spawn_subagent import register_subagent_tool\nfrom .search import register_search_tools\nfrom .shell import register_shell_tools\nfrom .tools import get_weather\n\n\n__all__ = [\n    \"RegisteredTool\",\n    \"ToolExecutionResult\",\n    \"ToolRegistry\",\n    \"get_weather\",\n    \"registry\",\n    \"tool\",\n    \"register_fs_tools\",\n    \"register_readonly_fs_tools\",\n    \"resolve_path\",\n    \"register_search_tools\",\n    \"register_shell_tools\",\n    \"register_subagent_tool\",\n]"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.022+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/tools/spawn_subagent.py",
+          "limit": 420
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.023+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"探索型 SubAgent 工具。\"\"\"\n\nfrom pathlib import Path\nfrom uuid import uuid4\n\nfrom openai import AsyncOpenAI\n\nfrom ..agent.context import Context\nfrom ..agent.loop import AgentTrace, RunStats, message_text, run\nfrom .fs import register_readonly_fs_tools\nfrom .registry import ToolRegistry\nfrom .search import register_search_tools\n\n\nSUBAGENT_SYSTEM_PROMPT = \"\"\"\n你是一个只读的项目探索助手。\n\n根据分配给你的子任务搜索和阅读项目代码，但不要修改任何文件。\n重点识别关键文件、代码关系、实现行为和潜在问题。\n\n完成探索后，返回不超过 500 token 的结构化总结：\n1. 关键结论\n2. 相关文件\n3. 支撑结论的代码事实\n\n不要返回完整文件内容，也不要描述无关的探索过程。\n\"\"\".strip()\n\n\ndef register_subagent_tool(\n    registry: ToolRegistry,\n    *,\n    client: AsyncOpenAI,\n    workdir: Path,\n    model: str,\n    parent_trace: AgentTrace,\n    parent_stats: RunStats,\n    max_tokens: int = 1000,\n) -> None:\n    \"\"\"注册绑定到当前模型和工作目录的探索型 SubAgent。\"\"\"\n\n    @registry.tool\n    async def spawn_subagent(task: str) -> str:\n        \"\"\"派出只读 SubAgent 探索复杂问题并返回简短总结。\n\n        适用于需要搜索多个文件、理解模块结构或追踪调用关系的子任务。\n        不适用于读取单个已知文件或直接执行小范围代码修改。\n\n        Args:\n            task: 明确且可独立完成的探索任务。\n        \"\"\"\n        child_registry = ToolRegistry()\n        register_readonly_fs_tools(child_registry, workdir)\n        register_search_tools(child_registry, workdir)\n\n        child_context = Context()\n        child_context.append_user(task)\n        child_stats = RunStats()\n        parent_stats.subagent_runs.append(child_stats)\n        child_trace = AgentTrace(\n            run_id=parent_trace.run_id,\n            agent_id=f\"subagent-{uuid4().hex[:8]}\",\n            parent_agent_id=parent_trace.agent_id,\n            role=\"subagent\",\n        )\n\n        response, _ = await run(\n            client,\n            child_context,\n            child_registry,\n            model=model,\n            system_prompt=SUBAGENT_SYSTEM_PROMPT,\n            max_turns=15,\n            max_tokens=max_tokens,\n            stats=child_stats,\n            trace=child_trace,\n        )\n\n        summary = message_text(response.choices[0].message)\n\n        if not summary:\n            raise RuntimeError(\"SubAgent 没有返回最终总结\")\n        return summary"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.024+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/prompts.py",
+          "limit": 240
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.025+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"Coding Agent 使用的系统提示词。\"\"\"\n\nfrom pathlib import Path\n\n\ndef build_system_prompt() -> str:\n    \"\"\"生成不包含运行时路径的稳定 Coding Agent 系统提示词。\"\"\"\n    return \"\"\"\n你是一个在本地项目中工作的通用 Coding Agent。\n你的任务来自用户消息。你需要通过检查项目、修改代码和运行验证来完成任务，\n而不是只给出修改建议。\n\n工作规则：\n1. 准确理解用户目标，并基于项目事实开展工作，不猜测未知内容。\n2. 修改前确认预期行为和现有实现，优先修复根因，不要修改测试来掩盖问题。\n3. 修改后进行与任务匹配的有效验证；验证不足时不得宣称任务完成。\n4. 保持修改范围聚焦，遵守工作目录边界，如实报告修改内容和验证结果，不编造事实。\n5. 当多个检查彼此独立时，可在同一轮发起多个工具调用，减少不必要的模型往返；避免重复读取相同内容。\n\"\"\".strip()\n\n\ndef build_task_message(task: str, workdir: Path) -> str:\n    \"\"\"将动态工作目录与用户任务放入 user message。\"\"\"\n    return f\"工作目录：{workdir.resolve()}\\n\\n用户任务：\\n{task}\""
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.027+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/agent/logging_config.py",
+          "limit": 360
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.030+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"Configure plain console logs and a structured JSON event file.\"\"\"\n\nimport json\nimport logging\nimport sys\nfrom datetime import datetime\nfrom pathlib import Path\nfrom typing import Any\n\n\nLOGGER_NAME = \"agent_mini\"\n\n\nclass ConsoleFormatter(logging.Formatter):\n    \"\"\"优先显示事件提供的详细控制台文本。\"\"\"\n\n    def format(self, record: logging.LogRecord) -> str:\n        return getattr(record, \"console_message\", record.getMessage())\n\n\nclass JsonEventFormatter(logging.Formatter):\n    \"\"\"Convert a log record to a JSON-serializable event.\"\"\"\n\n    def format_event(\n        self,\n        record: logging.LogRecord,\n    ) -> dict[str, Any]:\n        payload: dict[str, Any] = {\n            \"timestamp\": datetime.fromtimestamp(record.created).astimezone().isoformat(\n                timespec=\"milliseconds\"\n            ),\n            \"level\": record.levelname,\n            \"event\": getattr(record, \"event\", \"log\"),\n            \"message\": record.getMessage(),\n        }\n        trace = getattr(record, \"trace\", None)\n        if trace:\n            payload[\"trace\"] = trace\n        data = getattr(record, \"data\", None)\n        if data:\n            payload[\"data\"] = data\n        if record.exc_info:\n            payload[\"exception\"] = self.formatException(record.exc_info)\n        return payload\n\n\nclass JsonFileHandler(logging.Handler):\n    \"\"\"Keep the target file as one complete, readable JSON document.\"\"\"\n\n    def __init__(self, path: Path) -> None:\n        super().__init__()\n        self.path = path\n        self.events: list[dict[str, Any]] = []\n        self.event_formatter = JsonEventFormatter()\n        self._write_document()\n\n    def emit(self, record: logging.LogRecord) -> None:\n        try:\n            self.events.append(self.event_formatter.format_event(record))\n            self._write_document()\n        except Exception:\n            self.handleError(record)\n\n    def _write_document(self) -> None:\n        document = {\n            \"schema_version\": 2,\n            \"event_count\": len(self.events),\n            \"events\": self.events,\n        }\n        temporary_path = self.path.with_suffix(f\"{self.path.suffix}.tmp\")\n        with temporary_path.open(\"w\", encoding=\"utf-8\") as file:\n            json.dump(document, file, ensure_ascii=False, indent=2, default=str)\n            file.write(\"\\n\")\n        temporary_path.replace(self.path)\n\n\ndef get_logger(name: str) -> logging.Logger:\n    \"\"\"Return a child logger managed by agent-mini's logging configuration.\"\"\"\n    return logging.getLogger(f\"{LOGGER_NAME}.{name}\")\n\n\ndef configure_logging(log_file: Path) -> Path:\n    \"\"\"Clear the target file and write this run as one JSON document.\"\"\"\n    path = log_file.expanduser().resolve()\n    path.parent.mkdir(parents=True, exist_ok=True)\n\n    logger = logging.getLogger(LOGGER_NAME)\n    logger.setLevel(logging.INFO)\n    logger.propagate = False\n\n    for handler in logger.handlers[:]:\n        handler.close()\n        logger.removeHandler(handler)\n\n    console_handler = logging.StreamHandler(sys.stdout)\n    console_handler.setFormatter(ConsoleFormatter())\n    logger.addHandler(console_handler)\n\n    file_handler = JsonFileHandler(path)\n    logger.addHandler(file_handler)\n    return path"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.034+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "pyproject.toml",
+          "limit": 180
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.037+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 4
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "[project]\nname = \"agent-mini\"\nversion = \"0.1.0\"\ndescription = \"A minimal coding agent built for the AI Agent roadmap\"\nrequires-python = \">=3.12\"\ndependencies = [\n    \"anthropic>=0.68.0\",\n    \"openai>=2.44.0\",\n    \"pydantic-settings>=2.10.1\",\n    \"pyyaml>=6.0.3\",\n]\n\n[tool.uv]\npackage = false"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:17.039+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 5/20 轮 =====",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "max_turns": 20
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.435+08:00",
+      "level": "INFO",
+      "event": "agent.model_text",
+      "message": "模型返回文本",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "text": "调用关系已经闭合：CLI 构造设置并调用 `run_coding_agent`；运行时注册文件、搜索、Shell 和可选 SubAgent；`run` 每轮先把 Context 连同工具 schema 发给 Chat Completions，再把 assistant 的 tool calls 执行后追加为 `tool` 消息。最后再核对具体工具注册和日志实现，以说明“结果如何回到模型”以及费用/日志字段的实际来源。"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.438+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/tools/fs.py",
+          "limit": 220
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.440+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"工作目录内的文件操作工具。\"\"\"\n\nfrom pathlib import Path\n\nfrom .registry import ToolRegistry\n\n\ndef resolve_path(workdir: Path, path: str) -> Path:\n    \"\"\"解析工作目录内的路径，并拒绝越界访问。\"\"\"\n    root = workdir.resolve()\n    target = (root / path).resolve()\n\n    if not target.is_relative_to(root):\n        raise ValueError(f\"路径超出工作目录：{path}\")\n\n    return target\n\n\ndef register_readonly_fs_tools(\n    registry: ToolRegistry,\n    workdir: Path,\n) -> None:\n    \"\"\"注册绑定到指定工作目录的只读文件工具。\"\"\"\n\n    @registry.tool\n    def read_file(\n        path: str,\n        offset: int = 1,\n        limit: int = 200,\n    ) -> str:\n        \"\"\"读取工作目录内的 UTF-8 文本文件。\n\n        Args:\n            path: 相对于工作目录的文件路径。\n            offset: 起始行号，从 1 开始。\n            limit: 最多返回的行数。\n        \"\"\"\n        if offset < 1:\n            raise ValueError(\"offset 必须大于等于 1\")\n        if limit < 1:\n            raise ValueError(\"limit 必须大于等于 1\")\n\n        target = resolve_path(workdir, path)\n        if not target.exists():\n            raise FileNotFoundError(f\"文件不存在：{path}\")\n        if not target.is_file():\n            raise IsADirectoryError(f\"路径不是文件：{path}\")\n\n        lines = target.read_text(encoding=\"utf-8\").splitlines()\n        start = offset - 1\n        return \"\\n\".join(lines[start:start + limit])\n\n    @registry.tool\n    def list_dir(path: str = \".\") -> str:\n        \"\"\"列出工作目录内指定目录的直接子项。\n\n        Args:\n            path: 相对于工作目录的目录路径，默认为工作目录。\n        \"\"\"\n        target = resolve_path(workdir, path)\n        if not target.exists():\n            raise FileNotFoundError(f\"路径不存在：{path}\")\n        if not target.is_dir():\n            raise IsADirectoryError(f\"路径不是目录：{path}\")\n\n        entries = sorted(\n            target.iterdir(),\n            key=lambda entry: entry.name.lower(),\n        )\n        if not entries:\n            return \"(目录为空)\"\n\n        lines = []\n        for entry in entries:\n            kind = \"DIR\" if entry.is_dir() else \"FILE\"\n            lines.append(f\"[{kind}] {entry.name}\")\n        return \"\\n\".join(lines)\n\n\ndef register_fs_tools(\n    registry: ToolRegistry,\n    workdir: Path,\n) -> None:\n    \"\"\"注册绑定到指定工作目录的完整文件工具。\"\"\"\n    register_readonly_fs_tools(registry, workdir)\n\n    @registry.tool\n    def write_file(path: str, content: str) -> str:\n        \"\"\"创建或覆盖工作目录内的 UTF-8 文本文件。\n\n        Args:\n            path: 相对于工作目录的文件路径。\n            content: 要写入文件的完整内容。\n        \"\"\"\n        target = resolve_path(workdir, path)\n        if target.exists() and target.is_dir():\n            raise IsADirectoryError(f\"路径是目录：{path}\")\n\n        target.parent.mkdir(parents=True, exist_ok=True)\n        written = target.write_text(content, encoding=\"utf-8\")\n        return f\"已写入文件：{path}，共 {written} 个字符\"\n\n    @registry.tool\n    def edit_file(path: str, old_string: str, new_string: str) -> str:\n        \"\"\"精确替换已有文本文件中的唯一字符串。\n\n        Args:\n            path: 相对于工作目录的文件路径。\n            old_string: 文件中需要替换的原始字符串，必须只出现一次。\n            new_string: 替换后的字符串。\n        \"\"\"\n        if not old_string:\n            raise ValueError(\"old_string 不能为空\")\n\n        target = resolve_path(workdir, path)\n        if not target.exists():\n            raise FileNotFoundError(f\"文件不存在：{path}\")\n        if not target.is_file():\n            raise IsADirectoryError(f\"路径不是文件：{path}\")\n\n        content = target.read_text(encoding=\"utf-8\")\n        occurrences = content.count(old_string)\n        if occurrences == 0:\n            raise ValueError(\"文件中找不到 old_string\")\n        if occurrences > 1:\n            raise ValueError(\n                f\"old_string 在文件中出现 {occurrences} 次，无法唯一替换\"\n            )\n\n        updated = content.replace(old_string, new_string, 1)\n        target.write_text(updated, encoding=\"utf-8\")\n        return f\"已更新文件：{path}\""
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.442+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/tools/search.py",
+          "limit": 180
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.444+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"工作目录内的文本搜索工具。\"\"\"\n\nimport os\nimport re\nfrom collections.abc import Iterator\nfrom pathlib import Path\n\nfrom .fs import resolve_path\nfrom .registry import ToolRegistry\n\n\nIGNORED_DIRS = {\".git\", \".venv\", \"__pycache__\", \"node_modules\"}\n\n\ndef _iter_files(target: Path, root: Path) -> Iterator[Path]:\n    \"\"\"按名称顺序遍历文件，并跳过常见依赖和缓存目录。\"\"\"\n    if target.is_file():\n        yield target\n        return\n\n    for current_dir, dirnames, filenames in os.walk(target):\n        dirnames[:] = sorted(\n            (name for name in dirnames if name not in IGNORED_DIRS),\n            key=str.lower,\n        )\n        for filename in sorted(filenames, key=str.lower):\n            file_path = Path(current_dir) / filename\n            resolved = file_path.resolve()\n            if resolved.is_relative_to(root):\n                yield resolved\n\n\ndef register_search_tools(\n    registry: ToolRegistry,\n    workdir: Path,\n) -> None:\n    \"\"\"注册绑定到指定工作目录的搜索工具。\"\"\"\n    root = workdir.resolve()\n\n    @registry.tool\n    def grep(\n        pattern: str,\n        path: str = \".\",\n        max_results: int = 100,\n    ) -> str:\n        \"\"\"在文件或目录中搜索正则表达式。\n\n        Args:\n            pattern: 要搜索的正则表达式。\n            path: 搜索起点，默认为工作目录。\n            max_results: 最多返回的匹配数量。\n        \"\"\"\n        if not pattern:\n            raise ValueError(\"pattern 不能为空\")\n        if max_results < 1:\n            raise ValueError(\"max_results 必须大于等于 1\")\n\n        target = resolve_path(root, path)\n        if not target.exists():\n            raise FileNotFoundError(f\"路径不存在：{path}\")\n        if not target.is_file() and not target.is_dir():\n            raise ValueError(f\"路径不是普通文件或目录：{path}\")\n\n        try:\n            expression = re.compile(pattern)\n        except re.error as exc:\n            raise ValueError(f\"无效正则表达式：{exc}\") from exc\n\n        matches: list[str] = []\n        for file_path in _iter_files(target, root):\n            try:\n                with file_path.open(\"r\", encoding=\"utf-8\") as file:\n                    for line_number, line in enumerate(file, start=1):\n                        if \"\\x00\" in line:\n                            break\n                        if not expression.search(line):\n                            continue\n\n                        relative_path = file_path.relative_to(root).as_posix()\n                        text = line.rstrip(\"\\r\\n\")\n                        if len(text) > 500:\n                            text = f\"{text[:500]}...(行内容已截断)\"\n                        matches.append(\n                            f\"{relative_path}:{line_number}:{text}\"\n                        )\n\n                        if len(matches) >= max_results:\n                            matches.append(\"...(搜索结果已达到上限)\")\n                            return \"\\n\".join(matches)\n            except (OSError, UnicodeError):\n                continue\n\n        if not matches:\n            return \"(没有找到匹配内容)\"\n        return \"\\n\".join(matches)"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.446+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: read_file",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "read_file",
+        "arguments": {
+          "path": "src/tools/shell.py",
+          "limit": 220
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.448+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: read_file (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "read_file",
+        "status": "ok",
+        "content": "\"\"\"在指定工作目录内执行 Shell 命令。\"\"\"\n\nimport asyncio\nfrom pathlib import Path\n\nfrom .registry import ToolRegistry\n\n\ndef _truncate_output(output: str, max_chars: int) -> str:\n    \"\"\"输出过长时保留头尾，并截断中间部分。\"\"\"\n    if len(output) <= max_chars:\n        return output\n\n    marker = \"\\n...(中间内容已截断)...\\n\"\n    if max_chars <= len(marker):\n        return output[:max_chars]\n\n    remaining = max_chars - len(marker)\n    head_chars = remaining // 2\n    tail_chars = remaining - head_chars\n    return f\"{output[:head_chars]}{marker}{output[-tail_chars:]}\"\n\n\ndef register_shell_tools(\n    registry: ToolRegistry,\n    workdir: Path,\n    *,\n    timeout: float = 30.0,\n    max_output_chars: int = 10_000,\n) -> None:\n    \"\"\"注册绑定到指定工作目录的 Shell 工具。\"\"\"\n    if timeout <= 0:\n        raise ValueError(\"timeout 必须大于 0\")\n    if max_output_chars <= 0:\n        raise ValueError(\"max_output_chars 必须大于 0\")\n\n    root = workdir.resolve()\n\n    @registry.tool\n    async def run_shell(command: str) -> str:\n        \"\"\"在项目工作目录中执行 Shell 命令。\n\n        Args:\n            command: 要执行的 Shell 命令。\n        \"\"\"\n        if not command.strip():\n            raise ValueError(\"command 不能为空\")\n\n        process = await asyncio.create_subprocess_shell(\n            command,\n            cwd=root,\n            stdout=asyncio.subprocess.PIPE,\n            stderr=asyncio.subprocess.PIPE,\n        )\n\n        try:\n            stdout_bytes, stderr_bytes = await asyncio.wait_for(\n                process.communicate(),\n                timeout=timeout,\n            )\n        except TimeoutError:\n            process.kill()\n            await process.communicate()\n            return f\"命令执行超时（超过 {timeout} 秒）\"\n\n        stdout = stdout_bytes.decode(errors=\"replace\")\n        stderr = stderr_bytes.decode(errors=\"replace\")\n        output = (\n            f\"exit_code: {process.returncode}\\n\"\n            f\"stdout:\\n{stdout or '(无输出)'}\\n\"\n            f\"stderr:\\n{stderr or '(无输出)'}\"\n        )\n        return _truncate_output(output, max_output_chars)"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.450+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: run_shell",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "run_shell",
+        "arguments": {
+          "command": "nl -ba src/cli.py | sed -n '1,260p'"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.457+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: run_shell (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "run_shell",
+        "status": "ok",
+        "content": "exit_code: 0\nstdout:\n     1\t\"\"\"agent-mini 的命令行入口。\"\"\"\n     2\t\n     3\timport argparse\n     4\timport asyncio\n     5\tfrom pathlib import Path\n     6\tfrom typing import Any\n     7\tfrom uuid import uuid4\n     8\t\n     9\tfrom openai import APIError\n    10\t\n    11\t\n    12\tif __package__:\n    13\t    from .agent.config import AgentSettings\n    14\t    from .agent.cost import estimate_cost\n    15\t    from .agent.loop import MaxTurnsExceeded, RunStats\n    16\t    from .agent.runtime import run_coding_agent\n    17\t    from .agent.logging_config import configure_logging, get_logger\n    18\telse:\n    19\t    from agent.config import AgentSettings\n    20\t    from agent.cost import estimate_cost\n    21\t    from agent.loop import MaxTurnsExceeded, RunStats\n    22\t    from agent.runtime import run_coding_agent\n    23\t    from agent.logging_config import configure_logging, get_logger\n    24\t\n    25\t\n    26\tlogger = get_logger(\"cli\")\n    27\t\n    28\t\n    29\tdef parse_args() -> argparse.Namespace:\n    30\t    \"\"\"解析 Coding Agent 的命令行参数。\"\"\"\n    31\t    parser = argparse.ArgumentParser(\n    32\t        description=\"在指定项目中运行 Coding Agent。\",\n    33\t    )\n    34\t\n    35\t    parser.add_argument(\n    36\t        \"task\",\n    37\t        help=\"交给 Agent 完成的任务。\",\n    38\t    )\n    39\t    parser.add_argument(\n    40\t        \"--dir\",\n    41\t        dest=\"workdir\",\n    42\t        type=Path,\n    43\t        default=Path.cwd(),\n    44\t        help=\"Agent 操作的项目目录，默认为当前目录。\",\n    45\t    )\n    46\t    parser.add_argument(\n    47\t        \"--model\",\n    48\t        default=None,\n    49\t        help=\"覆盖环境配置中的模型名称。\",\n    50\t    )\n    51\t    parser.add_argument(\n    52\t        \"--max-turns\",\n    53\t        type=int,\n    54\t        default=None,\n    55\t        help=\"覆盖 Agent 最大循环轮数。\",\n    56\t    )\n    57\t    parser.add_argument(\n    58\t        \"--no-subagent\",\n    59\t        action=\"store_false\",\n    60\t        dest=\"enable_subagent\",\n    61\t        help=\"禁用探索型 SubAgent，用于对比实验。\",\n    62\t    )\n    63\t    parser.add_argument(\n    64\t        \"--log-file\",\n    65\t        type=Path,\n    66\t        default=None,\n    67\t        help=\"JSON 运行日志；默认 logs/agent.json，每次运行覆盖写入。\",\n    68\t    )\n    69\t\n    70\t    args = parser.parse_args()\n    71\t    if args.max_turns is not None and args.max_turns < 1:\n    72\t        parser.error(\"--max-turns 必须大于 0\")\n    73\t    return args\n    74\t\n    75\t\n    76\tdef extract_text(message: Any) -> str:\n    77\t    \"\"\"提取 Chat Completions 响应中的 assistant 文本。\"\"\"\n    78\t    return message.choices[0].message.content or \"(模型未返回文本)\"\n    79\t\n    80\t\n    81\tdef log_stats(\n    82\t    stats: RunStats,\n    83\t    *,\n    84\t    trace: dict[str, str] | None = None,\n    85\t) -> None:\n    86\t    \"\"\"记录一次 Agent 运行累计的模型用量。\"\"\"\n    87\t    total_stats = stats.aggregate()\n    88\t    main_tokens = (\n    89\t        stats.input_tokens\n    90\t        + stats.cache_read_input_tokens\n    91\t        + stats.cache_creation_input_tokens\n    92\t        + stats.output_tokens\n    93\t    )\n    94\t    total_tokens = (\n    95\t        total_stats.input_tokens\n    96\t        + total_stats.cache_read_input_tokens\n    97\t        + total_stats.cache_creation_input_tokens\n    98\t        + total_stats.output_tokens\n    99\t    )\n   100\t    subagent_turns = total_stats.turns - stats.turns\n   101\t    subagent_input_tokens = total_stats.input_tokens - stats.input_tokens\n   102\t    subagent_cache_read_tokens = (\n   103\t        total_stats.cache_read_input_tokens\n   104\t        - stats.cache_read_input_tokens\n   105\t    )\n   106\t    subagent_cache_creation_tokens = (\n   107\t        total_stats.cache_creation_input_tokens\n   108\t        - stats.cache_creation_input_tokens\n   109\t    )\n   110\t    subagent_output_tokens = total_stats.output_tokens - stats.output_tokens\n   111\t    subagent_tokens = total_tokens - main_tokens\n   112\t    logger.info(\n   113\t        (\n   114\t            \"运行统计: main_turns=%s, subagent_runs=%s, \"\n   115\t            \"subagent_turns=%s, main_tokens=%s, \"\n   116\t            \"subagent_tokens=%s, total_tokens=%s\"\n   117\t        ),\n   118\t        stats.turns,\n   119\t        len(stats.subagent_runs),\n   120\t        subagent_turns,\n   121\t        main_tokens,\n   122\t        subagent_tokens,\n   123\t        total_tokens,\n   124\t        extra={\n   125\t            \"event\": \"run.usage\",\n   126\t            \"trace\": trace,\n   127\t            \"data\": {\n   128\t                \"main\": {\n   129\t                    \"turns\": stats.turns,\n   130\t                    \"input_tokens\": stats.input_tokens,\n   131\t                    \"cache_read_input_tokens\": (\n   132\t                        stats.cache_read_input_tokens\n   133\t                    ),\n   134\t                    \"cache_creation_input_tokens\": (\n   135\t                        stats.cache_creation_input_tokens\n   136\t                    ),\n   137\t                    \"output_tokens\": stats.output_tokens,\n   138\t                    \"total_tokens\": main_tokens,\n   139\t                },\n   140\t                \"subagents\": {\n   141\t                    \"runs\": len(stats.subagent_runs),\n   142\t                    \"turns\": subagent_turns,\n   143\t                    \"input_tokens\": subagent_input_tokens,\n   144\t                    \"cache_read_input_tokens\": subagent_cache_read_tokens,\n   145\t                    \"cache_creation_input_tokens\": (\n   146\t                        subagent_cache_creation_tokens\n   147\t                    ),\n   148\t                    \"output_tokens\": subagent_output_tokens,\n   149\t                    \"total_tokens\": subagent_tokens,\n   150\t                },\n   151\t                \"total\": {\n   152\t                    \"turns\": total_stats.turns,\n   153\t                    \"input_tokens\": total_stats.input_tokens,\n   154\t                    \"cache_read_input_tokens\": (\n   155\t                        total_stats.cache_read_input_tokens\n   156\t                    ),\n   157\t                    \"cache_creation_input_tokens\": (\n   158\t                        total_stats.cache_creation_input_tokens\n   159\t                    ),\n   160\t                    \"output_tokens\": total_stats.output_tokens,\n   161\t                    \"total_tokens\": total_tokens,\n   162\t                },\n   163\t            },\n   164\t        },\n   165\t    )\n   166\t\n   167\t\n   168\tdef log_cost(\n   169\t    stats: RunStats,\n   170\t    settings: AgentSettings,\n   171\t    *,\n   172\t    trace: dict[str, str] | None = None,\n   173\t) -> None:\n   174\t    \"\"\"价格配置完整时打印预估费用。\"\"\"\n   175\t    cost = estimate_cost(stats, settings)\n   176\t    if cost is None:\n   177\t        logger.info(\n   178\t            \"预估费用: 未配置完整的模型单价\",\n   179\t            extra={\"event\": \"run.cost_unavailable\", \"trace\": trace},\n   180\t        )\n   181\t        return\n   182\t\n   183\t    logger.info(\n   184\t        \"预估费用: %s %.6f\",\n   185\t        settings.price_currency,\n   186\t        cost,\n   187\t        extra={\n   188\t            \"event\": \"run.cost\",\n   189\t            \"trace\": trace,\n   190\t            \"data\": {\"currency\": settings.price_currency, \"amount\": cost},\n   191\t        },\n   192\t    )\n   193\t\n   194\t\n   195\tasync def main() -> None:\n   196\t    \"\"\"解析命令行参数，运行 Agent 并展示结果。\"\"\"\n   197\t    args = parse_args()\n   198\t    workdir = args.workdir.resolve()\n   199\t    settings = AgentSettings()\n   200\t    run_id = uuid4().hex\n   201\t    trace = {\"run_id\": run_id, \"agent_id\": \"main\", \"role\": \"main\"}\n   202\t    log_file = configure_logging(args.log_file or settings.log_file)\n   203\t    logger.info(\n   204\t        \"详细日志: %s\",\n   205\t        log_file,\n   206\t        extra={\n   207\t            \"event\": \"run.started\",\n   208\t            \"trace\": trace,\n   209\t            \"data\": {\n   210\t                \"task\": args.task,\n   211\t                \"workdir\": str(workdir),\n   212\t                \"log_file\": str(log_file),\n   213\t                \"model\": args.model or settings.model,\n   214\t                \"max_turns\": args.max_turns or settings.max_turns,\n   215\t                \"enable_subagent\": args.enable_subagent,\n   216\t            },\n   217\t        },\n   218\t    )\n   219\t\n   220\t    try:\n   221\t        final_response, stats = await run_coding_agent(\n   222\t            task=args.task,\n   223\t            workdir=workdir,\n   224\t            settings=settings,\n   225\t            model=args.model,\n   226\t            max_turns=args.max_turns,\n   227\t            run_id=run_id,\n   228\t            enable_subagent=args.enable_subagent,\n   229\t        )\n   230\t    except MaxTurnsExceeded as exc:\n   231\t        logger.error(\n   232\t            \"运行失败: %s\",\n   233\t            exc,\n   234\t            extra={\"event\": \"run.max_turns_exceeded\", \"trace\": trace},\n   235\t        )\n   236\t        log_stats(exc.stats, trace=trace)\n   237\t        log_cost(exc.stats, settings, trace=trace)\n   238\t        return\n   239\t    except APIError as exc:\n   240\t        logger.error(\n   241\t            \"模型请求失败: %s\",\n   242\t            exc,\n   243\t            extra={\"event\": \"run.api_error\", \"trace\": trace},\n   244\t        )\n   245\t        return\n   246\t\n   247\t    log_stats(stats, trace=trace)\n   248\t    log_cost(stats, settings, trace=trace)\n   249\t    finish_reason = final_response.choices[0].finish_reason\n   250\t    answer = extract_text(final_response)\n   251\t    logger.info(\n   252\t        \"运行完成\",\n   253\t        extra={\n   254\t            \"event\": \"run.completed\",\n   255\t            \"trace\": trace,\n   256\t            \"console_message\": f\"最终回答: {answer}\",\n   257\t            \"data\": {\"finish_reason\": finish_reason, \"answer\": answer},\n   258\t        },\n   259\t    )\n   260\t\n\nstderr:\n(无输出)"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.459+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: run_shell",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "run_shell",
+        "arguments": {
+          "command": "nl -ba src/agent/loop.py | sed -n '1,520'"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.464+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: run_shell (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "run_shell",
+        "status": "ok",
+        "content": "exit_code: 1\nstdout:\n(无输出)\nstderr:\nsed: -e expression #1, char 5: missing command\n"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.466+08:00",
+      "level": "INFO",
+      "event": "agent.tool_started",
+      "message": "工具开始: run_shell",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "run_shell",
+        "arguments": {
+          "command": "true"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.470+08:00",
+      "level": "INFO",
+      "event": "agent.tool_completed",
+      "message": "工具完成: run_shell (ok)",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 5
+      },
+      "data": {
+        "tool": "run_shell",
+        "status": "ok",
+        "content": "exit_code: 0\nstdout:\n(无输出)\nstderr:\n(无输出)"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:02:26.473+08:00",
+      "level": "INFO",
+      "event": "agent.turn_started",
+      "message": "===== 第 6/20 轮 =====",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 6
+      },
+      "data": {
+        "max_turns": 20
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:03:39.900+08:00",
+      "level": "INFO",
+      "event": "agent.model_text",
+      "message": "模型返回文本",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 6
+      },
+      "data": {
+        "text": "**完整数据流**\n\n项目的 CLI 入口是 [`src/cli.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/cli.py)。典型调用链为：\n\n```text\n命令行参数\n  -> cli.parse_args()\n  -> cli.main()\n  -> runtime.run_coding_agent()\n  -> loop.run()\n  -> loop.call_llm()\n  -> OpenAI Chat Completions\n  -> assistant 文本或 tool_calls\n  -> 工具执行\n  -> Context 更新\n  -> 下一轮模型调用\n  -> 最终日志和费用日志\n```\n\n## 1. CLI 接收任务\n\n`src/cli.py:parse_args()` 使用 `argparse` 接收：\n\n- 位置参数 `task`\n- 工作目录 `--dir`\n- 模型覆盖值 `--model`\n- 最大轮数 `--max-turns`\n- 是否启用 SubAgent 的 `--no-subagent`\n- JSON 日志路径 `--log-file`\n\n`src/cli.py:main()` 随后：\n\n1. 将工作目录解析为绝对路径。\n2. 创建 `AgentSettings()`，从环境变量或 `.env` 加载 API Key、Base URL、模型、最大轮数和价格配置。\n3. 生成 `run_id`，建立主 Agent 的追踪信息：\n   ```python\n   {\"run_id\": run_id, \"agent_id\": \"main\", \"role\": \"main\"}\n   ```\n4. 调用 `configure_logging()` 初始化控制台和 JSON 文件日志。\n5. 记录 `run.started` 事件。\n6. 调用 `run_coding_agent(...)` 执行任务。\n\n任务和工作目录会由 [`src/agent/prompts.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/prompts.py) 的 `build_task_message()` 组合成用户消息：\n\n```text\n工作目录：<绝对路径>\n\n用户任务：\n<CLI task>\n```\n\n## 2. Runtime 组装 Agent 依赖\n\n[`src/agent/runtime.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/runtime.py) 的 `run_coding_agent()` 负责一次运行的依赖组装：\n\n1. 检查工作目录存在且为目录。\n2. 生成 `AgentTrace`。\n3. 创建主运行统计对象 `RunStats`。\n4. 创建独立的 `ToolRegistry`。\n5. 注册工具：\n   - `register_fs_tools()`：`read_file`、`list_dir`、`write_file`、`edit_file`\n   - `register_search_tools()`：`grep`\n   - `register_shell_tools()`：`run_shell`\n   - `register_subagent_tool()`：可选的 `spawn_subagent`\n6. 创建 `Context`，将任务消息通过 `context.append_user()` 放入消息历史。\n7. 创建 `AsyncOpenAI` 客户端。\n8. 调用 `loop.run(...)`。\n\n模型使用 OpenAI Chat Completions 接口，实际请求地址和模型来自 `AgentSettings`。\n\n## 3. 工具注册和 Schema 生成\n\n[`src/tools/registry.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/registry.py) 中的 `ToolRegistry` 统一管理工具。\n\n注册工具时，`ToolRegistry.register()` 会：\n\n- 保存工具名称和处理函数。\n- 从函数签名和类型标注生成参数 Schema。\n- 从 docstring 读取工具描述和参数描述。\n- 生成 `RegisteredTool`。\n\n`ToolRegistry.schemas()` 将工具导出为内部格式：\n\n```python\n{\n    \"name\": \"...\",\n    \"description\": \"...\",\n    \"input_schema\": {...}\n}\n```\n\n`loop.openai_tools()` 再将其转换为 OpenAI function tool 格式：\n\n```python\n{\n    \"type\": \"function\",\n    \"function\": {\n        \"name\": \"...\",\n        \"description\": \"...\",\n        \"parameters\": {...}\n    }\n}\n```\n\n因此，模型在每轮请求中都能看到当前注册的工具名称、描述和参数约束。\n\n## 4. 每轮模型调用\n\n核心循环位于 [`src/agent/loop.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/loop.py) 的 `run()`。\n\n它执行：\n\n```python\nfor turn in range(1, max_turns + 1):\n```\n\n每轮主要步骤如下：\n\n### 4.1 调用 `call_llm()`\n\n`run()` 调用：\n\n```python\nresponse = await call_llm(\n    client,\n    context,\n    model=model,\n    system_prompt=system_prompt,\n    tools=tools,\n    max_tokens=max_tokens,\n    ...\n)\n```\n\n`call_llm()` 使用：\n\n```python\nclient.chat.completions.create(\n    model=model,\n    max_tokens=max_tokens,\n    messages=[\n        {\"role\": \"system\", \"content\": system_prompt},\n        *context.messages,\n    ],\n    tools=openai_tools(tools),\n)\n```\n\n因此发送给模型的上下文由三部分组成：\n\n1. 系统提示词 `build_system_prompt()`\n2. `Context.messages` 中已有的用户、assistant、tool 消息\n3. 当前可用工具 Schema\n\n`call_llm()` 最多尝试 3 次。只有以下错误会重试：\n\n- `APIConnectionError`\n- HTTP 429\n- HTTP 500 或更高的服务端错误\n\n重试采用指数退避加随机延迟。其他 API 错误直接抛出。\n\n### 4.2 处理模型响应\n\n`run()` 从响应中取得：\n\n```python\nmessage = response.choices[0].message\n```\n\n`message_text()` 提取文本内容并记录 `agent.model_text` 日志。\n\n然后通过 `extract_usage_tokens(response.usage)` 规范化 token 用量，支持：\n\n- OpenAI 风格的 `prompt_tokens` / `completion_tokens`\n- `input_tokens` / `output_tokens`\n- 缓存读取 token\n- 缓存创建 token\n\n结果累计到 `RunStats`：\n\n- `turns`\n- `input_tokens`\n- `output_tokens`\n- `cache_read_input_tokens`\n- `cache_creation_input_tokens`\n\n## 5. Context 如何更新\n\nContext 位于 [`src/agent/context.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/context.py)，其核心字段是：\n\n```python\nself.messages: list[dict[str, Any]]\n```\n\n### 5.1 先追加 assistant 消息\n\n模型每次返回后，`loop.run()` 调用：\n\n```python\ncontext.append_assistant(assistant_message(message))\n```\n\n`assistant_message()` 会把 SDK 对象转换成可回放的字典：\n\n```python\n{\n    \"role\": \"assistant\",\n    \"content\": message.content,\n    \"tool_calls\": [\n        {\n            \"id\": tool_call.id,\n            \"type\": \"function\",\n            \"function\": {\n                \"name\": tool_call.function.name,\n                \"arguments\": tool_call.function.arguments,\n            },\n        }\n    ]\n}\n```\n\n如果模型返回了工具调用，工具调用的名称、调用 ID 和 JSON 参数都会保留在 Context 中。\n\n### 5.2 有工具调用时执行工具\n\n如果：\n\n```python\nif not message.tool_calls:\n```\n\n条件为假，则进入：\n\n```python\ntool_results = await execute_tools(...)\n```\n\n`execute_tools()` 按模型返回顺序逐个处理 tool call：\n\n1. 读取工具名称。\n2. 使用 `json.loads()` 解析参数。\n3. 检查参数必须是 JSON object。\n4. 通过 `ToolCallTracker` 检测相同工具调用是否连续重复。\n5. 调用：\n   ```python\n   registry.execute_with_status(name, input_data)\n   ```\n6. 使用 `asyncio.wait_for()` 施加工具超时。\n7. 生成对应的 `tool` 消息。\n\n工具执行的实际职责由具体注册函数提供：\n\n- [`src/tools/fs.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/fs.py)\n  - `read_file()`\n  - `list_dir()`\n  - `write_file()`\n  - `edit_file()`\n- [`src/tools/search.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/search.py)\n  - `grep()`\n- [`src/tools/shell.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/shell.py)\n  - 异步 `run_shell()`\n\n`ToolRegistry.execute_with_status()` 会负责：\n\n- 检查工具是否注册。\n- 根据函数类型标注校验输入。\n- 调用同步或异步处理函数。\n- 将返回值序列化为文本。\n- 将工具异常转换为 `ToolExecutionResult(is_error=True)`，不会直接中断 Agent 循环。\n\n### 5.3 工具结果如何返回模型\n\n`execute_tools()` 对每个调用生成：\n\n```python\n{\n    \"role\": \"tool\",\n    \"tool_call_id\": tool_call.id,\n    \"content\": content,\n}\n```\n\n随后由 `run()` 调用：\n\n```python\ncontext.append_tool_results(tool_results)\ncontext.assert_paired()\n```\n\n这些 `tool` 消息被追加到 `Context.messages`。下一轮 `call_llm()` 会把完整历史重新放入：\n\n```python\nmessages=[\n    {\"role\": \"system\", \"content\": system_prompt},\n    *context.messages,\n]\n```\n\n因此工具结果不是通过 Python 返回值直接传给模型，而是作为带有对应 `tool_call_id` 的 `role=\"tool\"` 消息，在下一次 Chat Completions 请求中返回给模型。\n\n`Context.assert_paired()` 确保：\n\n- 每个 assistant tool call 都有对应的 tool result。\n- `tool_call_id` 有效且不重复。\n- tool result 不会匹配到不存在的调用。\n- tool call 后不会插入普通 user 消息。\n\n## 6. SubAgent 数据流\n\n如果 CLI 没有指定 `--no-subagent`，`runtime.run_coding_agent()` 会注册 [`src/tools/spawn_subagent.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/spawn_subagent.py) 中的 `spawn_subagent()`。\n\n主模型调用该工具后：\n\n1. `spawn_subagent(task)` 创建独立的子 `ToolRegistry`。\n2. 子 Agent 只注册只读文件工具和搜索工具。\n3. 创建独立的 `Context`，并追加子任务。\n4. 创建独立的 `RunStats`，加入主统计对象的 `subagent_runs`。\n5. 创建 `AgentTrace`，角色为 `subagent`。\n6. 调用同一个 `loop.run()`，但使用只读系统提示词和最多 15 轮。\n7. 取子 Agent 最终 assistant 文本作为 `spawn_subagent()` 的返回值。\n\n这个返回值随后由主 Agent 的 `ToolRegistry.execute_with_status()` 序列化为工具结果，并以 `role=\"tool\"` 消息回到主 Agent Context。\n\n费用和 token 汇总通过 `RunStats.aggregate()` 递归累加主 Agent 及所有 SubAgent 的统计。\n\n## 7. 费用统计\n\n费用逻辑位于 [`src/agent/cost.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/cost.py) 的 `estimate_cost()`。\n\n它首先调用：\n\n```python\nstats = stats.aggregate()\n```\n\n然后按每百万 token 的价格计算：\n\n```text\n(input_tokens * input_price\n + output_tokens * output_price\n + cache_read_tokens * cache_read_price\n + cache_creation_tokens * cache_creation_price)\n / 1,000,000\n```\n\n如果基础输入/输出价格缺失，或者实际使用了缓存 token 但没有对应缓存价格，则返回 `None`。\n\n费用有两个使用点：\n\n### 7.1 运行期间费用熔断\n\n`loop.run()` 每次模型响应、更新 token 统计后检查：\n\n```python\ncurrent_cost = cost_estimator(stats)\n```\n\n如果超过 `max_cost_usd`，抛出：\n\n```python\nCostLimitExceeded(...)\n```\n\n该检查发生在工具执行前，因此模型响应本身已经产生的 token 会被计入费用；如果响应带有 tool calls，则超预算时不会继续执行这些工具。\n\n当前 CLI 没有专门捕获 `CostLimitExceeded`，所以它不会像 `MaxTurnsExceeded` 一样转为正常的失败日志流程，而会向上抛出。\n\n### 7.2 运行结束费用日志\n\n`src/cli.py:log_cost()` 在正常完成和达到最大轮数时调用：\n\n- 价格完整：记录 `run.cost`\n- 价格不完整：记录 `run.cost_unavailable`\n\n`src/cli.py:log_stats()` 记录：\n\n- 主 Agent 轮数和 token\n- SubAgent 数量、轮数和 token\n- 主 Agent、SubAgent 以及总计\n\n## 8. Agent 的主要停止出口\n\n### 正常完成：模型不再请求工具\n\n在 `loop.run()` 中：\n\n```python\nif not message.tool_calls:\n    return response, stats\n```\n\n只要模型返回的 assistant 消息没有 `tool_calls`，Agent 认为任务完成，返回最后一个 `ChatCompletion` 和 `RunStats`。\n\n`finish_reason` 会从：\n\n```python\nresponse.choices[0].finish_reason\n```\n\n读取并写入完成日志。\n\n### 达到最大轮数\n\n如果循环执行完 `max_turns` 轮仍然每轮都产生工具调用，`run()` 抛出：\n\n```python\nMaxTurnsExceeded(max_turns, stats)\n```\n\nCLI 捕获后记录：\n\n- `run.max_turns_exceeded`\n- `run.usage`\n- `run.cost` 或 `run.cost_unavailable`\n\n此时不会有最终回答日志。\n\n### 超过费用上限\n\n`loop.run()` 抛出：\n\n```python\nCostLimitExceeded\n```\n\n这是独立的停止出口。当前 `cli.main()` 没有捕获它，因此会作为未处理异常退出，且不会进入 CLI 的正常 `log_stats()` / `log_cost()` / `run.completed` 流程。\n\n### 模型 API 错误\n\n`call_llm()` 在不可重试错误或重试耗尽后抛出 API 异常。`cli.main()` 捕获 `APIError`，记录：\n\n```text\nrun.api_error\n```\n\n然后返回。该分支当前不会记录最终回答，也不会调用 `log_stats()` 和 `log_cost()`。\n\n### 工具调用级异常\n\n以下情况通常不会直接停止 Agent：\n\n- 工具参数 JSON 无效\n- 工具参数类型校验失败\n- 工具不存在\n- 工具函数抛出异常\n- 工具执行超时\n- 相同工具调用连续重复达到限制\n\n这些情况会被转换成工具结果文本，继续追加到 Context，让模型在下一轮看到错误并自行采取下一步行动。\n\n但以下 Context 校验错误会直接抛出并终止：\n\n- tool call 与 tool result 不匹配\n- tool call ID 重复\n- tool call 后出现普通 user 消息\n- Context 中存在未知消息角色\n\n### 用户中断\n\n`src/cli.py` 最外层捕获 `KeyboardInterrupt`，记录：\n\n```text\nrun.interrupted\n```\n\n## 9. 最终日志输出\n\n日志配置位于 [`src/agent/logging_config.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/logging_config.py)。\n\n`configure_logging()` 安装两个 Handler：\n\n1. `ConsoleFormatter`\n   - 输出到 stdout。\n   - 如果事件带有 `console_message`，优先显示该内容。\n2. `JsonFileHandler`\n   - 将完整运行写入一个 JSON 文档。\n   - 每次事件到达后更新：\n     ```json\n     {\n       \"schema_version\": 2,\n       \"event_count\": 0,\n       \"events\": []\n     }\n     ```\n   - 通过临时文件写入后替换目标文件。\n\n正常完成时，`cli.main()` 按顺序执行：\n\n```text\nlog_stats()\nlog_cost()\nlogger.info(... event=\"run.completed\")\n```\n\n最终回答由 `extract_text()` 从最后一个 `ChatCompletion` 中取出：\n\n```python\nmessage.choices[0].message.content\n```\n\n并通过 `run.completed` 事件的 `console_message` 输出为：\n\n```text\n最终回答: <模型文本>\n```\n\n所以最终答案主要存在于日志事件的：\n\n```json\ndata.answer\n```\n\n以及控制台日志的 `console_message` 中，而不是由 CLI 使用 `print()` 直接输出。\n\n本次仅检查和分析了代码，没有修改任何文件，也未运行测试或实际发起模型调用。"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:03:39.902+08:00",
+      "level": "INFO",
+      "event": "agent.completed",
+      "message": "Agent 完成: main",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main",
+        "turn": 6
+      },
+      "data": {
+        "turns": 6,
+        "finish_reason": "stop"
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:03:39.904+08:00",
+      "level": "INFO",
+      "event": "run.usage",
+      "message": "运行统计: main_turns=6, subagent_runs=0, subagent_turns=0, main_tokens=89560, subagent_tokens=0, total_tokens=89560",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main"
+      },
+      "data": {
+        "main": {
+          "turns": 6,
+          "input_tokens": 84514,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "output_tokens": 5046,
+          "total_tokens": 89560
+        },
+        "subagents": {
+          "runs": 0,
+          "turns": 0,
+          "input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0
+        },
+        "total": {
+          "turns": 6,
+          "input_tokens": 84514,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "output_tokens": 5046,
+          "total_tokens": 89560
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:03:39.906+08:00",
+      "level": "INFO",
+      "event": "run.cost",
+      "message": "预估费用: USD 0.114790",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main"
+      },
+      "data": {
+        "currency": "USD",
+        "amount": 0.11479
+      }
+    },
+    {
+      "timestamp": "2026-07-30T14:03:39.908+08:00",
+      "level": "INFO",
+      "event": "run.completed",
+      "message": "运行完成",
+      "trace": {
+        "run_id": "c95a5be74a404d5ebab7c50ad841cf3e",
+        "agent_id": "main",
+        "role": "main"
+      },
+      "data": {
+        "finish_reason": "stop",
+        "answer": "**完整数据流**\n\n项目的 CLI 入口是 [`src/cli.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/cli.py)。典型调用链为：\n\n```text\n命令行参数\n  -> cli.parse_args()\n  -> cli.main()\n  -> runtime.run_coding_agent()\n  -> loop.run()\n  -> loop.call_llm()\n  -> OpenAI Chat Completions\n  -> assistant 文本或 tool_calls\n  -> 工具执行\n  -> Context 更新\n  -> 下一轮模型调用\n  -> 最终日志和费用日志\n```\n\n## 1. CLI 接收任务\n\n`src/cli.py:parse_args()` 使用 `argparse` 接收：\n\n- 位置参数 `task`\n- 工作目录 `--dir`\n- 模型覆盖值 `--model`\n- 最大轮数 `--max-turns`\n- 是否启用 SubAgent 的 `--no-subagent`\n- JSON 日志路径 `--log-file`\n\n`src/cli.py:main()` 随后：\n\n1. 将工作目录解析为绝对路径。\n2. 创建 `AgentSettings()`，从环境变量或 `.env` 加载 API Key、Base URL、模型、最大轮数和价格配置。\n3. 生成 `run_id`，建立主 Agent 的追踪信息：\n   ```python\n   {\"run_id\": run_id, \"agent_id\": \"main\", \"role\": \"main\"}\n   ```\n4. 调用 `configure_logging()` 初始化控制台和 JSON 文件日志。\n5. 记录 `run.started` 事件。\n6. 调用 `run_coding_agent(...)` 执行任务。\n\n任务和工作目录会由 [`src/agent/prompts.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/prompts.py) 的 `build_task_message()` 组合成用户消息：\n\n```text\n工作目录：<绝对路径>\n\n用户任务：\n<CLI task>\n```\n\n## 2. Runtime 组装 Agent 依赖\n\n[`src/agent/runtime.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/runtime.py) 的 `run_coding_agent()` 负责一次运行的依赖组装：\n\n1. 检查工作目录存在且为目录。\n2. 生成 `AgentTrace`。\n3. 创建主运行统计对象 `RunStats`。\n4. 创建独立的 `ToolRegistry`。\n5. 注册工具：\n   - `register_fs_tools()`：`read_file`、`list_dir`、`write_file`、`edit_file`\n   - `register_search_tools()`：`grep`\n   - `register_shell_tools()`：`run_shell`\n   - `register_subagent_tool()`：可选的 `spawn_subagent`\n6. 创建 `Context`，将任务消息通过 `context.append_user()` 放入消息历史。\n7. 创建 `AsyncOpenAI` 客户端。\n8. 调用 `loop.run(...)`。\n\n模型使用 OpenAI Chat Completions 接口，实际请求地址和模型来自 `AgentSettings`。\n\n## 3. 工具注册和 Schema 生成\n\n[`src/tools/registry.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/registry.py) 中的 `ToolRegistry` 统一管理工具。\n\n注册工具时，`ToolRegistry.register()` 会：\n\n- 保存工具名称和处理函数。\n- 从函数签名和类型标注生成参数 Schema。\n- 从 docstring 读取工具描述和参数描述。\n- 生成 `RegisteredTool`。\n\n`ToolRegistry.schemas()` 将工具导出为内部格式：\n\n```python\n{\n    \"name\": \"...\",\n    \"description\": \"...\",\n    \"input_schema\": {...}\n}\n```\n\n`loop.openai_tools()` 再将其转换为 OpenAI function tool 格式：\n\n```python\n{\n    \"type\": \"function\",\n    \"function\": {\n        \"name\": \"...\",\n        \"description\": \"...\",\n        \"parameters\": {...}\n    }\n}\n```\n\n因此，模型在每轮请求中都能看到当前注册的工具名称、描述和参数约束。\n\n## 4. 每轮模型调用\n\n核心循环位于 [`src/agent/loop.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/loop.py) 的 `run()`。\n\n它执行：\n\n```python\nfor turn in range(1, max_turns + 1):\n```\n\n每轮主要步骤如下：\n\n### 4.1 调用 `call_llm()`\n\n`run()` 调用：\n\n```python\nresponse = await call_llm(\n    client,\n    context,\n    model=model,\n    system_prompt=system_prompt,\n    tools=tools,\n    max_tokens=max_tokens,\n    ...\n)\n```\n\n`call_llm()` 使用：\n\n```python\nclient.chat.completions.create(\n    model=model,\n    max_tokens=max_tokens,\n    messages=[\n        {\"role\": \"system\", \"content\": system_prompt},\n        *context.messages,\n    ],\n    tools=openai_tools(tools),\n)\n```\n\n因此发送给模型的上下文由三部分组成：\n\n1. 系统提示词 `build_system_prompt()`\n2. `Context.messages` 中已有的用户、assistant、tool 消息\n3. 当前可用工具 Schema\n\n`call_llm()` 最多尝试 3 次。只有以下错误会重试：\n\n- `APIConnectionError`\n- HTTP 429\n- HTTP 500 或更高的服务端错误\n\n重试采用指数退避加随机延迟。其他 API 错误直接抛出。\n\n### 4.2 处理模型响应\n\n`run()` 从响应中取得：\n\n```python\nmessage = response.choices[0].message\n```\n\n`message_text()` 提取文本内容并记录 `agent.model_text` 日志。\n\n然后通过 `extract_usage_tokens(response.usage)` 规范化 token 用量，支持：\n\n- OpenAI 风格的 `prompt_tokens` / `completion_tokens`\n- `input_tokens` / `output_tokens`\n- 缓存读取 token\n- 缓存创建 token\n\n结果累计到 `RunStats`：\n\n- `turns`\n- `input_tokens`\n- `output_tokens`\n- `cache_read_input_tokens`\n- `cache_creation_input_tokens`\n\n## 5. Context 如何更新\n\nContext 位于 [`src/agent/context.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/context.py)，其核心字段是：\n\n```python\nself.messages: list[dict[str, Any]]\n```\n\n### 5.1 先追加 assistant 消息\n\n模型每次返回后，`loop.run()` 调用：\n\n```python\ncontext.append_assistant(assistant_message(message))\n```\n\n`assistant_message()` 会把 SDK 对象转换成可回放的字典：\n\n```python\n{\n    \"role\": \"assistant\",\n    \"content\": message.content,\n    \"tool_calls\": [\n        {\n            \"id\": tool_call.id,\n            \"type\": \"function\",\n            \"function\": {\n                \"name\": tool_call.function.name,\n                \"arguments\": tool_call.function.arguments,\n            },\n        }\n    ]\n}\n```\n\n如果模型返回了工具调用，工具调用的名称、调用 ID 和 JSON 参数都会保留在 Context 中。\n\n### 5.2 有工具调用时执行工具\n\n如果：\n\n```python\nif not message.tool_calls:\n```\n\n条件为假，则进入：\n\n```python\ntool_results = await execute_tools(...)\n```\n\n`execute_tools()` 按模型返回顺序逐个处理 tool call：\n\n1. 读取工具名称。\n2. 使用 `json.loads()` 解析参数。\n3. 检查参数必须是 JSON object。\n4. 通过 `ToolCallTracker` 检测相同工具调用是否连续重复。\n5. 调用：\n   ```python\n   registry.execute_with_status(name, input_data)\n   ```\n6. 使用 `asyncio.wait_for()` 施加工具超时。\n7. 生成对应的 `tool` 消息。\n\n工具执行的实际职责由具体注册函数提供：\n\n- [`src/tools/fs.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/fs.py)\n  - `read_file()`\n  - `list_dir()`\n  - `write_file()`\n  - `edit_file()`\n- [`src/tools/search.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/search.py)\n  - `grep()`\n- [`src/tools/shell.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/shell.py)\n  - 异步 `run_shell()`\n\n`ToolRegistry.execute_with_status()` 会负责：\n\n- 检查工具是否注册。\n- 根据函数类型标注校验输入。\n- 调用同步或异步处理函数。\n- 将返回值序列化为文本。\n- 将工具异常转换为 `ToolExecutionResult(is_error=True)`，不会直接中断 Agent 循环。\n\n### 5.3 工具结果如何返回模型\n\n`execute_tools()` 对每个调用生成：\n\n```python\n{\n    \"role\": \"tool\",\n    \"tool_call_id\": tool_call.id,\n    \"content\": content,\n}\n```\n\n随后由 `run()` 调用：\n\n```python\ncontext.append_tool_results(tool_results)\ncontext.assert_paired()\n```\n\n这些 `tool` 消息被追加到 `Context.messages`。下一轮 `call_llm()` 会把完整历史重新放入：\n\n```python\nmessages=[\n    {\"role\": \"system\", \"content\": system_prompt},\n    *context.messages,\n]\n```\n\n因此工具结果不是通过 Python 返回值直接传给模型，而是作为带有对应 `tool_call_id` 的 `role=\"tool\"` 消息，在下一次 Chat Completions 请求中返回给模型。\n\n`Context.assert_paired()` 确保：\n\n- 每个 assistant tool call 都有对应的 tool result。\n- `tool_call_id` 有效且不重复。\n- tool result 不会匹配到不存在的调用。\n- tool call 后不会插入普通 user 消息。\n\n## 6. SubAgent 数据流\n\n如果 CLI 没有指定 `--no-subagent`，`runtime.run_coding_agent()` 会注册 [`src/tools/spawn_subagent.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/tools/spawn_subagent.py) 中的 `spawn_subagent()`。\n\n主模型调用该工具后：\n\n1. `spawn_subagent(task)` 创建独立的子 `ToolRegistry`。\n2. 子 Agent 只注册只读文件工具和搜索工具。\n3. 创建独立的 `Context`，并追加子任务。\n4. 创建独立的 `RunStats`，加入主统计对象的 `subagent_runs`。\n5. 创建 `AgentTrace`，角色为 `subagent`。\n6. 调用同一个 `loop.run()`，但使用只读系统提示词和最多 15 轮。\n7. 取子 Agent 最终 assistant 文本作为 `spawn_subagent()` 的返回值。\n\n这个返回值随后由主 Agent 的 `ToolRegistry.execute_with_status()` 序列化为工具结果，并以 `role=\"tool\"` 消息回到主 Agent Context。\n\n费用和 token 汇总通过 `RunStats.aggregate()` 递归累加主 Agent 及所有 SubAgent 的统计。\n\n## 7. 费用统计\n\n费用逻辑位于 [`src/agent/cost.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/cost.py) 的 `estimate_cost()`。\n\n它首先调用：\n\n```python\nstats = stats.aggregate()\n```\n\n然后按每百万 token 的价格计算：\n\n```text\n(input_tokens * input_price\n + output_tokens * output_price\n + cache_read_tokens * cache_read_price\n + cache_creation_tokens * cache_creation_price)\n / 1,000,000\n```\n\n如果基础输入/输出价格缺失，或者实际使用了缓存 token 但没有对应缓存价格，则返回 `None`。\n\n费用有两个使用点：\n\n### 7.1 运行期间费用熔断\n\n`loop.run()` 每次模型响应、更新 token 统计后检查：\n\n```python\ncurrent_cost = cost_estimator(stats)\n```\n\n如果超过 `max_cost_usd`，抛出：\n\n```python\nCostLimitExceeded(...)\n```\n\n该检查发生在工具执行前，因此模型响应本身已经产生的 token 会被计入费用；如果响应带有 tool calls，则超预算时不会继续执行这些工具。\n\n当前 CLI 没有专门捕获 `CostLimitExceeded`，所以它不会像 `MaxTurnsExceeded` 一样转为正常的失败日志流程，而会向上抛出。\n\n### 7.2 运行结束费用日志\n\n`src/cli.py:log_cost()` 在正常完成和达到最大轮数时调用：\n\n- 价格完整：记录 `run.cost`\n- 价格不完整：记录 `run.cost_unavailable`\n\n`src/cli.py:log_stats()` 记录：\n\n- 主 Agent 轮数和 token\n- SubAgent 数量、轮数和 token\n- 主 Agent、SubAgent 以及总计\n\n## 8. Agent 的主要停止出口\n\n### 正常完成：模型不再请求工具\n\n在 `loop.run()` 中：\n\n```python\nif not message.tool_calls:\n    return response, stats\n```\n\n只要模型返回的 assistant 消息没有 `tool_calls`，Agent 认为任务完成，返回最后一个 `ChatCompletion` 和 `RunStats`。\n\n`finish_reason` 会从：\n\n```python\nresponse.choices[0].finish_reason\n```\n\n读取并写入完成日志。\n\n### 达到最大轮数\n\n如果循环执行完 `max_turns` 轮仍然每轮都产生工具调用，`run()` 抛出：\n\n```python\nMaxTurnsExceeded(max_turns, stats)\n```\n\nCLI 捕获后记录：\n\n- `run.max_turns_exceeded`\n- `run.usage`\n- `run.cost` 或 `run.cost_unavailable`\n\n此时不会有最终回答日志。\n\n### 超过费用上限\n\n`loop.run()` 抛出：\n\n```python\nCostLimitExceeded\n```\n\n这是独立的停止出口。当前 `cli.main()` 没有捕获它，因此会作为未处理异常退出，且不会进入 CLI 的正常 `log_stats()` / `log_cost()` / `run.completed` 流程。\n\n### 模型 API 错误\n\n`call_llm()` 在不可重试错误或重试耗尽后抛出 API 异常。`cli.main()` 捕获 `APIError`，记录：\n\n```text\nrun.api_error\n```\n\n然后返回。该分支当前不会记录最终回答，也不会调用 `log_stats()` 和 `log_cost()`。\n\n### 工具调用级异常\n\n以下情况通常不会直接停止 Agent：\n\n- 工具参数 JSON 无效\n- 工具参数类型校验失败\n- 工具不存在\n- 工具函数抛出异常\n- 工具执行超时\n- 相同工具调用连续重复达到限制\n\n这些情况会被转换成工具结果文本，继续追加到 Context，让模型在下一轮看到错误并自行采取下一步行动。\n\n但以下 Context 校验错误会直接抛出并终止：\n\n- tool call 与 tool result 不匹配\n- tool call ID 重复\n- tool call 后出现普通 user 消息\n- Context 中存在未知消息角色\n\n### 用户中断\n\n`src/cli.py` 最外层捕获 `KeyboardInterrupt`，记录：\n\n```text\nrun.interrupted\n```\n\n## 9. 最终日志输出\n\n日志配置位于 [`src/agent/logging_config.py`](/home/gxq/ai-agent-roadmap/agent-mini/src/agent/logging_config.py)。\n\n`configure_logging()` 安装两个 Handler：\n\n1. `ConsoleFormatter`\n   - 输出到 stdout。\n   - 如果事件带有 `console_message`，优先显示该内容。\n2. `JsonFileHandler`\n   - 将完整运行写入一个 JSON 文档。\n   - 每次事件到达后更新：\n     ```json\n     {\n       \"schema_version\": 2,\n       \"event_count\": 0,\n       \"events\": []\n     }\n     ```\n   - 通过临时文件写入后替换目标文件。\n\n正常完成时，`cli.main()` 按顺序执行：\n\n```text\nlog_stats()\nlog_cost()\nlogger.info(... event=\"run.completed\")\n```\n\n最终回答由 `extract_text()` 从最后一个 `ChatCompletion` 中取出：\n\n```python\nmessage.choices[0].message.content\n```\n\n并通过 `run.completed` 事件的 `console_message` 输出为：\n\n```text\n最终回答: <模型文本>\n```\n\n所以最终答案主要存在于日志事件的：\n\n```json\ndata.answer\n```\n\n以及控制台日志的 `console_message` 中，而不是由 CLI 使用 `print()` 直接输出。\n\n本次仅检查和分析了代码，没有修改任何文件，也未运行测试或实际发起模型调用。"
+      }
+    }
+  ]
+}

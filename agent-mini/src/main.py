@@ -11,6 +11,7 @@ if __package__:
     from .agent.context import Context
     from .agent.loop import run
     from .agent.prompts import build_system_prompt, build_task_message
+    from .agent.logging_config import configure_logging, get_logger
     from .tools import (
         register_fs_tools,
         register_search_tools,
@@ -22,12 +23,16 @@ else:
     from agent.context import Context
     from agent.loop import run
     from agent.prompts import build_system_prompt, build_task_message
+    from agent.logging_config import configure_logging, get_logger
     from tools import (
         register_fs_tools,
         register_search_tools,
         register_shell_tools,
         registry,
     )
+
+
+logger = get_logger("main")
 
 
 def extract_text(message: Any) -> str:
@@ -38,6 +43,20 @@ def extract_text(message: Any) -> str:
 async def main() -> None:
     """创建 Agent 依赖并运行 Shell 命令任务。"""
     settings = AgentSettings()
+    log_file = configure_logging(settings.log_file)
+    logger.info(
+        "详细日志: %s",
+        log_file,
+        extra={
+            "event": "run.started",
+            "data": {
+                "workdir": str(PROJECT_ROOT),
+                "log_file": str(log_file),
+                "model": settings.model,
+                "max_turns": settings.max_turns,
+            },
+        },
+    )
     register_fs_tools(registry, PROJECT_ROOT)
     register_search_tools(registry, PROJECT_ROOT)
     register_shell_tools(registry, PROJECT_ROOT)
@@ -63,12 +82,22 @@ async def main() -> None:
             max_tokens=3000,
         )
 
-    print(f"总轮数: {stats.turns}")
-    print(f"输入 token: {stats.input_tokens}")
-    print(f"输出 token: {stats.output_tokens}")
-    print(f"总 token: {stats.input_tokens + stats.output_tokens}")
-    print(f"最终 finish_reason: {final_response.choices[0].finish_reason}")
-    print(f"最终回答: {extract_text(final_response)}")
+    answer = extract_text(final_response)
+    logger.info(
+        "最终回答: %s",
+        answer,
+        extra={
+            "event": "run.completed",
+            "data": {
+                "turns": stats.turns,
+                "input_tokens": stats.input_tokens,
+                "output_tokens": stats.output_tokens,
+                "total_tokens": stats.input_tokens + stats.output_tokens,
+                "finish_reason": final_response.choices[0].finish_reason,
+                "answer": answer,
+            },
+        },
+    )
 
 
 if __name__ == "__main__":

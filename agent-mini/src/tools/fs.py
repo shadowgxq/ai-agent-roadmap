@@ -16,11 +16,11 @@ def resolve_path(workdir: Path, path: str) -> Path:
     return target
 
 
-def register_fs_tools(
+def register_readonly_fs_tools(
     registry: ToolRegistry,
     workdir: Path,
 ) -> None:
-    """注册绑定到指定工作目录的文件工具。"""
+    """注册绑定到指定工作目录的只读文件工具。"""
 
     @registry.tool
     def read_file(
@@ -75,6 +75,14 @@ def register_fs_tools(
             kind = "DIR" if entry.is_dir() else "FILE"
             lines.append(f"[{kind}] {entry.name}")
         return "\n".join(lines)
+
+
+def register_fs_tools(
+    registry: ToolRegistry,
+    workdir: Path,
+) -> None:
+    """注册绑定到指定工作目录的完整文件工具。"""
+    register_readonly_fs_tools(registry, workdir)
 
     @registry.tool
     def write_file(path: str, content: str) -> str:

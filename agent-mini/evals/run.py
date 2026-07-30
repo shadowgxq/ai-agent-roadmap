@@ -1,5 +1,6 @@
 """发现并运行 eval cases，输出单项结果与批量汇总。"""
 
+import argparse
 import asyncio
 import shutil
 import subprocess
@@ -18,9 +19,23 @@ from src.agent.config import AgentSettings
 from src.agent.cost import estimate_cost
 from src.agent.loop import CostLimitExceeded, MaxTurnsExceeded
 from src.agent.runtime import run_coding_agent
+from src.agent.logging_config import configure_logging, get_logger
 
 
 CASES_ROOT = Path(__file__).resolve().parent / "cases"
+logger = get_logger("evals")
+
+
+def parse_args() -> argparse.Namespace:
+    """解析 Eval 日志文件参数。"""
+    parser = argparse.ArgumentParser(description="运行全部 agent-mini eval cases。")
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        default=None,
+        help="JSON 运行日志；默认 logs/agent.json，每次运行覆盖写入。",
+    )
+    return parser.parse_args()
 
 
 @dataclass
@@ -225,53 +240,114 @@ async def run_case(
     return result
 
 
-def print_result(result: EvalResult) -> None:
-    """打印一个 case 的状态、消耗和失败原因。"""
+def log_result(result: EvalResult) -> None:
+    """记录一个 case 的状态、消耗和失败原因。"""
     label = result.status.upper()
-    print(
+    summary = (
         f"[{label}] {result.case_name} | "
         f"turns={result.turns} | "
         f"duration={result.duration_s:.2f}s | "
         f"cost=${result.cost_usd:.6f}"
     )
+    logger.info(
+        summary,
+        extra={
+            "event": "eval.case_completed",
+            "data": {
+                "case": result.case_name,
+                "status": result.status,
+                "turns": result.turns,
+                "duration_s": result.duration_s,
+                "cost_usd": result.cost_usd,
+                "reason": result.reason or None,
+            },
+        },
+    )
     if result.reason:
-        print(f"原因:\n{result.reason}")
+        logger.info(
+            "原因:\n%s",
+            result.reason,
+            extra={
+                "event": "eval.case_reason",
+                "data": {"case": result.case_name, "reason": result.reason},
+            },
+        )
 
 
-def print_summary(results: list[EvalResult]) -> None:
+def log_summary(results: list[EvalResult]) -> None:
     """汇总整批 Eval 的状态、总轮数、总耗时和总费用。"""
     counts = {
         status: sum(result.status == status for result in results)
         for status in ("pass", "fail", "error")
     }
-    print("\n===== Eval 汇总 =====")
-    print(
+    counts_text = (
         f"{counts['pass']} passed, "
         f"{counts['fail']} failed, "
         f"{counts['error']} errors"
     )
-    print(f"总轮数: {sum(result.turns for result in results)}")
-    print(f"总耗时: {sum(result.duration_s for result in results):.2f}s")
-    print(f"总费用: ${sum(result.cost_usd for result in results):.6f}")
+    turns = sum(result.turns for result in results)
+    duration = sum(result.duration_s for result in results)
+    cost = sum(result.cost_usd for result in results)
+
+    logger.info(
+        "Eval 汇总: %s, turns=%s, duration=%.2fs, cost=$%.6f",
+        counts_text,
+        turns,
+        duration,
+        cost,
+        extra={
+            "event": "eval.completed",
+            "data": {
+                "passed": counts["pass"],
+                "failed": counts["fail"],
+                "errors": counts["error"],
+                "turns": turns,
+                "duration_s": duration,
+                "cost_usd": cost,
+            },
+        },
+    )
 
 
 async def main() -> None:
     """顺序运行全部 cases，避免并发请求干扰结果和日志。"""
+    args = parse_args()
+    settings = AgentSettings()
+    log_file = configure_logging(args.log_file or settings.log_file)
+    logger.info(
+        "详细日志: %s",
+        log_file,
+        extra={
+            "event": "eval.started",
+            "data": {"log_file": str(log_file), "cases_root": str(CASES_ROOT)},
+        },
+    )
+
     case_dirs = discover_cases(CASES_ROOT)
     if not case_dirs:
-        print(f"没有发现 Eval case: {CASES_ROOT}")
+        logger.warning(
+            "没有发现 Eval case: %s",
+            CASES_ROOT,
+            extra={"event": "eval.no_cases"},
+        )
         return
 
-    settings = AgentSettings()
     results: list[EvalResult] = []
 
     for case_dir in case_dirs:
-        print(f"\n[RUN] {case_dir.name}")
+        logger.info(
+            "[RUN] %s",
+            case_dir.name,
+            extra={
+                "event": "eval.case_started",
+                "data": {"case": case_dir.name},
+            },
+        )
         result = await run_case(case_dir, settings)
         results.append(result)
-        print_result(result)
+        log_result(result)
 
-    print_summary(results)
+    log_summary(results)
 
 
 if __name__ == "__main__":

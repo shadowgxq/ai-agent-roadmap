@@ -3,14 +3,43 @@
 import asyncio
 import json
 import random
+import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+from uuid import uuid4
 
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from .context import Context
+from .logging_config import get_logger
+
+
+logger = get_logger("agent.loop")
+
+
+@dataclass(frozen=True)
+class AgentTrace:
+    """标识一次运行中的主 Agent 或 SubAgent。"""
+
+    run_id: str
+    agent_id: str
+    role: str
+    parent_agent_id: str | None = None
+
+    def event_context(self, turn: int | None = None) -> dict[str, Any]:
+        """生成附加到结构化日志事件的关联字段。"""
+        context: dict[str, Any] = {
+            "run_id": self.run_id,
+            "agent_id": self.agent_id,
+            "role": self.role,
+        }
+        if self.parent_agent_id is not None:
+            context["parent_agent_id"] = self.parent_agent_id
+        if turn is not None:
+            context["turn"] = turn
+        return context
 
 
 @dataclass
@@ -22,6 +51,29 @@ class RunStats:
     output_tokens: int = 0
     cache_read_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
+    subagent_runs: list["RunStats"] = field(default_factory=list)
+
+    def aggregate(self) -> "RunStats":
+        """返回当前 Agent 及所有子 Agent 的汇总统计。"""
+        total = RunStats(
+            turns=self.turns,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            cache_read_input_tokens=self.cache_read_input_tokens,
+            cache_creation_input_tokens=self.cache_creation_input_tokens,
+        )
+        for child in self.subagent_runs:
+            child_total = child.aggregate()
+            total.turns += child_total.turns
+            total.input_tokens += child_total.input_tokens
+            total.output_tokens += child_total.output_tokens
+            total.cache_read_input_tokens += (
+                child_total.cache_read_input_tokens
+            )
+            total.cache_creation_input_tokens += (
+                child_total.cache_creation_input_tokens
+            )
+        return total
 
 
 @dataclass(frozen=True)
@@ -178,6 +230,8 @@ async def run(
     max_tokens: int = 300,
     cost_estimator: Callable[[RunStats], float | None] | None = None,
     max_cost_usd: float | None = None,
+    stats: RunStats | None = None,
+    trace: AgentTrace | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
     if max_cost_usd is not None:
@@ -186,11 +240,43 @@ async def run(
         if cost_estimator is None:
             raise ValueError("设置 max_cost_usd 时必须提供 cost_estimator")
 
+    if trace is None:
+        trace = AgentTrace(
+            run_id=uuid4().hex,
+            agent_id="main",
+            role="main",
+        )
+
     tools = registry.schemas()
-    stats = RunStats()
+    if stats is None:
+        stats = RunStats()
     tracker = ToolCallTracker()
+    logger.info(
+        "Agent 开始: %s",
+        trace.agent_id,
+        extra={
+            "event": "agent.started",
+            "trace": trace.event_context(),
+            "data": {
+                "model": model,
+                "max_turns": max_turns,
+                "max_tokens": max_tokens,
+                "message_count": len(context.messages),
+                "tools": [tool["name"] for tool in tools],
+            },
+        },
+    )
     for turn in range(1, max_turns + 1):
-        print(f"\n===== 第 {turn}/{max_turns} 轮 =====")
+        logger.info(
+            "===== 第 %s/%s 轮 =====",
+            turn,
+            max_turns,
+            extra={
+                "event": "agent.turn_started",
+                "trace": trace.event_context(turn),
+                "data": {"max_turns": max_turns},
+            },
+        )
         response = await call_llm(
             client,
             context,
@@ -198,11 +284,21 @@ async def run(
             system_prompt=system_prompt,
             tools=tools,
             max_tokens=max_tokens,
+            trace=trace,
+            turn=turn,
         )
         message = response.choices[0].message
         text = message_text(message)
         if text:
-            print(f"模型文本: {text}")
+            logger.info(
+                "模型返回文本",
+                extra={
+                    "event": "agent.model_text",
+                    "trace": trace.event_context(turn),
+                    "console_message": f"模型文本: {text}",
+                    "data": {"text": text},
+                },
+            )
 
         token_usage = extract_usage_tokens(response.usage)
 
@@ -228,12 +324,39 @@ async def run(
         context.append_assistant(assistant_message(message))
 
         if not message.tool_calls:
+            logger.info(
+                "Agent 完成: %s",
+                trace.agent_id,
+                extra={
+                    "event": "agent.completed",
+                    "trace": trace.event_context(turn),
+                    "data": {
+                        "turns": stats.turns,
+                        "finish_reason": response.choices[0].finish_reason,
+                    },
+                },
+            )
             return response, stats
 
-        tool_results = await execute_tools(message, registry, tracker)
+        tool_results = await execute_tools(
+            message,
+            registry,
+            tracker,
+            trace=trace,
+            turn=turn,
+        )
         context.append_tool_results(tool_results)
         context.assert_paired()
 
+    logger.error(
+        "Agent 达到最大轮数: %s",
+        max_turns,
+        extra={
+            "event": "agent.max_turns_exceeded",
+            "trace": trace.event_context(max_turns),
+            "data": {"max_turns": max_turns},
+        },
+    )
     raise MaxTurnsExceeded(max_turns, stats)
 
 
@@ -278,6 +401,8 @@ async def call_llm(
     max_tokens: int = 300,
     max_attempts: int = 3,
     base_delay: float = 1.0,
+    trace: AgentTrace | None = None,
+    turn: int | None = None,
 ) -> ChatCompletion:
 
     for attempt in range(max_attempts):
@@ -297,9 +422,25 @@ async def call_llm(
                 raise
 
             delay = base_delay * 2**attempt + random.uniform(0, 0.5)
-            print(
-                f"模型请求失败，{delay:.2f} 秒后重试 "
-                f"({attempt + 2}/{max_attempts}): {type(exc).__name__}"
+            logger.warning(
+                "模型请求失败，%.2f 秒后重试 (%s/%s): %s",
+                delay,
+                attempt + 2,
+                max_attempts,
+                type(exc).__name__,
+                extra={
+                    "event": "agent.model_retry",
+                    "trace": (
+                        trace.event_context(
+                            turn) if trace is not None else None
+                    ),
+                    "data": {
+                        "delay_s": delay,
+                        "attempt": attempt + 2,
+                        "max_attempts": max_attempts,
+                        "error_type": type(exc).__name__,
+                    },
+                },
             )
             await asyncio.sleep(delay)
 
@@ -332,21 +473,39 @@ async def execute_tools(
     registry: Any,
     tracker: ToolCallTracker | None = None,
     tool_timeout: float = 300.0,
+    *,
+    trace: AgentTrace | None = None,
+    turn: int | None = None,
 ) -> list[dict[str, Any]]:
     """按顺序执行 function calls，并生成匹配的 tool messages。"""
     if tool_timeout <= 0:
         raise ValueError("tool_timeout 必须大于 0")
 
     tool_results: list[dict[str, Any]] = []
-    for tool_call in message.tool_calls or []:
+    tool_calls = message.tool_calls or []
+    for tool_call in tool_calls:
         name = tool_call.function.name
+        trace_context = (
+            trace.event_context(turn) if trace is not None else None
+        )
         try:
             input_data = json.loads(tool_call.function.arguments or "{}")
             if not isinstance(input_data, dict):
                 raise TypeError("工具输入必须是 object")
         except (TypeError, json.JSONDecodeError) as exc:
             content = f"工具 {name} 参数 JSON 无效: {exc}"
-            print(content)
+            logger.error(
+                content,
+                extra={
+                    "event": "agent.tool_invalid_arguments",
+                    "trace": trace_context,
+                    "data": {
+                        "tool": name,
+                        "status": "invalid_arguments",
+                        "error": str(exc),
+                    },
+                },
+            )
             tool_results.append(
                 {
                     "role": "tool",
@@ -361,20 +520,61 @@ async def execute_tools(
                 "检测到相同工具调用已连续重复 "
                 f"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。"
             )
-            print(f"拦截重复调用: {name} {input_data}")
+            logger.warning(
+                "拦截重复调用: %s %s",
+                name,
+                input_data,
+                extra={
+                    "event": "agent.tool_blocked",
+                    "trace": trace_context,
+                    "data": {
+                        "tool": name,
+                        "status": "blocked",
+                        "arguments": input_data,
+                    },
+                },
+            )
         else:
-            print(f"调用工具: {name} {input_data}")
+            logger.info(
+                "工具开始: %s",
+                name,
+                extra={
+                    "event": "agent.tool_started",
+                    "trace": trace_context,
+                    "console_message": f"调用工具: {name} {input_data}",
+                    "data": {
+                        "tool": name,
+                        "arguments": input_data,
+                    },
+                },
+            )
             try:
                 execution = await asyncio.wait_for(
                     registry.execute_with_status(name, input_data),
                     timeout=tool_timeout,
                 )
                 content = execution.content
+                status = "error" if execution.is_error else "ok"
             except TimeoutError:
                 content = (
                     f"工具 {name} 执行超时（超过 {tool_timeout:g} 秒）"
                 )
-            print(f"工具结果: {content}")
+                status = "timeout"
+            logger.info(
+                "工具完成: %s (%s)",
+                name,
+                status,
+                extra={
+                    "event": "agent.tool_completed",
+                    "trace": trace_context,
+                    "console_message": f"工具结果: {content}",
+                    "data": {
+                        "tool": name,
+                        "status": status,
+                        "content": content,
+                    },
+                },
+            )
 
         tool_results.append(
             {

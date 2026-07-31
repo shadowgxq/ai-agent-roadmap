@@ -74,6 +74,7 @@ async def main() -> None:
             runtime = WorkflowRuntime(
                 client,
                 model=args.model or settings.model,
+                prompt_cache=settings.prompt_cache_config,
             )
             if isinstance(state, ParallelizationState):
                 await run_parallelization(

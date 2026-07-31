@@ -1,11 +1,25 @@
 """Workflow 节点共享的模型调用与观测能力。"""
 
+import json
 from dataclasses import dataclass
+from typing import Any
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
+from ..agent.cache import PromptCacheConfig
 from ..agent.loop import extract_usage_tokens
+
+
+def _usage_payload(usage: Any) -> Any:
+    """Convert an SDK usage object into a loggable payload."""
+    if isinstance(usage, dict):
+        return usage
+
+    model_dump = getattr(usage, "model_dump", None)
+    if callable(model_dump):
+        return model_dump(exclude_none=True)
+    return repr(usage)
 
 
 @dataclass
@@ -48,10 +62,12 @@ class WorkflowRuntime:
         client: AsyncOpenAI,
         model: str,
         *,
+        prompt_cache: PromptCacheConfig | None = None,
         stats: WorkflowStats | None = None,
     ) -> None:
         self.client = client
         self.model = model
+        self.prompt_cache = prompt_cache or PromptCacheConfig()
         self.stats = stats or WorkflowStats()
 
     async def complete(
@@ -70,6 +86,7 @@ class WorkflowRuntime:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            **self.prompt_cache.request_kwargs(),
         )
         output = (response.choices[0].message.content or "").strip()
         self.stats.record(response)
@@ -84,12 +101,16 @@ class WorkflowRuntime:
     ) -> None:
         """打印单个节点的 token 用量和输出摘要。"""
         usage = extract_usage_tokens(response.usage)
+        raw_usage = _usage_payload(response.usage)
         preview = " ".join(output.split())
         if len(preview) > 120:
             preview = f"{preview[:120]}..."
         print(
             f"[workflow] {step_name}: "
             f"input_tokens={usage.input_tokens}, "
+            f"cache_read_input_tokens={usage.cache_read_input_tokens}, "
+            f"cache_creation_input_tokens={usage.cache_creation_input_tokens}, "
             f"output_tokens={usage.output_tokens}, "
+            f"usage={json.dumps(raw_usage, ensure_ascii=False, default=str, sort_keys=True)}, "
             f"output={preview or '(空)'}"
         )

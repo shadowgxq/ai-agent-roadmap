@@ -33,7 +33,8 @@ class RunStatsSnapshot(BaseModel):
             output_tokens=stats.output_tokens,
             cache_read_input_tokens=stats.cache_read_input_tokens,
             cache_creation_input_tokens=stats.cache_creation_input_tokens,
-            subagent_runs=[cls.from_stats(child) for child in stats.subagent_runs],
+            subagent_runs=[cls.from_stats(child)
+                           for child in stats.subagent_runs],
         )
 
     def to_stats(self) -> RunStats:

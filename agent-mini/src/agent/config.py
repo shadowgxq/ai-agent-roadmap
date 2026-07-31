@@ -5,6 +5,8 @@ from pathlib import Path
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .cache import PromptCacheConfig
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -54,6 +56,9 @@ class AgentSettings(BaseSettings):
         default=None,
         ge=0,
     )
+    prompt_cache_enabled: bool = True
+    prompt_cache_key: str = Field(default="agent-mini", min_length=1)
+    prompt_cache_retention: str | None = None
     price_currency: str = "USD"
 
     @field_validator("base_url")
@@ -62,3 +67,12 @@ class AgentSettings(BaseSettings):
         """把网关根地址规范成 OpenAI SDK 需要的 `/v1` 地址。"""
         value = value.rstrip("/")
         return value if value.endswith("/v1") else f"{value}/v1"
+
+    @property
+    def prompt_cache_config(self) -> PromptCacheConfig:
+        """Build the cache options shared by all model call paths."""
+        return PromptCacheConfig(
+            enabled=self.prompt_cache_enabled,
+            key=self.prompt_cache_key,
+            retention=self.prompt_cache_retention,
+        )

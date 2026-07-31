@@ -55,6 +55,7 @@ async def main() -> None:
             runtime = WorkflowRuntime(
                 client,
                 model=args.model or settings.model,
+                prompt_cache=settings.prompt_cache_config,
             )
             await run_evaluator_optimizer(
                 runtime,
@@ -64,9 +65,15 @@ async def main() -> None:
     finally:
         print(state.model_dump_json(indent=2))
         if runtime is not None:
+            stats = runtime.stats
             print(
                 f"模型调用: {runtime.stats.calls}, "
-                f"总 token: {runtime.stats.total_tokens}"
+                f"input_tokens: {stats.input_tokens}, "
+                f"cache_read_input_tokens: {stats.cache_read_input_tokens}, "
+                f"cache_creation_input_tokens: "
+                f"{stats.cache_creation_input_tokens}, "
+                f"output_tokens: {stats.output_tokens}, "
+                f"总 token: {stats.total_tokens}"
             )
 
 

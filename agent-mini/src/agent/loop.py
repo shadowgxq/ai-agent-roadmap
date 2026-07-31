@@ -12,6 +12,7 @@ from uuid import uuid4
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
+from .cache import PromptCacheConfig
 from .context import Context
 from .logging_config import get_logger
 
@@ -118,10 +119,28 @@ def _token_count(value: Any) -> int:
 
 def extract_usage_tokens(usage: Any) -> UsageTokens:
     """Normalize OpenAI-style and Anthropic-style usage fields."""
-    details = _usage_value(usage, "prompt_tokens_details")
+    details = next(
+        (
+            _usage_value(usage, field_name)
+            for field_name in (
+                "prompt_tokens_details",
+                "input_tokens_details",
+                "cache_details",
+            )
+            if _usage_value(usage, field_name) is not None
+        ),
+        None,
+    )
 
     cache_read = _token_count(
-        _usage_value(usage, "cache_read_input_tokens", "cache_read_tokens")
+        _usage_value(
+            usage,
+            "cache_read_input_tokens",
+            "cache_read_tokens",
+            "cached_tokens",
+            "prompt_cache_hit_tokens",
+            "cache_hit_tokens",
+        )
     )
     if cache_read == 0:
         cache_read = _token_count(
@@ -130,6 +149,8 @@ def extract_usage_tokens(usage: Any) -> UsageTokens:
                 "cache_read_input_tokens",
                 "cache_read_tokens",
                 "cached_tokens",
+                "prompt_cache_hit_tokens",
+                "cache_hit_tokens",
             )
         )
 
@@ -139,6 +160,8 @@ def extract_usage_tokens(usage: Any) -> UsageTokens:
             "cache_creation_input_tokens",
             "cache_creation_tokens",
             "cache_write_input_tokens",
+            "cache_write_tokens",
+            "prompt_cache_creation_tokens",
         )
     )
     if cache_creation == 0:
@@ -148,6 +171,8 @@ def extract_usage_tokens(usage: Any) -> UsageTokens:
                 "cache_creation_input_tokens",
                 "cache_creation_tokens",
                 "cache_write_input_tokens",
+                "cache_write_tokens",
+                "prompt_cache_creation_tokens",
             )
         )
 
@@ -230,6 +255,7 @@ async def run(
     max_tokens: int = 300,
     cost_estimator: Callable[[RunStats], float | None] | None = None,
     max_cost_usd: float | None = None,
+    prompt_cache: PromptCacheConfig | None = None,
     stats: RunStats | None = None,
     trace: AgentTrace | None = None,
     start_turn: int = 0,
@@ -291,6 +317,7 @@ async def run(
             system_prompt=system_prompt,
             tools=tools,
             max_tokens=max_tokens,
+            prompt_cache=prompt_cache,
             trace=trace,
             turn=turn,
         )
@@ -412,6 +439,7 @@ async def call_llm(
     max_tokens: int = 300,
     max_attempts: int = 3,
     base_delay: float = 1.0,
+    prompt_cache: PromptCacheConfig | None = None,
     trace: AgentTrace | None = None,
     turn: int | None = None,
 ) -> ChatCompletion:
@@ -426,6 +454,11 @@ async def call_llm(
                     *context.messages,
                 ],
                 tools=openai_tools(tools),
+                **(
+                    prompt_cache.request_kwargs()
+                    if prompt_cache is not None
+                    else {}
+                ),
             )
         except (APIConnectionError, APIStatusError) as exc:
             is_last_attempt = attempt == max_attempts - 1

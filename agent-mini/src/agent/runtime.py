@@ -118,6 +118,7 @@ async def run_coding_agent(
                 model=selected_model,
                 parent_trace=trace,
                 parent_stats=main_stats,
+                prompt_cache=settings.prompt_cache_config,
             )
         return await run(
             client,
@@ -129,6 +130,7 @@ async def run_coding_agent(
             max_tokens=max_tokens,
             cost_estimator=lambda stats: estimate_cost(stats, settings),
             max_cost_usd=max_cost_usd,
+            prompt_cache=settings.prompt_cache_config,
             stats=main_stats,
             trace=trace,
             start_turn=start_turn,

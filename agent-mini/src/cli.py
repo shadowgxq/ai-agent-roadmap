@@ -14,7 +14,8 @@ if __package__:
     from .agent.config import AgentSettings
     from .agent.context import Context
     from .agent.cost import estimate_cost
-    from .agent.loop import MaxTurnsExceeded, RunStats
+    from .agent.git_snapshot import GitSnapshotError, rollback_to_sha
+    from .agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
     from .agent.runtime import run_coding_agent
     from .agent.logging_config import configure_logging, get_logger
 else:
@@ -22,7 +23,8 @@ else:
     from agent.config import AgentSettings
     from agent.context import Context
     from agent.cost import estimate_cost
-    from agent.loop import MaxTurnsExceeded, RunStats
+    from agent.git_snapshot import GitSnapshotError, rollback_to_sha
+    from agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
     from agent.runtime import run_coding_agent
     from agent.logging_config import configure_logging, get_logger
 
@@ -71,6 +73,11 @@ def parse_args() -> argparse.Namespace:
         help="从指定 run_id 的 checkpoint 恢复任务。",
     )
     parser.add_argument(
+        "--rollback",
+        metavar="RUN_ID",
+        help="将指定运行的工作目录回滚到任务开始前的 Git 快照。",
+    )
+    parser.add_argument(
         "--log-file",
         type=Path,
         default=None,
@@ -78,9 +85,11 @@ def parse_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-    if args.resume and args.task:
-        parser.error("--resume 不能与新的 task 同时使用")
-    if not args.resume and not args.task:
+    if args.resume and args.rollback:
+        parser.error("--resume 和 --rollback 不能同时使用")
+    if args.rollback and args.task:
+        parser.error("--rollback 不能与新的 task 同时使用")
+    if not args.resume and not args.rollback and not args.task:
         parser.error("必须提供 task，或使用 --resume RUN_ID")
     if args.resume and (
         args.model is not None
@@ -92,6 +101,13 @@ def parse_args() -> argparse.Namespace:
             "--resume 会恢复原始模型、目录、轮数和 SubAgent 配置，"
             "不能同时覆盖这些参数"
         )
+    if args.rollback and (
+        args.model is not None
+        or args.max_turns is not None
+        or args.workdir != Path.cwd()
+        or not args.enable_subagent
+    ):
+        parser.error("--rollback 只需要 RUN_ID，不能覆盖运行参数")
     if args.max_turns is not None and args.max_turns < 1:
         parser.error("--max-turns 必须大于 0")
     return args
@@ -219,6 +235,20 @@ def log_cost(
 async def main() -> None:
     """解析命令行参数，运行 Agent 并展示结果。"""
     args = parse_args()
+
+    if args.rollback:
+        checkpoint = load_checkpoint(args.rollback)
+        if checkpoint.start_sha is None:
+            raise GitSnapshotError(
+                f"运行 {checkpoint.run_id} 没有 Git 起点，无法回滚"
+            )
+        rollback_to_sha(Path(checkpoint.workdir), checkpoint.start_sha)
+        print(
+            f"已回滚运行 {checkpoint.run_id} 的工作目录到 "
+            f"{checkpoint.start_sha}"
+        )
+        return
+
     settings = AgentSettings()
 
     if args.resume:
@@ -236,6 +266,7 @@ async def main() -> None:
         context = Context(checkpoint.messages)
         stats = checkpoint.stats.to_stats()
         start_turn = checkpoint.turn
+        start_sha = checkpoint.start_sha
     else:
         task = args.task
         if task is None:
@@ -250,6 +281,7 @@ async def main() -> None:
         context = None
         stats = None
         start_turn = 0
+        start_sha = None
 
     trace = {"run_id": run_id, "agent_id": "main", "role": "main"}
     log_file = configure_logging(args.log_file or settings.log_file)
@@ -284,6 +316,8 @@ async def main() -> None:
             enable_subagent=enable_subagent,
             context=context,
             stats=stats,
+            start_turn=start_turn,
+            start_sha=start_sha,
             checkpoint_enabled=True,
         )
     except MaxTurnsExceeded as exc:
@@ -294,12 +328,36 @@ async def main() -> None:
         )
         log_stats(exc.stats, trace=trace)
         log_cost(exc.stats, settings, trace=trace)
+        logger.error(
+            "可使用 --rollback %s 恢复任务开始前的文件状态。",
+            run_id,
+            extra={"event": "run.rollback_available", "trace": trace},
+        )
+        return
+    except CostLimitExceeded as exc:
+        logger.error(
+            "运行因费用上限停止: %s",
+            exc,
+            extra={"event": "run.cost_limit_exceeded", "trace": trace},
+        )
+        log_stats(exc.stats, trace=trace)
+        log_cost(exc.stats, settings, trace=trace)
+        logger.error(
+            "可使用 --rollback %s 恢复任务开始前的文件状态。",
+            run_id,
+            extra={"event": "run.rollback_available", "trace": trace},
+        )
         return
     except APIError as exc:
         logger.error(
             "模型请求失败: %s",
             exc,
             extra={"event": "run.api_error", "trace": trace},
+        )
+        logger.error(
+            "可使用 --rollback %s 恢复任务开始前的文件状态。",
+            run_id,
+            extra={"event": "run.rollback_available", "trace": trace},
         )
         return
 

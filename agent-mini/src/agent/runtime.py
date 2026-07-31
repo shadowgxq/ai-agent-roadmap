@@ -1,5 +1,6 @@
 """组装并运行一次 Coding Agent。"""
 
+import asyncio
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,6 +24,7 @@ from .checkpoint import (
 from .config import AgentSettings
 from .context import Context
 from .cost import estimate_cost
+from .git_snapshot import ensure_start_snapshot, get_head_sha
 from .loop import AgentTrace, RunStats, run
 from .prompts import build_system_prompt, build_task_message
 
@@ -43,6 +45,7 @@ async def run_coding_agent(
     start_turn: int = 0,
     checkpoint_enabled: bool = False,
     runs_dir: Path = DEFAULT_RUNS_DIR,
+    start_sha: str | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """组装依赖并在指定目录运行一次 Coding Agent。"""
     workdir = workdir.resolve()
@@ -53,6 +56,13 @@ async def run_coding_agent(
         max_turns if max_turns is not None else settings.max_turns
     )
     selected_run_id = run_id or uuid4().hex
+    selected_start_sha = start_sha
+    if selected_start_sha is None:
+        selected_start_sha = (
+            ensure_start_snapshot(workdir)
+            if checkpoint_enabled
+            else get_head_sha(workdir)
+        )
     trace = AgentTrace(
         run_id=selected_run_id,
         agent_id="main",
@@ -98,6 +108,7 @@ async def run_coding_agent(
                 max_cost_usd=max_cost_usd,
                 enable_subagent=enable_subagent,
                 status=status,
+                start_sha=selected_start_sha,
             ),
             runs_dir=runs_dir,
         )
@@ -105,36 +116,54 @@ async def run_coding_agent(
     if checkpoint_enabled and start_turn == 0:
         persist_checkpoint(context, main_stats, 0, "running")
 
-    async with AsyncOpenAI(
-        api_key=settings.api_key,
-        base_url=settings.base_url,
-        max_retries=0,
-    ) as client:
-        if enable_subagent:
-            register_subagent_tool(
+    def persist_failure_checkpoint(status: CheckpointStatus) -> None:
+        """仅在消息完整配对时，记录可安全恢复的异常状态。"""
+        try:
+            context.assert_paired()
+        except RuntimeError:
+            # 工具调用尚未得到全部结果；保留上一份完整轮次的 checkpoint。
+            return
+        persist_checkpoint(context, main_stats, main_stats.turns, status)
+
+    try:
+        async with AsyncOpenAI(
+            api_key=settings.api_key,
+            base_url=settings.base_url,
+            max_retries=0,
+        ) as client:
+            if enable_subagent:
+                register_subagent_tool(
+                    registry,
+                    client=client,
+                    workdir=workdir,
+                    model=selected_model,
+                    parent_trace=trace,
+                    parent_stats=main_stats,
+                    prompt_cache=settings.prompt_cache_config,
+                )
+            return await run(
+                client,
+                context,
                 registry,
-                client=client,
-                workdir=workdir,
                 model=selected_model,
-                parent_trace=trace,
-                parent_stats=main_stats,
+                system_prompt=build_system_prompt(),
+                max_turns=selected_max_turns,
+                max_tokens=max_tokens,
+                cost_estimator=lambda stats: estimate_cost(stats, settings),
+                max_cost_usd=max_cost_usd,
                 prompt_cache=settings.prompt_cache_config,
+                stats=main_stats,
+                trace=trace,
+                start_turn=start_turn,
+                checkpoint_callback=(
+                    persist_checkpoint if checkpoint_enabled else None
+                ),
             )
-        return await run(
-            client,
-            context,
-            registry,
-            model=selected_model,
-            system_prompt=build_system_prompt(),
-            max_turns=selected_max_turns,
-            max_tokens=max_tokens,
-            cost_estimator=lambda stats: estimate_cost(stats, settings),
-            max_cost_usd=max_cost_usd,
-            prompt_cache=settings.prompt_cache_config,
-            stats=main_stats,
-            trace=trace,
-            start_turn=start_turn,
-            checkpoint_callback=(
-                persist_checkpoint if checkpoint_enabled else None
-            ),
-        )
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        if checkpoint_enabled:
+            persist_failure_checkpoint("interrupted")
+        raise
+    except Exception:
+        if checkpoint_enabled:
+            persist_failure_checkpoint("failed")
+        raise

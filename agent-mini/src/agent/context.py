@@ -6,8 +6,14 @@ from typing import Any
 class Context:
     """保存 user、assistant 和 tool 消息，并校验工具调用配对。"""
 
-    def __init__(self) -> None:
-        self.messages: list[dict[str, Any]] = []
+    def __init__(self, messages: list[dict[str, Any]] | None = None) -> None:
+        self.messages: list[dict[str, Any]] = (
+            [dict(message) for message in messages]
+            if messages is not None
+            else []
+        )
+        if messages is not None:
+            self.assert_paired()
 
     def append_user(self, text: str) -> None:
         """追加用户文本消息。"""

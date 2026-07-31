@@ -10,13 +10,17 @@ from openai import APIError
 
 
 if __package__:
+    from .agent.checkpoint import load_checkpoint
     from .agent.config import AgentSettings
+    from .agent.context import Context
     from .agent.cost import estimate_cost
     from .agent.loop import MaxTurnsExceeded, RunStats
     from .agent.runtime import run_coding_agent
     from .agent.logging_config import configure_logging, get_logger
 else:
+    from agent.checkpoint import load_checkpoint
     from agent.config import AgentSettings
+    from agent.context import Context
     from agent.cost import estimate_cost
     from agent.loop import MaxTurnsExceeded, RunStats
     from agent.runtime import run_coding_agent
@@ -34,7 +38,8 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "task",
-        help="交给 Agent 完成的任务。",
+        nargs="?",
+        help="交给 Agent 完成的任务；使用 --resume 时省略。",
     )
     parser.add_argument(
         "--dir",
@@ -61,6 +66,11 @@ def parse_args() -> argparse.Namespace:
         help="禁用探索型 SubAgent，用于对比实验。",
     )
     parser.add_argument(
+        "--resume",
+        metavar="RUN_ID",
+        help="从指定 run_id 的 checkpoint 恢复任务。",
+    )
+    parser.add_argument(
         "--log-file",
         type=Path,
         default=None,
@@ -68,6 +78,20 @@ def parse_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    if args.resume and args.task:
+        parser.error("--resume 不能与新的 task 同时使用")
+    if not args.resume and not args.task:
+        parser.error("必须提供 task，或使用 --resume RUN_ID")
+    if args.resume and (
+        args.model is not None
+        or args.max_turns is not None
+        or args.workdir != Path.cwd()
+        or not args.enable_subagent
+    ):
+        parser.error(
+            "--resume 会恢复原始模型、目录、轮数和 SubAgent 配置，"
+            "不能同时覆盖这些参数"
+        )
     if args.max_turns is not None and args.max_turns < 1:
         parser.error("--max-turns 必须大于 0")
     return args
@@ -195,37 +219,72 @@ def log_cost(
 async def main() -> None:
     """解析命令行参数，运行 Agent 并展示结果。"""
     args = parse_args()
-    workdir = args.workdir.resolve()
     settings = AgentSettings()
-    run_id = uuid4().hex
+
+    if args.resume:
+        checkpoint = load_checkpoint(args.resume)
+        if checkpoint.status == "completed":
+            raise ValueError(f"运行 {checkpoint.run_id} 已经完成，不能继续恢复")
+        task = checkpoint.task
+        workdir = Path(checkpoint.workdir).resolve()
+        run_id = checkpoint.run_id
+        model = checkpoint.model
+        max_turns = checkpoint.max_turns
+        max_tokens = checkpoint.max_tokens
+        max_cost_usd = checkpoint.max_cost_usd
+        enable_subagent = checkpoint.enable_subagent
+        context = Context(checkpoint.messages)
+        stats = checkpoint.stats.to_stats()
+        start_turn = checkpoint.turn
+    else:
+        task = args.task
+        if task is None:
+            raise RuntimeError("CLI 参数校验未提供 task")
+        workdir = args.workdir.resolve()
+        run_id = uuid4().hex
+        model = args.model or settings.model
+        max_turns = args.max_turns or settings.max_turns
+        max_tokens = 3000
+        max_cost_usd = None
+        enable_subagent = args.enable_subagent
+        context = None
+        stats = None
+        start_turn = 0
+
     trace = {"run_id": run_id, "agent_id": "main", "role": "main"}
     log_file = configure_logging(args.log_file or settings.log_file)
     logger.info(
         "详细日志: %s",
         log_file,
         extra={
-            "event": "run.started",
+            "event": "run.resumed" if args.resume else "run.started",
             "trace": trace,
             "data": {
-                "task": args.task,
+                "task": task,
                 "workdir": str(workdir),
                 "log_file": str(log_file),
-                "model": args.model or settings.model,
-                "max_turns": args.max_turns or settings.max_turns,
-                "enable_subagent": args.enable_subagent,
+                "model": model,
+                "max_turns": max_turns,
+                "enable_subagent": enable_subagent,
+                "start_turn": start_turn,
             },
         },
     )
 
     try:
         final_response, stats = await run_coding_agent(
-            task=args.task,
+            task=task,
             workdir=workdir,
             settings=settings,
-            model=args.model,
-            max_turns=args.max_turns,
+            model=model,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
+            max_cost_usd=max_cost_usd,
             run_id=run_id,
-            enable_subagent=args.enable_subagent,
+            enable_subagent=enable_subagent,
+            context=context,
+            stats=stats,
+            checkpoint_enabled=True,
         )
     except MaxTurnsExceeded as exc:
         logger.error(

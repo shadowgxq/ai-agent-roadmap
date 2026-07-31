@@ -6,7 +6,7 @@ import random
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI
@@ -232,8 +232,15 @@ async def run(
     max_cost_usd: float | None = None,
     stats: RunStats | None = None,
     trace: AgentTrace | None = None,
+    start_turn: int = 0,
+    checkpoint_callback: Callable[
+        [Context, RunStats, int, Literal["running", "completed"]], None
+    ] | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
+    if start_turn < 0 or start_turn > max_turns:
+        raise ValueError("start_turn 必须在 0 和 max_turns 之间")
+
     if max_cost_usd is not None:
         if max_cost_usd <= 0:
             raise ValueError("max_cost_usd 必须大于 0")
@@ -266,7 +273,7 @@ async def run(
             },
         },
     )
-    for turn in range(1, max_turns + 1):
+    for turn in range(start_turn + 1, max_turns + 1):
         logger.info(
             "===== 第 %s/%s 轮 =====",
             turn,
@@ -324,6 +331,8 @@ async def run(
         context.append_assistant(assistant_message(message))
 
         if not message.tool_calls:
+            if checkpoint_callback is not None:
+                checkpoint_callback(context, stats, turn, "completed")
             logger.info(
                 "Agent 完成: %s",
                 trace.agent_id,
@@ -347,6 +356,8 @@ async def run(
         )
         context.append_tool_results(tool_results)
         context.assert_paired()
+        if checkpoint_callback is not None:
+            checkpoint_callback(context, stats, turn, "running")
 
     logger.error(
         "Agent 达到最大轮数: %s",

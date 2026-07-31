@@ -13,6 +13,13 @@ from ..tools import (
     register_shell_tools,
     register_subagent_tool,
 )
+from .checkpoint import (
+    DEFAULT_RUNS_DIR,
+    Checkpoint,
+    CheckpointStatus,
+    RunStatsSnapshot,
+    save_checkpoint,
+)
 from .config import AgentSettings
 from .context import Context
 from .cost import estimate_cost
@@ -31,18 +38,27 @@ async def run_coding_agent(
     max_cost_usd: float | None = None,
     run_id: str | None = None,
     enable_subagent: bool = True,
+    context: Context | None = None,
+    stats: RunStats | None = None,
+    start_turn: int = 0,
+    checkpoint_enabled: bool = False,
+    runs_dir: Path = DEFAULT_RUNS_DIR,
 ) -> tuple[ChatCompletion, RunStats]:
     """组装依赖并在指定目录运行一次 Coding Agent。"""
     workdir = workdir.resolve()
     if not workdir.is_dir():
         raise NotADirectoryError(f"工作目录不存在或不是目录: {workdir}")
     selected_model = model if model is not None else settings.model
+    selected_max_turns = (
+        max_turns if max_turns is not None else settings.max_turns
+    )
+    selected_run_id = run_id or uuid4().hex
     trace = AgentTrace(
-        run_id=run_id or uuid4().hex,
+        run_id=selected_run_id,
         agent_id="main",
         role="main",
     )
-    main_stats = RunStats()
+    main_stats = stats if stats is not None else RunStats()
 
     registry = ToolRegistry()
     register_fs_tools(registry, workdir)
@@ -53,8 +69,42 @@ async def run_coding_agent(
         max_output_chars=settings.max_tool_output_chars,
     )
 
-    context = Context()
-    context.append_user(build_task_message(task, workdir))
+    if context is None:
+        context = Context()
+        context.append_user(build_task_message(task, workdir))
+    else:
+        context.assert_paired()
+
+    def persist_checkpoint(
+        current_context: Context,
+        current_stats: RunStats,
+        turn: int,
+        status: CheckpointStatus,
+    ) -> None:
+        """在完整轮次边界保存可恢复状态。"""
+        total_cost = estimate_cost(current_stats, settings)
+        save_checkpoint(
+            Checkpoint(
+                run_id=selected_run_id,
+                task=task,
+                messages=current_context.messages,
+                turn=turn,
+                stats=RunStatsSnapshot.from_stats(current_stats),
+                total_cost_usd=total_cost,
+                workdir=str(workdir),
+                model=selected_model,
+                max_turns=selected_max_turns,
+                max_tokens=max_tokens,
+                max_cost_usd=max_cost_usd,
+                enable_subagent=enable_subagent,
+                status=status,
+            ),
+            runs_dir=runs_dir,
+        )
+
+    if checkpoint_enabled and start_turn == 0:
+        persist_checkpoint(context, main_stats, 0, "running")
+
     async with AsyncOpenAI(
         api_key=settings.api_key,
         base_url=settings.base_url,
@@ -75,14 +125,14 @@ async def run_coding_agent(
             registry,
             model=selected_model,
             system_prompt=build_system_prompt(),
-            max_turns=(
-                max_turns
-                if max_turns is not None
-                else settings.max_turns
-            ),
+            max_turns=selected_max_turns,
             max_tokens=max_tokens,
             cost_estimator=lambda stats: estimate_cost(stats, settings),
             max_cost_usd=max_cost_usd,
             stats=main_stats,
             trace=trace,
+            start_turn=start_turn,
+            checkpoint_callback=(
+                persist_checkpoint if checkpoint_enabled else None
+            ),
         )

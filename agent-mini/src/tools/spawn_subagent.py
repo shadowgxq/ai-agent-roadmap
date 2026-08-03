@@ -38,6 +38,7 @@ def register_subagent_tool(
     parent_stats: RunStats,
     prompt_cache: PromptCacheConfig | None = None,
     max_tokens: int = 1000,
+    context_window_tokens: int = 128_000,
 ) -> None:
     """注册绑定到当前模型和工作目录的探索型 SubAgent。"""
 
@@ -74,6 +75,7 @@ def register_subagent_tool(
             system_prompt=SUBAGENT_SYSTEM_PROMPT,
             max_turns=15,
             max_tokens=max_tokens,
+            context_window_tokens=context_window_tokens,
             prompt_cache=prompt_cache,
             stats=child_stats,
             trace=child_trace,

@@ -19,6 +19,8 @@ from .logging_config import get_logger
 
 logger = get_logger("agent.loop")
 
+DEFAULT_CONTEXT_WINDOW_TOKENS = 128_000
+
 EventCallback = Callable[
     [str, dict[str, Any]],
     Awaitable[None] | None,
@@ -106,6 +108,8 @@ class UsageTokens:
     output_tokens: int = 0
     cache_read_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
+    # Request context size, including cached input when reported separately.
+    context_tokens: int | None = None
 
 
 def _usage_value(source: Any, *names: str) -> Any:
@@ -198,12 +202,15 @@ def extract_usage_tokens(usage: Any) -> UsageTokens:
         )
 
     explicit_input = _usage_value(usage, "input_tokens")
-    prompt_tokens = _token_count(_usage_value(usage, "prompt_tokens"))
+    raw_prompt_tokens = _usage_value(usage, "prompt_tokens")
+    prompt_tokens = _token_count(raw_prompt_tokens)
     if explicit_input is not None:
         input_tokens = _token_count(explicit_input)
+        context_tokens = input_tokens + cache_read + cache_creation
     else:
         # OpenAI-style prompt_tokens commonly includes cached input.
         input_tokens = max(prompt_tokens - cache_read - cache_creation, 0)
+        context_tokens = prompt_tokens if raw_prompt_tokens is not None else None
 
     output_tokens = _token_count(
         _usage_value(usage, "output_tokens", "completion_tokens")
@@ -213,6 +220,7 @@ def extract_usage_tokens(usage: Any) -> UsageTokens:
         output_tokens=output_tokens,
         cache_read_input_tokens=cache_read,
         cache_creation_input_tokens=cache_creation,
+        context_tokens=context_tokens,
     )
 
 
@@ -274,6 +282,7 @@ async def run(
     system_prompt: str,
     max_turns: int = 10,
     max_tokens: int = 300,
+    context_window_tokens: int = DEFAULT_CONTEXT_WINDOW_TOKENS,
     cost_estimator: Callable[[RunStats], float | None] | None = None,
     max_cost_usd: float | None = None,
     prompt_cache: PromptCacheConfig | None = None,
@@ -288,6 +297,8 @@ async def run(
     """运行 Agent，直到模型结束或达到最大轮数。"""
     if start_turn < 0 or start_turn > max_turns:
         raise ValueError("start_turn 必须在 0 和 max_turns 之间")
+    if context_window_tokens <= 0:
+        raise ValueError("context_window_tokens 必须大于 0")
 
     if max_cost_usd is not None:
         if max_cost_usd <= 0:
@@ -362,6 +373,41 @@ async def run(
             )
 
         token_usage = extract_usage_tokens(response.usage)
+
+        context_tokens = token_usage.context_tokens
+        context_usage_percent = (
+            round(context_tokens / context_window_tokens * 100, 2)
+            if context_tokens is not None
+            else None
+        )
+        context_usage_data = {
+            "turn": turn,
+            "context_tokens": context_tokens,
+            "context_window_tokens": context_window_tokens,
+            "context_usage_percent": context_usage_percent,
+            "available": context_tokens is not None,
+        }
+        if context_tokens is None:
+            context_message = (
+                f"上下文用量: turn={turn} context_tokens=unknown "
+                f"window={context_window_tokens} usage=unknown%"
+            )
+        else:
+            context_message = (
+                f"上下文用量: turn={turn} context_tokens={context_tokens} "
+                f"window={context_window_tokens} "
+                f"usage={context_usage_percent:.2f}%"
+            )
+        logger.info(
+            "上下文用量",
+            extra={
+                "event": "agent.context_usage",
+                "trace": trace.event_context(turn),
+                "console_message": context_message,
+                "data": context_usage_data,
+            },
+        )
+        await emit_event(event_callback, "context_usage", context_usage_data)
 
         stats.turns += 1
         stats.input_tokens += token_usage.input_tokens

@@ -80,6 +80,7 @@ async def main() -> None:
             system_prompt=system_prompt,
             max_turns=settings.max_turns,
             max_tokens=3000,
+            context_window_tokens=settings.context_window_tokens,
             prompt_cache=settings.prompt_cache_config,
         )
 

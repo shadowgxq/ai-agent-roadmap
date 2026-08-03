@@ -49,6 +49,14 @@ class AgentSettings(BaseSettings):
     log_file: Path = PROJECT_ROOT / "logs" / "agent.json"
     max_turns: int = 30
     max_tool_output_chars: int = 10_000
+    context_window_tokens: int = Field(
+        default=128_000,
+        ge=1,
+        validation_alias=AliasChoices(
+            "CONTEXT_WINDOW_TOKENS",
+            "CONTEXT_WINDOW",
+        ),
+    )
     input_price_per_million: float | None = Field(default=None, ge=0)
     output_price_per_million: float | None = Field(default=None, ge=0)
     cache_read_price_per_million: float | None = Field(default=None, ge=0)

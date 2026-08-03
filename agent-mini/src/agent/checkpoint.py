@@ -62,6 +62,7 @@ class Checkpoint(BaseModel):
     model: str = Field(min_length=1)
     max_turns: int = Field(gt=0)
     max_tokens: int = Field(gt=0)
+    context_window_tokens: int = Field(default=128_000, ge=1)
     max_cost_usd: float | None = Field(default=None, gt=0)
     enable_subagent: bool = True
     status: CheckpointStatus = "running"

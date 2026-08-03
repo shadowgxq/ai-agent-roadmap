@@ -5,7 +5,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-EventType = Literal["text", "tool_call", "tool_result", "done"]
+EventType = Literal[
+    "text",
+    "tool_call",
+    "tool_result",
+    "context_usage",
+    "done",
+]
 
 
 class AgentEvent(BaseModel):

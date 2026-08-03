@@ -261,6 +261,7 @@ async def main() -> None:
         model = checkpoint.model
         max_turns = checkpoint.max_turns
         max_tokens = checkpoint.max_tokens
+        context_window_tokens = checkpoint.context_window_tokens
         max_cost_usd = checkpoint.max_cost_usd
         enable_subagent = checkpoint.enable_subagent
         context = Context(checkpoint.messages)
@@ -276,6 +277,7 @@ async def main() -> None:
         model = args.model or settings.model
         max_turns = args.max_turns or settings.max_turns
         max_tokens = 3000
+        context_window_tokens = settings.context_window_tokens
         max_cost_usd = None
         enable_subagent = args.enable_subagent
         context = None
@@ -311,6 +313,7 @@ async def main() -> None:
             model=model,
             max_turns=max_turns,
             max_tokens=max_tokens,
+            context_window_tokens=context_window_tokens,
             max_cost_usd=max_cost_usd,
             run_id=run_id,
             enable_subagent=enable_subagent,

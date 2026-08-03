@@ -37,6 +37,7 @@ async def run_coding_agent(
     model: str | None = None,
     max_turns: int | None = None,
     max_tokens: int = 3000,
+    context_window_tokens: int | None = None,
     max_cost_usd: float | None = None,
     run_id: str | None = None,
     enable_subagent: bool = True,
@@ -56,6 +57,13 @@ async def run_coding_agent(
     selected_max_turns = (
         max_turns if max_turns is not None else settings.max_turns
     )
+    selected_context_window_tokens = (
+        context_window_tokens
+        if context_window_tokens is not None
+        else settings.context_window_tokens
+    )
+    if selected_context_window_tokens <= 0:
+        raise ValueError("context_window_tokens 必须大于 0")
     selected_run_id = run_id or uuid4().hex
     selected_start_sha = start_sha
     if selected_start_sha is None:
@@ -106,6 +114,7 @@ async def run_coding_agent(
                 model=selected_model,
                 max_turns=selected_max_turns,
                 max_tokens=max_tokens,
+                context_window_tokens=selected_context_window_tokens,
                 max_cost_usd=max_cost_usd,
                 enable_subagent=enable_subagent,
                 status=status,
@@ -141,6 +150,7 @@ async def run_coding_agent(
                     parent_trace=trace,
                     parent_stats=main_stats,
                     prompt_cache=settings.prompt_cache_config,
+                    context_window_tokens=selected_context_window_tokens,
                 )
             return await run(
                 client,
@@ -150,6 +160,7 @@ async def run_coding_agent(
                 system_prompt=build_system_prompt(),
                 max_turns=selected_max_turns,
                 max_tokens=max_tokens,
+                context_window_tokens=selected_context_window_tokens,
                 cost_estimator=lambda stats: estimate_cost(stats, settings),
                 max_cost_usd=max_cost_usd,
                 prompt_cache=settings.prompt_cache_config,

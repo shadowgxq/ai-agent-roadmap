@@ -13,7 +13,7 @@ from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from .cache import PromptCacheConfig
-from .compact import compact
+from .compact import compact, hard_truncate
 from .context import Context
 from .logging_config import get_logger
 
@@ -357,24 +357,65 @@ async def run(
             },
         )
         compact_before_tokens: int | None = None
+        compact_strategy: Literal["summary", "hard_truncate"] | None = None
         if (
             compact_enabled
             and last_context_tokens is not None
             and last_context_tokens
             >= compact_threshold * context_window_tokens
         ):
-            compacted_messages = await compact(
-                client,
-                context.messages,
-                model=compact_model or model,
-                keep_recent=compact_keep_recent,
-                max_tokens=compact_max_tokens,
-            )
-            if compacted_messages != context.messages:
+            compact_error: Exception | None = None
+            try:
+                compacted_messages = await compact(
+                    client,
+                    context.messages,
+                    model=compact_model or model,
+                    keep_recent=compact_keep_recent,
+                    max_tokens=compact_max_tokens,
+                )
+                validated_messages = Context(compacted_messages).messages
+                compact_strategy = "summary"
+            except Exception as exc:
+                compact_error = exc
+                logger.warning(
+                    "上下文摘要最终失败，改用完整轮次硬裁剪: %s",
+                    type(exc).__name__,
+                    extra={
+                        "event": "agent.context_compact_failed",
+                        "trace": trace.event_context(turn),
+                        "data": {
+                            "error_type": type(exc).__name__,
+                            "error": str(exc),
+                        },
+                    },
+                )
+                try:
+                    truncated_messages = hard_truncate(
+                        context.messages,
+                        keep_recent=compact_keep_recent,
+                    )
+                    validated_messages = Context(truncated_messages).messages
+                    compact_strategy = "hard_truncate"
+                except Exception as fallback_exc:
+                    validated_messages = context.messages
+                    compact_strategy = None
+                    logger.error(
+                        "上下文硬裁剪失败，保留原上下文继续执行: %s",
+                        type(fallback_exc).__name__,
+                        extra={
+                            "event": "agent.context_compact_fallback_failed",
+                            "trace": trace.event_context(turn),
+                            "data": {
+                                "error_type": type(fallback_exc).__name__,
+                                "error": str(fallback_exc),
+                            },
+                        },
+                    )
+
+            if validated_messages != context.messages:
                 compact_before_tokens = last_context_tokens
                 before_message_count = len(context.messages)
-                context.messages = compacted_messages
-                context.assert_paired()
+                context.messages = validated_messages
                 logger.info(
                     "上下文压缩完成，等待下一次请求确认 token 用量",
                     extra={
@@ -388,6 +429,12 @@ async def run(
                             "before_tokens": compact_before_tokens,
                             "before_message_count": before_message_count,
                             "after_message_count": len(context.messages),
+                            "strategy": compact_strategy,
+                            "fallback_error": (
+                                str(compact_error)
+                                if compact_error is not None
+                                else None
+                            ),
                         },
                     },
                 )
@@ -428,6 +475,7 @@ async def run(
                 "turn": turn,
                 "before_tokens": compact_before_tokens,
                 "after_tokens": after_tokens,
+                "strategy": compact_strategy,
             }
             logger.info(
                 "上下文压缩用量",

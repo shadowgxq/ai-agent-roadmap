@@ -68,6 +68,11 @@ class AgentSettings(BaseSettings):
     prompt_cache_key: str = Field(default="agent-mini", min_length=1)
     prompt_cache_retention: str | None = None
     price_currency: str = "USD"
+    compact_enabled: bool = True
+    compact_threshold: float = Field(default=0.7, gt=0, lt=1)
+    compact_keep_recent: int = Field(default=4, ge=1)
+    compact_model: str | None = None
+    compact_max_tokens: int = Field(default=1000, ge=1)
 
     @field_validator("base_url")
     @classmethod

@@ -82,6 +82,11 @@ async def main() -> None:
             max_tokens=3000,
             context_window_tokens=settings.context_window_tokens,
             prompt_cache=settings.prompt_cache_config,
+            compact_enabled=settings.compact_enabled,
+            compact_threshold=settings.compact_threshold,
+            compact_keep_recent=settings.compact_keep_recent,
+            compact_model=settings.compact_model,
+            compact_max_tokens=settings.compact_max_tokens,
         )
 
     answer = extract_text(final_response)

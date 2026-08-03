@@ -167,6 +167,11 @@ async def run_coding_agent(
                 stats=main_stats,
                 trace=trace,
                 start_turn=start_turn,
+                compact_enabled=settings.compact_enabled,
+                compact_threshold=settings.compact_threshold,
+                compact_keep_recent=settings.compact_keep_recent,
+                compact_model=settings.compact_model,
+                compact_max_tokens=settings.compact_max_tokens,
                 checkpoint_callback=(
                     persist_checkpoint if checkpoint_enabled else None
                 ),

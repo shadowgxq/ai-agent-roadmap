@@ -13,9 +13,9 @@ from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from .cache import PromptCacheConfig
+from .compact import compact
 from .context import Context
 from .logging_config import get_logger
-
 
 logger = get_logger("agent.loop")
 
@@ -293,12 +293,23 @@ async def run(
         [Context, RunStats, int, Literal["running", "completed"]], None
     ] | None = None,
     event_callback: EventCallback | None = None,
+    compact_enabled: bool = False,
+    compact_threshold: float = 0.7,
+    compact_keep_recent: int = 4,
+    compact_model: str | None = None,
+    compact_max_tokens: int = 1000,
 ) -> tuple[ChatCompletion, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
     if start_turn < 0 or start_turn > max_turns:
         raise ValueError("start_turn 必须在 0 和 max_turns 之间")
     if context_window_tokens <= 0:
         raise ValueError("context_window_tokens 必须大于 0")
+    if not 0 < compact_threshold < 1:
+        raise ValueError("compact_threshold 必须在 0 和 1 之间")
+    if compact_keep_recent < 1:
+        raise ValueError("compact_keep_recent 必须大于 0")
+    if compact_max_tokens < 1:
+        raise ValueError("compact_max_tokens 必须大于 0")
 
     if max_cost_usd is not None:
         if max_cost_usd <= 0:
@@ -332,6 +343,8 @@ async def run(
             },
         },
     )
+    last_context_tokens: int | None = None
+
     for turn in range(start_turn + 1, max_turns + 1):
         logger.info(
             "===== 第 %s/%s 轮 =====",
@@ -343,6 +356,42 @@ async def run(
                 "data": {"max_turns": max_turns},
             },
         )
+        compact_before_tokens: int | None = None
+        if (
+            compact_enabled
+            and last_context_tokens is not None
+            and last_context_tokens
+            >= compact_threshold * context_window_tokens
+        ):
+            compacted_messages = await compact(
+                client,
+                context.messages,
+                model=compact_model or model,
+                keep_recent=compact_keep_recent,
+                max_tokens=compact_max_tokens,
+            )
+            if compacted_messages != context.messages:
+                compact_before_tokens = last_context_tokens
+                before_message_count = len(context.messages)
+                context.messages = compacted_messages
+                context.assert_paired()
+                logger.info(
+                    "上下文压缩完成，等待下一次请求确认 token 用量",
+                    extra={
+                        "event": "agent.context_compacted",
+                        "trace": trace.event_context(turn),
+                        "console_message": (
+                            f"[compact] before={compact_before_tokens} tokens, "
+                            "after=pending"
+                        ),
+                        "data": {
+                            "before_tokens": compact_before_tokens,
+                            "before_message_count": before_message_count,
+                            "after_message_count": len(context.messages),
+                        },
+                    },
+                )
+
         response = await call_llm(
             client,
             context,
@@ -373,6 +422,29 @@ async def run(
             )
 
         token_usage = extract_usage_tokens(response.usage)
+        if compact_before_tokens is not None:
+            after_tokens = token_usage.context_tokens
+            compact_data = {
+                "turn": turn,
+                "before_tokens": compact_before_tokens,
+                "after_tokens": after_tokens,
+            }
+            logger.info(
+                "上下文压缩用量",
+                extra={
+                    "event": "agent.compact_usage",
+                    "trace": trace.event_context(turn),
+                    "console_message": (
+                        f"[compact] before={compact_before_tokens} tokens, "
+                        f"after={after_tokens if after_tokens is not None else 'unknown'} "
+                        "tokens"
+                    ),
+                    "data": compact_data,
+                },
+            )
+            await emit_event(event_callback, "compact_usage", compact_data)
+
+        last_context_tokens = token_usage.context_tokens
 
         context_tokens = token_usage.context_tokens
         context_usage_percent = (

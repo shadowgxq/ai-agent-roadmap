@@ -28,6 +28,7 @@ wheels/
 *.egg-info/
 
 # Logs and local runtime files
+logs/
 *.log
 *.tmp
 *.bak

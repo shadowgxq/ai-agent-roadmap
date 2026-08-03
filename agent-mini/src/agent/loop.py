@@ -4,7 +4,7 @@ import asyncio
 import json
 import random
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 from uuid import uuid4
@@ -18,6 +18,27 @@ from .logging_config import get_logger
 
 
 logger = get_logger("agent.loop")
+
+EventCallback = Callable[
+    [str, dict[str, Any]],
+    Awaitable[None] | None,
+]
+
+
+async def emit_event(
+    callback: EventCallback | None,
+    event: str,
+    data: dict[str, Any],
+) -> None:
+    """通知可选观察者；观察者异常不应中断 Agent 主循环。"""
+    if callback is None:
+        return
+    try:
+        result = callback(event, data)
+        if result is not None:
+            await result
+    except Exception:
+        logger.exception("Agent 事件观察者执行失败: %s", event)
 
 
 @dataclass(frozen=True)
@@ -262,6 +283,7 @@ async def run(
     checkpoint_callback: Callable[
         [Context, RunStats, int, Literal["running", "completed"]], None
     ] | None = None,
+    event_callback: EventCallback | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
     if start_turn < 0 or start_turn > max_turns:
@@ -333,6 +355,11 @@ async def run(
                     "data": {"text": text},
                 },
             )
+            await emit_event(
+                event_callback,
+                "text",
+                {"turn": turn, "text": text},
+            )
 
         token_usage = extract_usage_tokens(response.usage)
 
@@ -372,8 +399,32 @@ async def run(
                     },
                 },
             )
+            await emit_event(
+                event_callback,
+                "done",
+                {
+                    "status": "completed",
+                    "turn": turn,
+                    "finish_reason": response.choices[0].finish_reason,
+                },
+            )
             return response, stats
 
+        await emit_event(
+            event_callback,
+            "tool_call",
+            {
+                "turn": turn,
+                "calls": [
+                    {
+                        "id": tool_call.id,
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments,
+                    }
+                    for tool_call in message.tool_calls
+                ],
+            },
+        )
         tool_results = await execute_tools(
             message,
             registry,
@@ -383,6 +434,20 @@ async def run(
         )
         context.append_tool_results(tool_results)
         context.assert_paired()
+        await emit_event(
+            event_callback,
+            "tool_result",
+            {
+                "turn": turn,
+                "results": [
+                    {
+                        "tool_call_id": result["tool_call_id"],
+                        "content": result["content"],
+                    }
+                    for result in tool_results
+                ],
+            },
+        )
         if checkpoint_callback is not None:
             checkpoint_callback(context, stats, turn, "running")
 

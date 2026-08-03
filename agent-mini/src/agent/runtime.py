@@ -25,7 +25,7 @@ from .config import AgentSettings
 from .context import Context
 from .cost import estimate_cost
 from .git_snapshot import ensure_start_snapshot, get_head_sha
-from .loop import AgentTrace, RunStats, run
+from .loop import AgentTrace, EventCallback, RunStats, run
 from .prompts import build_system_prompt, build_task_message
 
 
@@ -46,6 +46,7 @@ async def run_coding_agent(
     checkpoint_enabled: bool = False,
     runs_dir: Path = DEFAULT_RUNS_DIR,
     start_sha: str | None = None,
+    event_callback: EventCallback | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """组装依赖并在指定目录运行一次 Coding Agent。"""
     workdir = workdir.resolve()
@@ -158,6 +159,7 @@ async def run_coding_agent(
                 checkpoint_callback=(
                     persist_checkpoint if checkpoint_enabled else None
                 ),
+                event_callback=event_callback,
             )
     except (asyncio.CancelledError, KeyboardInterrupt):
         if checkpoint_enabled:

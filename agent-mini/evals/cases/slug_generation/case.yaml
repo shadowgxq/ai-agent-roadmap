@@ -1,0 +1,4 @@
+task: 修复 URL slug 生成函数对标点和连续分隔符的处理，修改完成后运行测试确认问题已经解决
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 0.5

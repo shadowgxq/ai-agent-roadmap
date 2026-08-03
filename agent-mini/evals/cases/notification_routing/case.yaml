@@ -1,0 +1,4 @@
+task: 这是一个多目录通知项目。请先使用 spawn_subagent 探索偏好读取、类别路由、渠道构造和通知服务的数据流，再修复失败测试并运行测试确认问题已经解决
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 120
+max_cost_usd: 1.5

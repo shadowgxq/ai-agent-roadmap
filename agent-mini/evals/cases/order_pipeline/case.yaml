@@ -1,0 +1,4 @@
+task: 这是一个多目录结算项目。请先使用 spawn_subagent 探索订单从领域模型、折扣、运费到结算服务的完整数据流，再修复失败测试并运行测试确认问题已经解决
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 120
+max_cost_usd: 1.5

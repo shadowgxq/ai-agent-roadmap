@@ -1,0 +1,4 @@
+task: 修复缓存条目在过期时刻仍被返回的问题，修改完成后运行测试确认问题已经解决
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 0.5

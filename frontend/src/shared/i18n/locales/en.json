@@ -41,6 +41,7 @@
       "text": "Model response",
       "toolCall": "Tool call",
       "toolResult": "Tool result",
+      "contextUsage": "Context usage",
       "done": "Run finished",
       "emptyTitle": "No events yet",
       "emptyDescription": "Start a run to watch the agent inspect the project and report each step."

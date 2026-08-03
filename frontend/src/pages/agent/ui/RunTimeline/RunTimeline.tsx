@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Circle, Terminal, Wrench } from 'lucide-react';
+import { Activity, AlertCircle, CheckCircle2, Circle, Terminal, Wrench } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AgentEvent } from '../../model';
@@ -28,6 +28,7 @@ function eventTitle(type: AgentEvent['type'], t: (key: string) => string) {
     text: t('agent.timeline.text'),
     tool_call: t('agent.timeline.toolCall'),
     tool_result: t('agent.timeline.toolResult'),
+    context_usage: t('agent.timeline.contextUsage'),
     done: t('agent.timeline.done'),
   } as const;
   return labels[type];
@@ -37,6 +38,7 @@ function EventIcon({ type }: { type: AgentEvent['type'] }) {
   if (type === 'text') return <Circle size={16} aria-hidden="true" />;
   if (type === 'tool_call') return <Wrench size={16} aria-hidden="true" />;
   if (type === 'tool_result') return <Terminal size={16} aria-hidden="true" />;
+  if (type === 'context_usage') return <Activity size={16} aria-hidden="true" />;
   return <CheckCircle2 size={16} aria-hidden="true" />;
 }
 
@@ -70,6 +72,26 @@ function EventBody({ event }: { event: AgentEvent }) {
           </pre>
         ))}
       </div>
+    );
+  }
+
+  if (event.type === 'context_usage') {
+    const contextTokens =
+      typeof event.data.context_tokens === 'number'
+        ? event.data.context_tokens.toLocaleString()
+        : 'unknown';
+    const contextWindow =
+      typeof event.data.context_window_tokens === 'number'
+        ? event.data.context_window_tokens.toLocaleString()
+        : 'unknown';
+    const usage =
+      typeof event.data.context_usage_percent === 'number'
+        ? `${event.data.context_usage_percent.toFixed(2)}%`
+        : 'unknown';
+    return (
+      <p className={styles.contextUsage}>
+        {contextTokens} / {contextWindow} tokens ({usage})
+      </p>
     );
   }
 

@@ -41,6 +41,7 @@
       "text": "模型回复",
       "toolCall": "工具调用",
       "toolResult": "工具结果",
+      "contextUsage": "上下文用量",
       "done": "运行结束",
       "emptyTitle": "还没有事件",
       "emptyDescription": "开始一次运行后，这里会实时展示 Agent 探索项目和执行任务的过程。"

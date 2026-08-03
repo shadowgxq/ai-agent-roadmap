@@ -1,4 +1,4 @@
-export const AGENT_EVENT_TYPES = ['text', 'tool_call', 'tool_result', 'done'] as const;
+export const AGENT_EVENT_TYPES = ['text', 'tool_call', 'tool_result', 'context_usage', 'done'] as const;
 
 export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
 

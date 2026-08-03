@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Repair Runner'
+  short_description: 'Run repairs/list.yaml repair queue'
+  default_prompt: 'Use $repair-runner to process the repairs queue.'

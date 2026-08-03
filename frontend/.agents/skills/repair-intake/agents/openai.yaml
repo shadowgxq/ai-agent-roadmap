@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Repair Intake'
+  short_description: 'Create repairs queue items from user reports'
+  default_prompt: 'Use $repair-intake to register this issue as a repair item.'

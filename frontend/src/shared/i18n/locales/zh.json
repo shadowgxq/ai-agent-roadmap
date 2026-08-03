@@ -1,0 +1,70 @@
+{
+  "app": {
+    "title": "AI Agent Roadmap"
+  },
+  "agent": {
+    "eyebrow": "Coding Agent",
+    "title": "让 Agent 在项目中执行任务",
+    "status": {
+      "idle": "待命",
+      "starting": "启动中",
+      "running": "运行中",
+      "completed": "已完成",
+      "failed": "失败",
+      "interrupted": "已中断"
+    },
+    "composer": {
+      "eyebrow": "任务输入",
+      "title": "描述要做的事",
+      "label": "任务",
+      "placeholder": "让 Agent 检查、修改并验证项目中的问题……",
+      "run": "运行 Agent",
+      "running": "运行中",
+      "newRun": "新建运行"
+    },
+    "run": {
+      "label": "Agent 运行",
+      "eyebrow": "执行过程",
+      "id": "运行 ID",
+      "notStarted": "尚未开始运行",
+      "live": "实时"
+    },
+    "errors": {
+      "start": "无法启动 Agent 运行。",
+      "event": "Agent 返回了无法读取的事件。",
+      "stream": "运行完成前事件流已断开。"
+    },
+    "timeline": {
+      "label": "Agent 事件时间线",
+      "eyebrow": "事件流",
+      "title": "运行时间线",
+      "text": "模型回复",
+      "toolCall": "工具调用",
+      "toolResult": "工具结果",
+      "done": "运行结束",
+      "emptyTitle": "还没有事件",
+      "emptyDescription": "开始一次运行后，这里会实时展示 Agent 探索项目和执行任务的过程。"
+    }
+  },
+  "errors": {
+    "global": {
+      "eyebrow": "应用错误",
+      "title": "应用遇到了意外错误。",
+      "description": "你的数据不会因此改变。请重新加载页面重试，或返回首页重新开始。"
+    },
+    "route": {
+      "eyebrow": "页面错误",
+      "title": "当前页面暂时无法显示。",
+      "description": "路由加载时发生错误。请重新加载页面，或返回首页选择其他路径。"
+    },
+    "notFound": {
+      "eyebrow": "404",
+      "title": "找不到这个页面。",
+      "description": "页面地址可能已失效或不完整，请返回首页继续。"
+    },
+    "actions": {
+      "reload": "重新加载",
+      "home": "返回首页"
+    }
+  }
+}

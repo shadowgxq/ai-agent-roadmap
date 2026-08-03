@@ -1,0 +1,1988 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="轻记账 UX/UI standalone interaction prototype"
+    />
+    <link rel="stylesheet" href="../../../src/shared/styles/global.css" />
+    <title>轻记账 · UX/UI 交互原型</title>
+    <style>
+      :root {
+        --prototype-width: 1120px;
+        --app-content-width: 760px;
+        --app-header-height: 72px;
+        --app-nav-height: 78px;
+        --transition-fast: 160ms ease;
+        --transition-standard: 240ms ease;
+      }
+
+      body {
+        min-width: 320px;
+        color: var(--color-text);
+        background: var(--color-background);
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        color: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid var(--color-focus-ring);
+        outline-offset: 3px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .prototype-page {
+        min-height: 100dvh;
+        padding: 32px 24px;
+      }
+
+      .prototype-workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 20px;
+        width: min(100%, var(--prototype-width));
+        margin: 0 auto;
+        align-items: start;
+      }
+
+      .app-shell {
+        position: relative;
+        min-height: min(820px, calc(100dvh - 64px));
+        overflow: hidden;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-background);
+        box-shadow: var(--shadow-lg);
+      }
+
+      .app-topbar {
+        position: sticky;
+        z-index: var(--z-sticky);
+        top: 0;
+        display: flex;
+        min-height: var(--app-header-height);
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: 12px 24px;
+        border-bottom: 1px solid var(--color-border);
+        background: color-mix(in srgb, var(--color-background) 94%, transparent);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand-lockup {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand-name {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
+        letter-spacing: 0;
+      }
+
+      .brand-note {
+        color: var(--color-muted);
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-xs);
+        letter-spacing: 0;
+      }
+
+      .topbar-actions,
+      .inline-actions,
+      .button-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+
+      .icon-button,
+      .topbar-action {
+        display: inline-flex;
+        min-width: 44px;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        color: var(--color-text);
+        transition:
+          background var(--transition-fast),
+          border-color var(--transition-fast),
+          transform var(--transition-fast);
+      }
+
+      .icon-button {
+        padding: 8px;
+      }
+
+      .icon-button:hover,
+      .topbar-action:hover {
+        border-color: var(--color-primary);
+        background: var(--color-background);
+      }
+
+      .icon-button:active,
+      .topbar-action:active,
+      .primary-button:active,
+      .secondary-button:active,
+      .nav-item:active {
+        transform: translateY(1px);
+      }
+
+      .app-body {
+        min-height: calc(min(820px, 100dvh - 64px) - var(--app-header-height));
+        padding-bottom: calc(var(--app-nav-height) + env(safe-area-inset-bottom));
+      }
+
+      .page-content {
+        width: min(100%, var(--app-content-width));
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .page-heading,
+      .section-heading,
+      .row-between {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+      }
+
+      .page-heading {
+        align-items: flex-start;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 8px;
+        color: var(--color-primary-strong);
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+      }
+
+      .eyebrow::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        content: '';
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(1.6rem, 3vw, 2.2rem);
+        line-height: var(--leading-tight);
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: var(--font-size-lg);
+        line-height: var(--leading-tight);
+      }
+
+      h3 {
+        font-size: var(--font-size-md);
+        line-height: var(--leading-tight);
+      }
+
+      .muted,
+      .helper-text {
+        color: var(--color-muted);
+      }
+
+      .helper-text {
+        margin-top: 7px;
+        font-size: var(--font-size-sm);
+        line-height: var(--leading-normal);
+      }
+
+      .primary-button,
+      .secondary-button,
+      .danger-button,
+      .text-button,
+      .filter-chip,
+      .segmented-button,
+      .category-button,
+      .month-option {
+        min-height: 44px;
+        border-radius: var(--radius-md);
+        font-weight: var(--font-weight-medium);
+        transition:
+          background var(--transition-fast),
+          border-color var(--transition-fast),
+          color var(--transition-fast),
+          transform var(--transition-fast);
+      }
+
+      .primary-button,
+      .secondary-button,
+      .danger-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 16px;
+      }
+
+      .primary-button {
+        background: var(--color-primary);
+        color: var(--color-primary-contrast);
+      }
+
+      .primary-button:hover {
+        background: var(--color-primary-strong);
+      }
+
+      .primary-button:disabled,
+      .secondary-button:disabled,
+      .danger-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+        transform: none;
+      }
+
+      .secondary-button {
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+      }
+
+      .secondary-button:hover {
+        border-color: var(--color-primary);
+      }
+
+      .danger-button {
+        border: 1px solid color-mix(in srgb, var(--color-danger) 42%, var(--color-border));
+        background: transparent;
+        color: var(--color-danger);
+      }
+
+      .danger-button:hover {
+        background: color-mix(in srgb, var(--color-danger) 9%, transparent);
+      }
+
+      .text-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 4px;
+        background: transparent;
+        color: var(--color-primary-strong);
+      }
+
+      .text-button:hover {
+        color: var(--color-primary);
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        margin-bottom: 24px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-border);
+      }
+
+      .summary-item {
+        min-width: 0;
+        padding: 17px;
+        background: var(--color-surface);
+      }
+
+      .summary-label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--color-muted);
+        font-size: var(--font-size-sm);
+      }
+
+      .summary-value,
+      .money,
+      .metric-number {
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0;
+      }
+
+      .summary-value {
+        display: block;
+        overflow-wrap: anywhere;
+        font-family: var(--font-family-mono);
+        font-size: clamp(1.05rem, 2.5vw, 1.45rem);
+        font-weight: var(--font-weight-bold);
+      }
+
+      .income {
+        color: var(--color-success);
+      }
+
+      .expense {
+        color: var(--color-text);
+      }
+
+      .negative,
+      .danger-text {
+        color: var(--color-danger);
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        margin-bottom: 20px;
+      }
+
+      .segmented-control,
+      .filter-control {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      .segmented-control {
+        padding: 4px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+      }
+
+      .segmented-button,
+      .filter-chip {
+        padding: 8px 12px;
+        background: transparent;
+        color: var(--color-muted);
+      }
+
+      .segmented-button.active,
+      .filter-chip.active {
+        background: var(--color-primary);
+        color: var(--color-primary-contrast);
+      }
+
+      .filter-chip {
+        border: 1px solid var(--color-border);
+      }
+
+      .filter-chip:hover {
+        border-color: var(--color-primary);
+      }
+
+      .select-control,
+      .field-control {
+        width: 100%;
+        min-height: 48px;
+        padding: 10px 12px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+      }
+
+      .select-control {
+        width: auto;
+        min-width: 150px;
+      }
+
+      .month-trigger {
+        display: inline-flex;
+        min-height: 44px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--color-text);
+        font-weight: var(--font-weight-bold);
+      }
+
+      .month-trigger:hover {
+        background: var(--color-surface);
+      }
+
+      .date-group {
+        margin-top: 24px;
+      }
+
+      .date-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 0 9px;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      .date-heading strong {
+        font-size: var(--font-size-sm);
+      }
+
+      .day-totals {
+        color: var(--color-muted);
+        font-size: var(--font-size-xs);
+        text-align: right;
+      }
+
+      .ledger-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .ledger-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        width: 100%;
+        padding: 16px 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+        background: transparent;
+        text-align: left;
+      }
+
+      .ledger-row:hover .ledger-title {
+        color: var(--color-primary-strong);
+      }
+
+      .ledger-main,
+      .ledger-title-row,
+      .ledger-meta {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+      }
+
+      .ledger-main {
+        gap: 12px;
+      }
+
+      .ledger-mark {
+        display: inline-flex;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--color-border);
+        border-radius: 50%;
+        background: var(--color-surface);
+        color: var(--color-muted);
+      }
+
+      .ledger-mark.income-mark {
+        border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border));
+        color: var(--color-success);
+      }
+
+      .ledger-title-row {
+        gap: 8px;
+      }
+
+      .ledger-title {
+        overflow: hidden;
+        font-weight: var(--font-weight-medium);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .type-label {
+        flex: 0 0 auto;
+        padding: 3px 6px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        color: var(--color-muted);
+        font-size: var(--font-size-xs);
+      }
+
+      .ledger-meta {
+        gap: 7px;
+        margin-top: 4px;
+        color: var(--color-muted);
+        font-size: var(--font-size-sm);
+      }
+
+      .ledger-note {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ledger-amount {
+        align-self: center;
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
+        white-space: nowrap;
+      }
+
+      .empty-state,
+      .error-state,
+      .status-state {
+        padding: 48px 24px;
+        border: 1px dashed var(--color-border);
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+        text-align: center;
+      }
+
+      .state-icon {
+        display: inline-flex;
+        width: 48px;
+        height: 48px;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+        color: var(--color-primary-strong);
+      }
+
+      .error-state .state-icon {
+        background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+        color: var(--color-danger);
+      }
+
+      .state-actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .form-shell {
+        max-width: 560px;
+        margin: 0 auto;
+      }
+
+      .form-heading {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+
+      .back-button {
+        display: inline-flex;
+        min-width: 44px;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-md);
+        background: transparent;
+      }
+
+      .back-button:hover {
+        background: var(--color-surface);
+      }
+
+      .form-group {
+        margin-bottom: 22px;
+      }
+
+      .field-label {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-weight: var(--font-weight-medium);
+      }
+
+      .required-mark {
+        color: var(--color-danger);
+      }
+
+      .amount-input-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+      }
+
+      .amount-input-wrap:focus-within {
+        border-color: var(--color-focus-ring);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus-ring) 18%, transparent);
+      }
+
+      .currency-symbol {
+        color: var(--color-muted);
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-xl);
+      }
+
+      .amount-input {
+        width: 100%;
+        min-height: 48px;
+        padding: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        font-family: var(--font-family-mono);
+        font-size: clamp(1.8rem, 7vw, 2.5rem);
+        font-weight: var(--font-weight-bold);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .category-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .category-button {
+        min-height: 48px;
+        padding: 8px 6px;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        color: var(--color-text);
+      }
+
+      .category-button:hover,
+      .category-button.active {
+        border-color: var(--color-primary);
+        background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+        color: var(--color-primary-strong);
+      }
+
+      .category-button.active {
+        box-shadow: inset 0 0 0 1px var(--color-primary);
+        font-weight: var(--font-weight-bold);
+      }
+
+      .field-error {
+        display: block;
+        margin-top: 7px;
+        color: var(--color-danger);
+        font-size: var(--font-size-sm);
+        line-height: var(--leading-normal);
+      }
+
+      .field-control[aria-invalid='true'],
+      .amount-input-wrap.invalid {
+        border-color: var(--color-danger);
+      }
+
+      .textarea-control {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      .form-actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 32px;
+      }
+
+      .form-actions .primary-button,
+      .form-actions .danger-button {
+        width: 100%;
+      }
+
+      .budget-overview {
+        margin-bottom: 24px;
+        padding: 24px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+      }
+
+      .budget-headline {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .budget-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .budget-metric-label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--color-muted);
+        font-size: var(--font-size-sm);
+      }
+
+      .metric-number {
+        display: block;
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
+      }
+
+      .progress-track {
+        height: 12px;
+        overflow: hidden;
+        border-radius: var(--radius-full);
+        background: color-mix(in srgb, var(--color-border) 72%, transparent);
+      }
+
+      .progress-value {
+        height: 100%;
+        min-width: 8px;
+        border-radius: inherit;
+        background: var(--color-primary);
+        transition: width var(--transition-standard);
+      }
+
+      .progress-value.warning {
+        background: var(--color-warning);
+      }
+
+      .progress-value.danger {
+        background: var(--color-danger);
+      }
+
+      .budget-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 12px;
+        color: var(--color-primary-strong);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+      }
+
+      .budget-status.warning {
+        color: var(--color-warning);
+      }
+
+      .budget-status.danger {
+        color: var(--color-danger);
+      }
+
+      .chart-block {
+        margin-top: 28px;
+      }
+
+      .bar-list {
+        display: grid;
+        gap: 17px;
+        margin-top: 18px;
+      }
+
+      .bar-item {
+        display: grid;
+        grid-template-columns: 66px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .bar-label,
+      .bar-value {
+        font-size: var(--font-size-sm);
+      }
+
+      .bar-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .bar-track {
+        height: 10px;
+        overflow: hidden;
+        border-radius: var(--radius-full);
+        background: color-mix(in srgb, var(--color-border) 70%, transparent);
+      }
+
+      .bar-fill {
+        height: 100%;
+        min-width: 7px;
+        border-radius: inherit;
+        background: var(--color-primary);
+      }
+
+      .category-table {
+        width: 100%;
+        margin-top: 28px;
+        border-collapse: collapse;
+      }
+
+      .category-table th,
+      .category-table td {
+        padding: 13px 0;
+        border-bottom: 1px solid var(--color-border);
+        text-align: left;
+      }
+
+      .category-table th {
+        color: var(--color-muted);
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-medium);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .category-table td:last-child,
+      .category-table th:last-child {
+        text-align: right;
+      }
+
+      .bottom-nav {
+        position: absolute;
+        z-index: var(--z-sticky);
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        min-height: var(--app-nav-height);
+        padding: 8px 16px env(safe-area-inset-bottom);
+        border-top: 1px solid var(--color-border);
+        background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+        backdrop-filter: blur(16px);
+      }
+
+      .nav-item {
+        display: inline-flex;
+        min-height: 48px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--color-muted);
+        font-size: var(--font-size-xs);
+        transition:
+          background var(--transition-fast),
+          color var(--transition-fast),
+          transform var(--transition-fast);
+      }
+
+      .nav-item:hover,
+      .nav-item.active {
+        background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+        color: var(--color-primary-strong);
+      }
+
+      .inspector-panel {
+        position: sticky;
+        top: 24px;
+        padding: 18px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-md);
+      }
+
+      .inspector-panel summary {
+        cursor: pointer;
+        font-weight: var(--font-weight-bold);
+      }
+
+      .inspector-caption {
+        margin: 10px 0 18px;
+        color: var(--color-muted);
+        font-size: var(--font-size-sm);
+        line-height: var(--leading-normal);
+      }
+
+      .inspector-grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .inspector-label {
+        display: grid;
+        gap: 6px;
+        color: var(--color-muted);
+        font-size: var(--font-size-xs);
+      }
+
+      .inspector-select {
+        min-height: 42px;
+        padding: 7px 9px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: var(--color-background);
+        color: var(--color-text);
+      }
+
+      .inspector-divider {
+        height: 1px;
+        margin: 2px 0;
+        background: var(--color-border);
+      }
+
+      .inspector-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        color: var(--color-text);
+        font-size: var(--font-size-sm);
+      }
+
+      .modal-root {
+        position: relative;
+        z-index: var(--z-modal);
+      }
+
+      .overlay {
+        position: fixed;
+        z-index: var(--z-modal);
+        inset: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(20, 20, 20, 0.48);
+      }
+
+      .dialog,
+      .sheet {
+        width: min(100%, 520px);
+        max-height: min(720px, calc(100dvh - 32px));
+        overflow: auto;
+        padding: 24px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-lg);
+        animation: sheet-in 180ms ease-out both;
+      }
+
+      .dialog {
+        align-self: center;
+      }
+
+      .overlay-title {
+        margin-bottom: 8px;
+        font-size: var(--font-size-xl);
+      }
+
+      .overlay-copy {
+        color: var(--color-muted);
+        line-height: var(--leading-normal);
+      }
+
+      .overlay-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      .month-options {
+        display: grid;
+        gap: 8px;
+        margin-top: 20px;
+      }
+
+      .month-option {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 12px;
+        border: 1px solid var(--color-border);
+        background: var(--color-background);
+        text-align: left;
+      }
+
+      .month-option.active {
+        border-color: var(--color-primary);
+        background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+        color: var(--color-primary-strong);
+      }
+
+      .filter-section {
+        display: grid;
+        gap: 9px;
+        margin-top: 18px;
+      }
+
+      .filter-section-label {
+        color: var(--color-muted);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+      }
+
+      .toast-region {
+        position: fixed;
+        z-index: var(--z-toast);
+        right: 24px;
+        bottom: 24px;
+        display: grid;
+        gap: 8px;
+        width: min(360px, calc(100vw - 48px));
+      }
+
+      .toast {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 13px 15px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-md);
+        animation: toast-in 180ms ease-out both;
+      }
+
+      .toast.success {
+        border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+      }
+
+      .toast.error {
+        border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+      }
+
+      .skeleton-list {
+        display: grid;
+        gap: 16px;
+      }
+
+      .skeleton-line {
+        height: 54px;
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-border) 60%, var(--color-surface));
+        animation: pulse 1.2s ease-in-out infinite alternate;
+      }
+
+      .prototype-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-full);
+        color: var(--color-muted);
+        font-size: var(--font-size-xs);
+      }
+
+      @keyframes sheet-in {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes toast-in {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulse {
+        from {
+          opacity: 0.55;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 1023px) {
+        .prototype-page {
+          padding: 20px;
+        }
+
+        .prototype-workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .inspector-panel {
+          position: static;
+          order: 2;
+        }
+      }
+
+      @media (max-width: 719px) {
+        .prototype-page {
+          padding: 0;
+        }
+
+        .prototype-workspace {
+          display: block;
+        }
+
+        .app-shell {
+          min-height: 100dvh;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        .app-topbar {
+          padding: 10px 16px;
+        }
+
+        .brand-note {
+          display: none;
+        }
+
+        .page-content {
+          padding: 20px 16px;
+        }
+
+        .page-heading {
+          margin-bottom: 20px;
+        }
+
+        .page-heading .primary-button {
+          padding-inline: 11px;
+        }
+
+        .page-heading .primary-button span {
+          display: none;
+        }
+
+        .summary-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .summary-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 13px 15px;
+        }
+
+        .summary-label {
+          margin-bottom: 0;
+        }
+
+        .summary-value {
+          font-size: var(--font-size-md);
+        }
+
+        .toolbar {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .segmented-control {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .segmented-button {
+          padding-inline: 6px;
+        }
+
+        .select-control {
+          width: 100%;
+        }
+
+        .category-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .budget-grid {
+          grid-template-columns: 1fr;
+          gap: 13px;
+        }
+
+        .budget-headline {
+          align-items: flex-start;
+        }
+
+        .bar-item {
+          grid-template-columns: 50px minmax(0, 1fr) auto;
+        }
+
+        .inspector-panel {
+          margin: 16px;
+          border-radius: var(--radius-md);
+        }
+
+        .toast-region {
+          right: 16px;
+          bottom: calc(var(--app-nav-height) + 16px);
+          width: calc(100vw - 32px);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="prototype-page">
+      <div class="prototype-workspace">
+        <main class="app-shell" id="appShell">
+          <header class="app-topbar">
+            <div class="brand-lockup">
+              <span class="brand-name">轻记账</span>
+              <span class="brand-note">UX/UI prototype</span>
+            </div>
+            <div class="topbar-actions">
+              <span class="prototype-badge"><i data-lucide="flask-conical" aria-hidden="true"></i> 原型</span>
+              <button class="icon-button" type="button" data-action="theme-toggle" aria-label="切换主题">
+                <i data-lucide="sun-moon" aria-hidden="true"></i>
+              </button>
+            </div>
+          </header>
+          <div class="app-body">
+            <div id="appView" aria-live="polite"></div>
+          </div>
+          <nav class="bottom-nav" aria-label="主导航">
+            <button class="nav-item" type="button" data-view="ledger">
+              <i data-lucide="receipt-text" aria-hidden="true"></i><span>账单</span>
+            </button>
+            <button class="nav-item" type="button" data-view="budget">
+              <i data-lucide="gauge" aria-hidden="true"></i><span>预算</span>
+            </button>
+            <button class="nav-item" type="button" data-view="stats">
+              <i data-lucide="chart-no-axes-combined" aria-hidden="true"></i><span>统计</span>
+            </button>
+          </nav>
+        </main>
+
+        <aside class="inspector-panel">
+          <details open>
+            <summary>原型状态控制</summary>
+            <p class="inspector-caption">这些控件只用于检查设计稿的正常、空、错误和阈值状态，不属于产品界面。</p>
+            <div class="inspector-grid">
+              <label class="inspector-label">
+                当前页面
+                <select class="inspector-select" data-inspector="view">
+                  <option value="ledger">账单</option>
+                  <option value="entry">记一笔</option>
+                  <option value="budget">预算</option>
+                  <option value="stats">统计</option>
+                </select>
+              </label>
+              <label class="inspector-label">
+                账单状态
+                <select class="inspector-select" data-inspector="ledgerMode">
+                  <option value="normal">正常</option>
+                  <option value="first-use">首次空状态</option>
+                  <option value="filter-empty">筛选无结果</option>
+                  <option value="read-error">读取失败</option>
+                  <option value="loading">加载中</option>
+                </select>
+              </label>
+              <label class="inspector-label">
+                预算状态
+                <select class="inspector-select" data-inspector="budgetMode">
+                  <option value="normal">正常</option>
+                  <option value="unset">未设置</option>
+                  <option value="near">接近预算</option>
+                  <option value="over">超出预算</option>
+                  <option value="read-error">读取失败</option>
+                </select>
+              </label>
+              <label class="inspector-label">
+                统计状态
+                <select class="inspector-select" data-inspector="statsMode">
+                  <option value="normal">正常</option>
+                  <option value="empty">无账单</option>
+                  <option value="income-only">只有收入</option>
+                  <option value="read-error">读取失败</option>
+                </select>
+              </label>
+              <label class="inspector-label">
+                提交结果
+                <select class="inspector-select" data-inspector="saveMode">
+                  <option value="normal">成功</option>
+                  <option value="error">失败</option>
+                </select>
+              </label>
+              <div class="inspector-divider" aria-hidden="true"></div>
+              <label class="inspector-toggle">
+                <span>示例主题</span>
+                <button class="secondary-button" type="button" data-action="theme-toggle">切换</button>
+              </label>
+              <button class="secondary-button" type="button" data-action="reset-demo">
+                <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+                恢复示例数据
+              </button>
+            </div>
+          </details>
+        </aside>
+      </div>
+    </div>
+
+    <div class="modal-root" id="modalRoot"></div>
+    <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+      (() => {
+        const TODAY = '2026-07-28';
+        const CURRENT_MONTH = '2026-07';
+        const categories = {
+          expense: ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '其他'],
+          income: ['工资', '奖金', '理财', '其他'],
+        };
+
+        const initialBills = [
+          { id: 'bill-1', type: 'expense', amount: 35.5, category: '餐饮', date: '2026-07-28', note: '晚餐', createdAt: 5 },
+          { id: 'bill-2', type: 'expense', amount: 260, category: '交通', date: '2026-07-26', note: '地铁通勤', createdAt: 4 },
+          { id: 'bill-3', type: 'expense', amount: 180, category: '购物', date: '2026-07-20', note: '日用品', createdAt: 3 },
+          { id: 'bill-4', type: 'income', amount: 3000, category: '工资', date: '2026-07-05', note: '七月工资', createdAt: 2 },
+          { id: 'bill-5', type: 'expense', amount: 120, category: '其他', date: '2026-06-28', note: '临时支出', createdAt: 1 },
+        ];
+
+        const state = {
+          view: 'ledger',
+          selectedMonth: CURRENT_MONTH,
+          filterType: 'all',
+          filterCategory: 'all',
+          ledgerMode: 'normal',
+          budgetMode: 'normal',
+          statsMode: 'normal',
+          saveMode: 'normal',
+          bills: structuredClone(initialBills),
+          budgets: { [CURRENT_MONTH]: 1000 },
+          overlay: null,
+          toast: null,
+          form: null,
+          formErrors: {},
+          formPending: false,
+        };
+
+        const appView = document.getElementById('appView');
+        const modalRoot = document.getElementById('modalRoot');
+        const toastRegion = document.getElementById('toastRegion');
+
+        const money = (amount) => `¥${Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const signedMoney = (bill) => `${bill.type === 'income' ? '+' : '-'} ${money(bill.amount)}`;
+        const monthOf = (date) => date.slice(0, 7);
+        const formatMonth = (month) => {
+          const [year, value] = month.split('-');
+          return `${year} 年 ${Number(value)} 月`;
+        };
+        const formatDate = (date) => {
+          const [year, month, day] = date.split('-');
+          return `${year} 年 ${Number(month)} 月 ${Number(day)} 日`;
+        };
+        const monthLabel = (date) => {
+          const [, month, day] = date.split('-');
+          return `${Number(month)} 月 ${Number(day)} 日`;
+        };
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;',
+        })[character]);
+        const icon = (name, label = '') => `<i data-lucide="${name}"${label ? ` aria-label="${escapeHtml(label)}"` : ' aria-hidden="true"'}></i>`;
+
+        function renderIcons() {
+          if (window.lucide) {
+            window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+          }
+        }
+
+        function currentMonthBills() {
+          return state.bills.filter((bill) => monthOf(bill.date) === state.selectedMonth);
+        }
+
+        function totalsFor(bills) {
+          return bills.reduce((totals, bill) => {
+            totals[bill.type] += Number(bill.amount);
+            return totals;
+          }, { income: 0, expense: 0 });
+        }
+
+        function availableMonths() {
+          return [...new Set(state.bills.map((bill) => monthOf(bill.date)).concat(CURRENT_MONTH))].sort().reverse();
+        }
+
+        function displayBills() {
+          const all = currentMonthBills();
+          if (state.filterType === 'all') return state.filterCategory === 'all' ? all : all.filter((bill) => bill.category === state.filterCategory);
+          return all.filter((bill) => bill.type === state.filterType && (state.filterCategory === 'all' || bill.category === state.filterCategory));
+        }
+
+        function categoryOptions(type, selected = 'all') {
+          const options = type === 'all' ? [...new Set([...categories.expense, ...categories.income])] : categories[type];
+          return ['all', ...options].map((category) => `<option value="${escapeHtml(category)}" ${category === selected ? 'selected' : ''}>${category === 'all' ? '全部分类' : escapeHtml(category)}</option>`).join('');
+        }
+
+        function renderSummary(totals) {
+          const balance = totals.income - totals.expense;
+          return `
+            <section class="summary-grid" aria-label="${formatMonth(state.selectedMonth)}收支汇总">
+              <div class="summary-item"><span class="summary-label">收入</span><strong class="summary-value income">${money(totals.income)}</strong></div>
+              <div class="summary-item"><span class="summary-label">支出</span><strong class="summary-value expense">${money(totals.expense)}</strong></div>
+              <div class="summary-item"><span class="summary-label">结余</span><strong class="summary-value ${balance < 0 ? 'negative' : ''}">${money(balance)}</strong></div>
+            </section>`;
+        }
+
+        function renderMonthTrigger() {
+          return `<button class="month-trigger" type="button" data-action="open-months" aria-haspopup="dialog">${icon('calendar-days')} ${formatMonth(state.selectedMonth)} ${icon('chevron-down')}</button>`;
+        }
+
+        function renderLedger() {
+          const totals = totalsFor(currentMonthBills());
+          if (state.ledgerMode === 'loading') {
+            return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">账单</span><h1>${renderMonthTrigger()}</h1></div></div><div class="skeleton-list" aria-busy="true" aria-label="账单加载中"><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div></div>`;
+          }
+
+          const heading = `
+            <div class="page-heading">
+              <div><span class="eyebrow">Monthly ledger</span><h1>${renderMonthTrigger()}</h1></div>
+              <button class="primary-button" type="button" data-action="new-entry">${icon('plus')}<span>记一笔</span></button>
+            </div>`;
+
+          if (state.ledgerMode === 'read-error') {
+            return `<div class="page-content">${heading}${renderErrorState('账单读取失败', '当前月份的账单暂时无法读取，汇总没有被旧数据替代。', 'retry-ledger')}</div>`;
+          }
+
+          if (state.ledgerMode === 'first-use') {
+            return `<div class="page-content">${heading}${renderSummary({ income: 0, expense: 0 })}${renderEmptyState('开始记录第一笔账', '记录金额、分类和日期，月底就能快速看懂钱花在哪里。', 'new-entry', 'Plus', '记第一笔账')}</div>`;
+          }
+
+          const filters = `
+            <div class="toolbar">
+              <div class="segmented-control" role="group" aria-label="收支类型筛选">
+                ${[['all', '全部'], ['income', '收入'], ['expense', '支出']].map(([value, label]) => `<button class="segmented-button ${state.filterType === value ? 'active' : ''}" type="button" data-filter-type="${value}" aria-pressed="${state.filterType === value}">${label}</button>`).join('')}
+              </div>
+              <div class="filter-control">
+                <label class="sr-only" for="categoryFilter">分类筛选</label>
+                <select class="select-control" id="categoryFilter" data-action="category-filter" aria-label="分类筛选">${categoryOptions(state.filterType, state.filterCategory)}</select>
+                ${(state.filterType !== 'all' || state.filterCategory !== 'all') ? `<button class="text-button" type="button" data-action="reset-filters">${icon('x')} 重置</button>` : ''}
+              </div>
+            </div>`;
+
+          const bills = displayBills();
+          if (state.ledgerMode === 'filter-empty' || bills.length === 0) {
+            const isFiltered = state.filterType !== 'all' || state.filterCategory !== 'all' || state.ledgerMode === 'filter-empty';
+            const empty = isFiltered
+              ? renderEmptyState('没有匹配的账单', '当前筛选条件没有结果，月度汇总仍按全部账单计算。', 'reset-filters', 'rotate-ccw', '重置筛选')
+              : renderEmptyState(`${formatMonth(state.selectedMonth)}暂无账单`, '可以切换到其他月份，或立即记录一笔新的收支。', 'new-entry', 'Plus', '记一笔');
+            return `<div class="page-content">${heading}${renderSummary(totals)}${filters}${empty}</div>`;
+          }
+
+          const grouped = bills.reduce((groups, bill) => {
+            (groups[bill.date] ||= []).push(bill);
+            return groups;
+          }, {});
+          const list = Object.entries(grouped).sort(([a], [b]) => b.localeCompare(a)).map(([date, dateBills]) => {
+            const dayTotals = totalsFor(dateBills);
+            const rows = dateBills.sort((a, b) => b.createdAt - a.createdAt).map((bill) => `
+              <li>
+                <button class="ledger-row" type="button" data-action="edit-entry" data-bill-id="${bill.id}" aria-label="编辑 ${escapeHtml(bill.category)} ${signedMoney(bill)}">
+                  <span class="ledger-main">
+                    <span class="ledger-mark ${bill.type === 'income' ? 'income-mark' : ''}">${icon(bill.type === 'income' ? 'plus' : 'minus')}</span>
+                    <span>
+                      <span class="ledger-title-row"><strong class="ledger-title">${escapeHtml(bill.category)}</strong><span class="type-label">${bill.type === 'income' ? '收入' : '支出'}</span></span>
+                      <span class="ledger-meta"><span>${escapeHtml(bill.note || '无备注')}</span><span aria-hidden="true">·</span><span>${formatDate(bill.date)}</span></span>
+                    </span>
+                  </span>
+                  <span class="ledger-amount ${bill.type === 'income' ? 'income' : ''}">${signedMoney(bill)}</span>
+                </button>
+              </li>`).join('');
+            return `<section class="date-group"><div class="date-heading"><strong>${monthLabel(date)}</strong><span class="day-totals">收入 ${money(dayTotals.income)} · 支出 ${money(dayTotals.expense)}</span></div><ul class="ledger-list">${rows}</ul></section>`;
+          }).join('');
+
+          return `<div class="page-content">${heading}${renderSummary(totals)}${filters}<div aria-label="账单列表">${list}</div></div>`;
+        }
+
+        function renderEntry() {
+          const form = state.form || { id: '', type: 'expense', amount: '', category: '', date: TODAY, note: '' };
+          const isEdit = Boolean(form.id);
+          const typeCategories = categories[form.type];
+          return `
+            <div class="page-content">
+              <div class="form-shell">
+                <div class="form-heading">
+                  <button class="back-button" type="button" data-action="entry-back" aria-label="返回账单">${icon('chevron-left')}</button>
+                  <div><span class="eyebrow">${isEdit ? 'Edit record' : 'New record'}</span><h1>${isEdit ? '编辑账单' : '记一笔'}</h1></div>
+                </div>
+                <form id="entryForm" novalidate>
+                  <div class="form-group">
+                    <div class="field-label"><span>收支类型 <span class="required-mark">*</span></span><span class="muted">切换会清空分类</span></div>
+                    <div class="segmented-control" role="group" aria-label="收支类型">
+                      <button class="segmented-button ${form.type === 'expense' ? 'active' : ''}" type="button" data-form-type="expense" aria-pressed="${form.type === 'expense'}">支出</button>
+                      <button class="segmented-button ${form.type === 'income' ? 'active' : ''}" type="button" data-form-type="income" aria-pressed="${form.type === 'income'}">收入</button>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="field-label" for="amountInput">金额 <span class="required-mark">*</span></label>
+                    <div class="amount-input-wrap ${state.formErrors.amount ? 'invalid' : ''}">
+                      <span class="currency-symbol" aria-hidden="true">¥</span>
+                      <input class="amount-input" id="amountInput" name="amount" inputmode="decimal" autocomplete="off" value="${escapeHtml(form.amount)}" placeholder="0.00" aria-invalid="${Boolean(state.formErrors.amount)}" aria-describedby="amountError" />
+                    </div>
+                    ${state.formErrors.amount ? `<span class="field-error" id="amountError" role="alert">${escapeHtml(state.formErrors.amount)}</span>` : '<p class="helper-text">最多两位小数，单笔不超过 ¥9,999,999.99</p>'}
+                  </div>
+
+                  <div class="form-group">
+                    <div class="field-label"><span>分类 <span class="required-mark">*</span></span><span class="muted">${form.category ? '已选择' : '请选择一项'}</span></div>
+                    <div class="category-grid" role="group" aria-label="分类">
+                      ${typeCategories.map((category) => `<button class="category-button ${form.category === category ? 'active' : ''}" type="button" data-form-category="${escapeHtml(category)}" aria-pressed="${form.category === category}">${escapeHtml(category)}</button>`).join('')}
+                    </div>
+                    ${state.formErrors.category ? `<span class="field-error" role="alert">${escapeHtml(state.formErrors.category)}</span>` : ''}
+                  </div>
+
+                  <div class="form-group">
+                    <label class="field-label" for="dateInput">交易日期 <span class="required-mark">*</span></label>
+                    <input class="field-control" id="dateInput" name="date" type="date" max="${TODAY}" value="${escapeHtml(form.date)}" aria-invalid="${Boolean(state.formErrors.date)}" aria-describedby="dateError" />
+                    ${state.formErrors.date ? `<span class="field-error" id="dateError" role="alert">${escapeHtml(state.formErrors.date)}</span>` : '<p class="helper-text">不能选择晚于今天的日期</p>'}
+                  </div>
+
+                  <div class="form-group">
+                    <label class="field-label" for="noteInput">备注 <span class="muted">选填</span></label>
+                    <textarea class="field-control textarea-control" id="noteInput" name="note" maxlength="50" placeholder="写点备注，最多 50 个字符">${escapeHtml(form.note)}</textarea>
+                    ${state.formErrors.note ? `<span class="field-error" role="alert">${escapeHtml(state.formErrors.note)}</span>` : ''}
+                  </div>
+
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit" ${state.formPending ? 'disabled' : ''}>${icon(state.formPending ? 'loader-circle' : 'check')} ${state.formPending ? '保存中' : '保存'}</button>
+                    ${isEdit ? `<button class="danger-button" type="button" data-action="delete-entry" ${state.formPending ? 'disabled' : ''}>${icon('trash-2')} 删除这笔账单</button>` : ''}
+                  </div>
+                </form>
+              </div>
+            </div>`;
+        }
+
+        function budgetSnapshot() {
+          const actual = totalsFor(state.bills.filter((bill) => monthOf(bill.date) === CURRENT_MONTH)).expense;
+          const mode = state.budgetMode;
+          if (mode === 'near') return { budget: 1000, used: 850 };
+          if (mode === 'over') return { budget: 1000, used: 1200 };
+          return { budget: state.budgets[CURRENT_MONTH] || 0, used: actual };
+        }
+
+        function budgetStatus(budget, used) {
+          if (!budget) return { label: '未设置预算', tone: '', icon: 'circle-dashed', ratio: 0 };
+          const ratio = used / budget;
+          if (ratio >= 1) return { label: '达到预算上限', tone: 'danger', icon: 'alert-triangle', ratio };
+          if (ratio >= 0.8) return { label: '接近预算', tone: 'warning', icon: 'alert-circle', ratio };
+          return { label: '预算使用正常', tone: '', icon: 'check-circle-2', ratio };
+        }
+
+        function renderBudget() {
+          if (state.budgetMode === 'read-error') {
+            return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Monthly budget</span><h1>本月预算</h1></div></div>${renderErrorState('预算读取失败', '当前预算进度暂时无法确认，不展示旧数据。', 'retry-budget')}</div>`;
+          }
+          if (state.budgetMode === 'unset') {
+            return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Monthly budget</span><h1>本月预算</h1></div></div><div class="budget-overview"><div class="budget-headline"><div><span class="summary-label">本月支出</span><strong class="summary-value expense">${money(totalsFor(currentMonthBills()).expense)}</strong></div><span class="prototype-badge">${icon('calendar-days')} 仅管理当前月</span></div><div class="status-state"><span class="state-icon">${icon('wallet-cards')}</span><h2>还没有设置预算</h2><p class="helper-text">设置预算后，可以随时看到剩余额度和使用风险。</p><div class="state-actions"><button class="primary-button" type="button" data-action="open-budget">${icon('plus')} 设置预算</button></div></div></div></div>`;
+          }
+
+          const snapshot = budgetSnapshot();
+          const status = budgetStatus(snapshot.budget, snapshot.used);
+          const remaining = snapshot.budget - snapshot.used;
+          const visibleRatio = Math.min(status.ratio * 100, 100);
+          return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Monthly budget</span><h1>本月预算</h1></div><button class="secondary-button" type="button" data-action="open-budget">${icon('pencil')} 修改</button></div><section class="budget-overview" aria-label="本月预算进度"><div class="budget-headline"><div><span class="summary-label">预算金额</span><strong class="summary-value">${money(snapshot.budget)}</strong></div><span class="prototype-badge">${formatMonth(CURRENT_MONTH)}</span></div><div class="budget-grid"><div><span class="budget-metric-label">已使用</span><strong class="metric-number">${money(snapshot.used)}</strong></div><div><span class="budget-metric-label">${remaining >= 0 ? '剩余' : '超出'}</span><strong class="metric-number ${remaining < 0 ? 'negative' : ''}">${money(Math.abs(remaining))}</strong></div><div><span class="budget-metric-label">使用比例</span><strong class="metric-number">${(status.ratio * 100).toFixed(1)}%</strong></div></div><div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(status.ratio * 100, 100).toFixed(1)}" aria-label="预算使用比例"><div class="progress-value ${status.tone}" style="width: ${visibleRatio}%"></div></div><div class="budget-status ${status.tone}">${icon(status.icon)} ${status.label}${remaining < 0 ? `，超出 ${money(Math.abs(remaining))}` : ''}</div></section><p class="helper-text">已使用金额只计算当前月份的支出账单，收入不计入预算。</p></div>`;
+        }
+
+        function statisticsData() {
+          const expenses = currentMonthBills().filter((bill) => bill.type === 'expense');
+          const totals = totalsFor(currentMonthBills());
+          const byCategory = expenses.reduce((result, bill) => {
+            result[bill.category] = (result[bill.category] || 0) + bill.amount;
+            return result;
+          }, {});
+          return { totals, expenses, byCategory };
+        }
+
+        function renderStats() {
+          if (state.statsMode === 'read-error') {
+            return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Spending insight</span><h1>${renderMonthTrigger()}</h1></div></div>${renderErrorState('统计读取失败', '当前月份的统计无法确认，不使用旧月份数据替代。', 'retry-stats')}</div>`;
+          }
+          if (state.statsMode === 'empty') {
+            return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Spending insight</span><h1>${renderMonthTrigger()}</h1></div></div>${renderEmptyState('这个月还没有统计数据', '记录一笔账单后，收入、支出和分类分布会出现在这里。', 'new-entry', 'Plus', '记一笔')}</div>`;
+          }
+
+          const { totals, expenses, byCategory } = statisticsData();
+          const entries = Object.entries(byCategory).sort(([, a], [, b]) => b - a);
+          if (state.statsMode === 'income-only') {
+            return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Spending insight</span><h1>${renderMonthTrigger()}</h1></div></div>${renderSummary(totals)}<div class="status-state"><span class="state-icon">${icon('chart-no-axes-combined')}</span><h2>暂无支出数据</h2><p class="helper-text">本月有收入记录，但还没有支出账单，因此没有支出分类分布。</p></div></div>`;
+          }
+          if (!expenses.length) {
+            return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Spending insight</span><h1>${renderMonthTrigger()}</h1></div></div>${renderSummary(totals)}${renderEmptyState('暂无支出数据', '收入会保留在上方汇总，支出分类会在记录支出后出现。', 'new-entry', 'Plus', '记一笔')}</div>`;
+          }
+
+          const max = entries[0]?.[1] || 1;
+          const rows = entries.map(([category, amount], index) => {
+            const percentage = amount / totals.expense * 100;
+            return `<div class="bar-item"><span class="bar-label">${index + 1}. ${escapeHtml(category)}</span><span class="bar-track"><span class="bar-fill" style="width: ${Math.max(7, amount / max * 100)}%"></span></span><span class="bar-value money">${money(amount)} <span class="muted">${percentage.toFixed(1)}%</span></span></div>`;
+          }).join('');
+          const tableRows = entries.map(([category, amount], index) => `<tr><td>${index + 1}</td><td>${escapeHtml(category)}</td><td class="money">${money(amount)}</td><td class="money">${(amount / totals.expense * 100).toFixed(1)}%</td></tr>`).join('');
+          return `<div class="page-content"><div class="page-heading"><div><span class="eyebrow">Spending insight</span><h1>${renderMonthTrigger()}</h1></div></div>${renderSummary(totals)}<section class="chart-block" aria-labelledby="categoryChartTitle"><div class="section-heading"><div><h2 id="categoryChartTitle">支出分类</h2><p class="helper-text">按金额从高到低排列</p></div><span class="prototype-badge">${entries.length} 个分类</span></div><div class="bar-list" role="img" aria-label="${entries.map(([category, amount]) => `${category} ${money(amount)}`).join('，')}">${rows}</div></section><table class="category-table"><caption class="sr-only">支出分类金额和占比</caption><thead><tr><th>#</th><th>分类</th><th>金额</th><th>占比</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
+        }
+
+        function renderEmptyState(title, copy, action, actionIcon, actionLabel) {
+          return `<div class="empty-state"><span class="state-icon">${icon('inbox')}</span><h2>${escapeHtml(title)}</h2><p class="helper-text">${escapeHtml(copy)}</p><div class="state-actions"><button class="primary-button" type="button" data-action="${action}">${icon(actionIcon)} ${escapeHtml(actionLabel)}</button></div></div>`;
+        }
+
+        function renderErrorState(title, copy, action) {
+          return `<div class="error-state" role="alert"><span class="state-icon">${icon('triangle-alert')}</span><h2>${escapeHtml(title)}</h2><p class="helper-text">${escapeHtml(copy)}</p><div class="state-actions"><button class="secondary-button" type="button" data-action="${action}">${icon('refresh-cw')} 重试</button></div></div>`;
+        }
+
+        function renderOverlay() {
+          if (!state.overlay) {
+            modalRoot.innerHTML = '';
+            return;
+          }
+          const { type } = state.overlay;
+          if (type === 'months') {
+            modalRoot.innerHTML = `<div class="overlay" data-overlay-dismiss><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="monthDialogTitle"><div class="row-between"><div><h2 class="overlay-title" id="monthDialogTitle">选择月份</h2><p class="overlay-copy">只能查看当前月份和已有账单的历史月份。</p></div><button class="icon-button" type="button" data-action="close-overlay" aria-label="关闭">${icon('x')}</button></div><div class="month-options">${availableMonths().map((month) => `<button class="month-option ${month === state.selectedMonth ? 'active' : ''}" type="button" data-month="${month}"><span>${formatMonth(month)}</span>${month === CURRENT_MONTH ? '<span class="muted">当前月</span>' : ''}</button>`).join('')}</div></section></div>`;
+          } else if (type === 'filter') {
+            modalRoot.innerHTML = `<div class="overlay" data-overlay-dismiss><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="filterDialogTitle"><div class="row-between"><div><h2 class="overlay-title" id="filterDialogTitle">筛选账单</h2><p class="overlay-copy">筛选只影响明细和日期小计，不改变月度汇总。</p></div><button class="icon-button" type="button" data-action="close-overlay" aria-label="关闭">${icon('x')}</button></div><div class="filter-section"><span class="filter-section-label">收支类型</span><div class="segmented-control">${[['all', '全部'], ['income', '收入'], ['expense', '支出']].map(([value, label]) => `<button class="segmented-button ${state.filterType === value ? 'active' : ''}" type="button" data-filter-type="${value}">${label}</button>`).join('')}</div></div><div class="filter-section"><label class="filter-section-label" for="sheetCategory">分类</label><select class="select-control" id="sheetCategory" data-action="category-filter">${categoryOptions(state.filterType, state.filterCategory)}</select></div><div class="overlay-actions"><button class="secondary-button" type="button" data-action="reset-filters">${icon('rotate-ccw')} 重置</button><button class="primary-button" type="button" data-action="close-overlay">应用筛选</button></div></section></div>`;
+          } else if (type === 'budget') {
+            const current = state.budgets[CURRENT_MONTH] || '';
+            modalRoot.innerHTML = `<div class="overlay" data-overlay-dismiss><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="budgetDialogTitle"><div class="row-between"><div><h2 class="overlay-title" id="budgetDialogTitle">${current ? '修改本月预算' : '设置本月预算'}</h2><p class="overlay-copy">金额大于 0，最多两位小数，不超过 ¥9,999,999.99。</p></div><button class="icon-button" type="button" data-action="close-overlay" aria-label="关闭">${icon('x')}</button></div><form id="budgetForm"><div class="form-group" style="margin-top: 22px"><label class="field-label" for="budgetInput">预算金额 <span class="required-mark">*</span></label><div class="amount-input-wrap"><span class="currency-symbol" aria-hidden="true">¥</span><input class="amount-input" id="budgetInput" name="budget" inputmode="decimal" value="${current}" placeholder="0.00" /></div><span class="field-error" id="budgetError" role="alert" hidden></span></div><div class="overlay-actions"><button class="secondary-button" type="button" data-action="close-overlay">取消</button><button class="primary-button" type="submit">${icon('check')} 保存预算</button></div></form></section></div>`;
+          } else if (type === 'confirm-delete') {
+            modalRoot.innerHTML = `<div class="overlay" data-overlay-dismiss><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="deleteDialogTitle"><h2 class="overlay-title" id="deleteDialogTitle">删除这笔账单？</h2><p class="overlay-copy">删除后无法在产品内恢复，相关月份的汇总、预算和统计会同步更新。</p><div class="overlay-actions"><button class="secondary-button" type="button" data-action="close-overlay">取消</button><button class="danger-button" type="button" data-action="confirm-delete">${icon('trash-2')} 确认删除</button></div></section></div>`;
+          } else if (type === 'confirm-discard') {
+            modalRoot.innerHTML = `<div class="overlay" data-overlay-dismiss><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="discardDialogTitle"><h2 class="overlay-title" id="discardDialogTitle">放弃未保存的更改？</h2><p class="overlay-copy">继续编辑会保留当前内容，放弃后这些修改不会生效。</p><div class="overlay-actions"><button class="secondary-button" type="button" data-action="close-overlay">继续编辑</button><button class="danger-button" type="button" data-action="confirm-discard">放弃更改</button></div></section></div>`;
+          }
+          renderIcons();
+        }
+
+        function showToast(message, tone = 'success') {
+          const id = Date.now();
+          state.toast = { id, message, tone };
+          toastRegion.innerHTML = `<div class="toast ${tone}" role="status">${icon(tone === 'error' ? 'triangle-alert' : 'check-circle-2')}<span>${escapeHtml(message)}</span></div>`;
+          window.setTimeout(() => {
+            if (state.toast?.id === id) {
+              state.toast = null;
+              toastRegion.innerHTML = '';
+            }
+          }, 3600);
+        }
+
+        function openEntry(bill = null) {
+          state.form = bill ? { ...bill, amount: String(bill.amount) } : { id: '', type: 'expense', amount: '', category: '', date: TODAY, note: '' };
+          state.formErrors = {};
+          state.formPending = false;
+          state.view = 'entry';
+          state.overlay = null;
+          render();
+        }
+
+        function isFormDirty() {
+          if (!state.form) return false;
+          if (state.form.id) {
+            const original = state.bills.find((bill) => bill.id === state.form.id);
+            return JSON.stringify({ ...state.form, amount: String(state.form.amount) }) !== JSON.stringify({ ...original, amount: String(original?.amount) });
+          }
+          return Boolean(state.form.amount || state.form.category || state.form.note || state.form.date !== TODAY || state.form.type !== 'expense');
+        }
+
+        function validateEntry() {
+          const form = state.form;
+          const errors = {};
+          const amount = Number(form.amount);
+          if (!form.amount || !/^\d+(\.\d{1,2})?$/.test(form.amount) || !Number.isFinite(amount) || amount <= 0) errors.amount = '请输入大于 0 且最多两位小数的金额。';
+          if (amount > 9999999.99) errors.amount = '单笔金额不能超过 ¥9,999,999.99。';
+          if (!form.category) errors.category = '请选择当前收支类型对应的分类。';
+          if (!form.date) errors.date = '请选择交易日期。';
+          if (form.date > TODAY) errors.date = '交易日期不能晚于当前日期。';
+          if (String(form.note).trim().length > 50) errors.note = '备注去除首尾空格后不能超过 50 个字符。';
+          state.formErrors = errors;
+          return Object.keys(errors).length === 0;
+        }
+
+        function saveEntry(event) {
+          event.preventDefault();
+          if (state.formPending || !validateEntry()) {
+            render();
+            return;
+          }
+          state.formPending = true;
+          render();
+          window.setTimeout(() => {
+            if (state.saveMode === 'error') {
+              state.formPending = false;
+              showToast('保存失败，数据未更新。请再次保存。', 'error');
+              render();
+              return;
+            }
+            const normalized = { ...state.form, amount: Number(state.form.amount), note: String(state.form.note).trim(), createdAt: state.form.createdAt || Date.now() };
+            if (normalized.id) {
+              state.bills = state.bills.map((bill) => bill.id === normalized.id ? normalized : bill);
+            } else {
+              normalized.id = `bill-${Date.now()}`;
+              state.bills = [normalized, ...state.bills];
+            }
+            state.selectedMonth = monthOf(normalized.date);
+            state.formPending = false;
+            state.form = null;
+            state.formErrors = {};
+            state.view = 'ledger';
+            state.ledgerMode = 'normal';
+            state.overlay = null;
+            showToast(normalized.id.startsWith('bill-') && initialBills.some((bill) => bill.id === normalized.id) ? '账单已更新。' : '账单已保存。');
+            render();
+          }, 420);
+        }
+
+        function saveBudget(event) {
+          event.preventDefault();
+          const input = document.getElementById('budgetInput');
+          const error = document.getElementById('budgetError');
+          const value = input?.value.trim() || '';
+          const amount = Number(value);
+          if (!/^\d+(\.\d{1,2})?$/.test(value) || amount <= 0 || amount > 9999999.99) {
+            error.hidden = false;
+            error.textContent = '请输入 0 至 ¥9,999,999.99 之间、最多两位小数的金额。';
+            input?.setAttribute('aria-invalid', 'true');
+            input?.focus();
+            return;
+          }
+          if (state.saveMode === 'error') {
+            error.hidden = false;
+            error.textContent = '保存失败，原预算未改变。请再次尝试。';
+            return;
+          }
+          state.budgets[CURRENT_MONTH] = amount;
+          state.budgetMode = 'normal';
+          state.overlay = null;
+          showToast('预算已保存。');
+          render();
+        }
+
+        function render() {
+          if (state.view === 'ledger') appView.innerHTML = renderLedger();
+          if (state.view === 'entry') appView.innerHTML = renderEntry();
+          if (state.view === 'budget') appView.innerHTML = renderBudget();
+          if (state.view === 'stats') appView.innerHTML = renderStats();
+          document.querySelectorAll('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === state.view));
+          document.querySelectorAll('[data-inspector]').forEach((select) => {
+            select.value = state[select.dataset.inspector] ?? '';
+          });
+          renderOverlay();
+          renderIcons();
+        }
+
+        function resetDemo() {
+          state.view = 'ledger';
+          state.selectedMonth = CURRENT_MONTH;
+          state.filterType = 'all';
+          state.filterCategory = 'all';
+          state.ledgerMode = 'normal';
+          state.budgetMode = 'normal';
+          state.statsMode = 'normal';
+          state.saveMode = 'normal';
+          state.bills = structuredClone(initialBills);
+          state.budgets = { [CURRENT_MONTH]: 1000 };
+          state.overlay = null;
+          state.form = null;
+          state.formErrors = {};
+          showToast('示例数据已恢复。');
+          render();
+        }
+
+        document.addEventListener('click', (event) => {
+          const target = event.target.closest('[data-action], [data-view], [data-filter-type], [data-form-type], [data-form-category], [data-month]');
+          if (!target) return;
+          if (target.matches('[data-view]')) {
+            state.view = target.dataset.view;
+            if (state.view !== 'entry') state.form = null;
+            state.overlay = null;
+            render();
+            return;
+          }
+          if (target.matches('[data-month]')) {
+            state.selectedMonth = target.dataset.month;
+            state.overlay = null;
+            render();
+            return;
+          }
+          if (target.matches('[data-filter-type]')) {
+            state.filterType = target.dataset.filterType;
+            state.filterCategory = 'all';
+            render();
+            return;
+          }
+          if (target.matches('[data-form-type]')) {
+            state.form.type = target.dataset.formType;
+            state.form.category = '';
+            state.formErrors.category = '';
+            render();
+            return;
+          }
+          if (target.matches('[data-form-category]')) {
+            state.form.category = target.dataset.formCategory;
+            state.formErrors.category = '';
+            render();
+            return;
+          }
+
+          const action = target.dataset.action;
+          if (action === 'theme-toggle') {
+            const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = next;
+            return;
+          }
+          if (action === 'reset-demo') return resetDemo();
+          if (action === 'new-entry') return openEntry();
+          if (action === 'edit-entry') return openEntry(state.bills.find((bill) => bill.id === target.dataset.billId));
+          if (action === 'entry-back') {
+            if (isFormDirty()) state.overlay = { type: 'confirm-discard' };
+            else {
+              state.form = null;
+              state.view = 'ledger';
+            }
+            render();
+            return;
+          }
+          if (action === 'delete-entry') {
+            state.overlay = { type: 'confirm-delete' };
+            render();
+            return;
+          }
+          if (action === 'confirm-delete') {
+            const id = state.form?.id;
+            state.bills = state.bills.filter((bill) => bill.id !== id);
+            state.overlay = null;
+            state.form = null;
+            state.view = 'ledger';
+            showToast('账单已删除。');
+            render();
+            return;
+          }
+          if (action === 'confirm-discard') {
+            state.overlay = null;
+            state.form = null;
+            state.formErrors = {};
+            state.view = 'ledger';
+            render();
+            return;
+          }
+          if (action === 'open-months') {
+            state.overlay = { type: 'months' };
+            render();
+            return;
+          }
+          if (action === 'open-filter') {
+            state.overlay = { type: 'filter' };
+            render();
+            return;
+          }
+          if (action === 'open-budget') {
+            state.overlay = { type: 'budget' };
+            render();
+            return;
+          }
+          if (action === 'close-overlay') {
+            state.overlay = null;
+            render();
+            return;
+          }
+          if (action === 'reset-filters') {
+            state.filterType = 'all';
+            state.filterCategory = 'all';
+            state.overlay = null;
+            render();
+            return;
+          }
+          if (action === 'retry-ledger') {
+            state.ledgerMode = 'normal';
+            render();
+            return;
+          }
+          if (action === 'retry-budget') {
+            state.budgetMode = 'normal';
+            render();
+            return;
+          }
+          if (action === 'retry-stats') {
+            state.statsMode = 'normal';
+            render();
+          }
+        });
+
+        document.addEventListener('change', (event) => {
+          const target = event.target;
+          if (target.matches('[data-inspector]')) {
+            state[target.dataset.inspector] = target.value;
+            if (target.dataset.inspector === 'view' && target.value === 'entry') openEntry();
+            else render();
+            return;
+          }
+          if (target.matches('[data-action="category-filter"]')) {
+            state.filterCategory = target.value;
+            render();
+          }
+        });
+
+        document.addEventListener('input', (event) => {
+          if (!state.form) return;
+          const target = event.target;
+          if (target.name === 'amount' || target.name === 'date' || target.name === 'note') {
+            state.form[target.name] = target.value;
+          }
+        });
+
+        document.addEventListener('submit', (event) => {
+          if (event.target.id === 'entryForm') saveEntry(event);
+          if (event.target.id === 'budgetForm') saveBudget(event);
+        });
+
+        document.addEventListener('click', (event) => {
+          if (event.target.matches('[data-overlay-dismiss]')) {
+            state.overlay = null;
+            render();
+          }
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>

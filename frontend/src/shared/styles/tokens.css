@@ -1,0 +1,100 @@
+/**
+ * Design tokens.
+ *
+ * 分层约定：
+ * - primitive（与主题无关）：spacing / radius / typography / z-index / shadow。
+ * - semantic 颜色（随主题变）：--color-*，在 :root 为 light，[data-theme='dark'] 覆盖。
+ *
+ * 断点值无法作为 CSS 变量用于 @media，统一约定为常量（保持一致，勿散落魔法值）：
+ *   sm 480px / md 720px / lg 1024px / xl 1280px
+ *
+ * 新增/复用规则见 docs/frontend/guides/theming-and-i18n.md 与
+ * docs/frontend/standards/frontend-development.md#样式和配置。
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* Typography */
+  --font-family-base:
+    'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-family-mono:
+    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* Z-index */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-modal: 1300;
+  --z-popover: 1400;
+  --z-toast: 1500;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(20, 20, 20, 0.06);
+  --shadow-md: 0 4px 12px rgba(20, 20, 20, 0.08);
+  --shadow-lg: 0 12px 32px rgba(20, 20, 20, 0.12);
+
+  /* Semantic colors — light (default) */
+  --color-background: #f7f4ee;
+  --color-surface: #ffffff;
+  --color-text: #141414;
+  --color-muted: #5f6368;
+  --color-border: #ddd8cf;
+  --color-primary: #0f766e;
+  --color-primary-strong: #0b5c55;
+  --color-primary-contrast: #ffffff;
+  --color-danger: #b3261e;
+  --color-success: #2e7d32;
+  --color-warning: #9a6700;
+  --color-focus-ring: #0f766e;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-background: #14110c;
+  --color-surface: #1e1a14;
+  --color-text: #ededed;
+  --color-muted: #a8a29a;
+  --color-border: #332d24;
+  --color-primary: #5eead4;
+  --color-primary-strong: #99f6e4;
+  --color-primary-contrast: #06302b;
+  --color-danger: #f2b8b5;
+  --color-success: #a5d6a7;
+  --color-warning: #e0b25e;
+  --color-focus-ring: #5eead4;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+}

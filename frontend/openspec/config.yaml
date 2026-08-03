@@ -1,0 +1,23 @@
+schema: spec-driven
+
+language: |
+  use Chinese for communication
+  and explanation by default. Keep technical terms, identifiers, commands,
+  paths, filenames, environment variables, config keys, error messages,
+  logs, and URLs unchanged. If clarification is helpful, explain in
+  Chinese while preserving the original term.
+
+context: |
+  UI changes must follow the existing frontend standards, reuse shared UI,
+  and consume tokens from src/shared/styles/tokens.css. Skill directives in
+  the rules below are written into OpenSpec artifacts so the responsible agent
+  loads them while generating the design or applying UI tasks.
+
+rules:
+  design:
+    - 'When a change initializes or revises the product-wide visual system, explicitly load and use $ui-ux-pro-max and $design-system before writing design.md; record the selected visual direction, token architecture, and rejected alternatives.'
+    - 'For ordinary business UI changes, reuse the existing tokens and shared UI. Do not redesign the product-wide visual system unless the change scope explicitly requires it.'
+  tasks:
+    - 'Prefix every frontend task description with [ui] or [logic]. Classify pages, components, layout, responsive behavior, styling, and visual interaction as [ui]; classify API, data mapping, queries, state, routing, and non-visual tests as [logic].'
+    - 'Every [ui] task must explicitly include `Use $frontend-design` in its task description so the apply agent loads that Skill while implementing the task.'
+    - '[logic] tasks must not require $frontend-design. Keep UI and logic as separate checkbox items even when they share one top-level frontend section.'

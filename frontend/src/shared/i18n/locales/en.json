@@ -1,0 +1,70 @@
+{
+  "app": {
+    "title": "AI Agent Roadmap"
+  },
+  "agent": {
+    "eyebrow": "Coding Agent",
+    "title": "Run a task against your project",
+    "status": {
+      "idle": "Ready",
+      "starting": "Starting",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "interrupted": "Interrupted"
+    },
+    "composer": {
+      "eyebrow": "Task input",
+      "title": "Describe the work",
+      "label": "Task",
+      "placeholder": "Ask the agent to inspect, change, and verify a project...",
+      "run": "Run agent",
+      "running": "Running",
+      "newRun": "New run"
+    },
+    "run": {
+      "label": "Agent run",
+      "eyebrow": "Execution",
+      "id": "Run ID",
+      "notStarted": "No run started",
+      "live": "Live"
+    },
+    "errors": {
+      "start": "Unable to start the agent run.",
+      "event": "The agent sent an unreadable event.",
+      "stream": "The event stream disconnected before the run finished."
+    },
+    "timeline": {
+      "label": "Agent event timeline",
+      "eyebrow": "Event stream",
+      "title": "Run timeline",
+      "text": "Model response",
+      "toolCall": "Tool call",
+      "toolResult": "Tool result",
+      "done": "Run finished",
+      "emptyTitle": "No events yet",
+      "emptyDescription": "Start a run to watch the agent inspect the project and report each step."
+    }
+  },
+  "errors": {
+    "global": {
+      "eyebrow": "Application error",
+      "title": "The application hit an unexpected error.",
+      "description": "Your data is unchanged. Reload the page to retry, or return home to start again."
+    },
+    "route": {
+      "eyebrow": "Page error",
+      "title": "This page could not be displayed.",
+      "description": "The route failed while loading. Reload the page, or return home and try another path."
+    },
+    "notFound": {
+      "eyebrow": "404",
+      "title": "This page does not exist.",
+      "description": "The address may be outdated or incomplete. Return home to continue."
+    },
+    "actions": {
+      "reload": "Reload page",
+      "home": "Return home"
+    }
+  }
+}

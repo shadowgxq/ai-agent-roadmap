@@ -1,0 +1,55 @@
+# 角色路由表 —— manager-execute-current-batch 派发 subagent 时按此选择 agent_type。
+# 角色定义（人设 / 工具权限）见 .claude/agents/*.md；本文件只声明"哪类工作派给哪个角色"。
+# 没有命中路由的派发一律回退 default（通用 subagent），删除本文件即整体回退旧行为。
+#
+# 本项目为纯前端 Web 模板，无服务端，故不含 backend-dev 角色与后端分节路由。
+# 若使用方接入后端，可参考 docs/ai/openspec-manager-flow.md 的完整示例：
+#   补 .claude/agents/backend-dev.md，在 prd_review/review 加 backend-dev（review 用 when: has_backend_section），
+#   apply 恢复 split_by_tasks_section + ## 后端/## 前端 sections + order 后端先行 + shared_write_points 契约文件。
+
+routes:
+  # change 阶段：opsx:ff 一次性生成四件套（含 tasks.md 技术拆解），
+  # 而 product-manager 角色被禁止写 tasks.md 技术拆解，故保持通用 subagent 生成。
+  change:
+    agent_type: default
+
+  # PRD 需求评审会（manager-prd-review skill 使用）：change 生成 artifacts 之前的多角色评审。
+  # 所有参会角色均为评审模式：只输出意见，不修改任何文件。
+  prd_review:
+    agents:
+      - agent_type: product-manager # 需求完整性：验收标准可测、边界显式、不冲突不越界
+      - agent_type: ui-ux-reviewer # 交互合理性：PRD 用户路径一致、路径成立、状态齐全
+      - agent_type: frontend-dev # 前端可行性：技术风险、实现成本、依赖影响
+      - agent_type: qa # 可测性：验收标准可验证、场景可构造
+
+  # review 门禁（技术方案评审）：change 完成变 review: pending 后自动派评审（并行）。
+  # gate: auto —— AI 自愈评审闸（与 apply 后的 verify 门禁对称）：
+  #   全部无 BLOCKER → skill 代写 set-review approved（放行 apply）；
+  #   有 BLOCKER/CRITICAL → 按 backwrite-matrix 回派修订该 artifact → 复审（有限轮次，保持 pending）；
+  #   有人标「需产品决策」/ 意见硬冲突 / 轮次耗尽 → 升级给用户，保持 pending。
+  # 人工 intent 闸在 manager-prd-review（PRD 阶段）已兑现，此处不再要求逐条人工 set-review；
+  # 删掉 gate: auto 这一行即回退成「人工评审、意见仅供参考」的旧行为。
+  review:
+    auto: true
+    gate: auto
+    agents:
+      - agent_type: product-manager # PRD 覆盖 / 验收标准 / openspec config rules 遵守
+      - agent_type: ui-ux-reviewer # 交互合理性：PRD 用户路径一致、步数、状态与异常路径
+      - agent_type: frontend-dev # design/tasks 前端技术可行性（仅意见）
+      - agent_type: qa # 可测性：spec scenario 是否可验证
+
+  # apply 阶段：本项目单前端端，全部派 frontend-dev。
+  # tasks.md 若按分节组织，前端分节命中 frontend-dev；无分节则整体回退 frontend-dev。
+  apply:
+    split_by_tasks_section: true
+    sections:
+      - match: '前端|frontend'
+        agent_type: frontend-dev
+    fallback: frontend-dev
+
+  # apply 后的 verify 门禁：qa 必派（对抗式验收，无 Write/Edit 权限）；
+  # 前端实现的 change 并行派 ui-ux-reviewer 做 UI 走查。
+  verify:
+    agents:
+      - agent_type: qa
+      - agent_type: ui-ux-reviewer

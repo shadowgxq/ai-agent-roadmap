@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.git
+.codex
+.agents
+
+*.tsbuildinfo
+pnpm-lock.yaml
+
+openspec/changes
+**/*.incoming*

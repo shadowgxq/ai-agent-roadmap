@@ -1,0 +1,16 @@
+node_modules
+dist
+.DS_Store
+*.local
+*.log
+.env
+.env.*
+!.env.example
+
+# Ralph local transcripts
+scripts/ralph/logs/*
+!scripts/ralph/logs/.gitkeep
+!scripts/ralph/logs/failures/
+scripts/ralph/logs/failures/*
+!scripts/ralph/logs/failures/.gitkeep
+scripts/ralph/progress.txt

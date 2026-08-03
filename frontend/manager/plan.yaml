@@ -1,0 +1,229 @@
+updated_at: '2026-07-29'
+current:
+  title: 执行 交付轻记账的账单、预算和统计核心闭环
+  batch: batch-personal-bookkeeping-core
+  wave: wave-monthly-budget-management
+  next: 运行 manager-execute-current-batch 执行当前批次（change：monthly-budget-management）。
+requirements:
+  - id: req-ledger-monthly-browsing
+    title: 月度账单汇总与明细浏览
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 账单页默认展示设备本地当前月，可切换到有账单的历史月份、返回当前月，且不能选择未来月份。
+      - 所选月收入、支出和结余按交易日期归属的自然月完整账单计算，结余允许为负，金额以人民币显示两位小数。
+      - 账单按交易日期倒序分组，同日按创建时间倒序；记录展示分类、可选备注和金额，收入与支出有非纯颜色的明确差异，日期组展示当日收支小计。
+      - 点击账单可进入编辑状态，页面始终提供可发现的新增入口；切换月份、导航或加载状态时主要入口和页面结构保持稳定。
+  - id: req-ledger-filter-and-states
+    title: 账单筛选与页面状态恢复
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 用户可按全部、收入或支出筛选，并在已选类型下按对应固定分类筛选；切换类型会清除不匹配分类，且可见条件支持一键重置。
+      - 筛选只影响列表和日期小计，不影响所选月顶部完整汇总；无匹配结果时保留条件并提供重置入口。
+      - 设备无任何账单和所选历史月无账单时展示原因明确且可继续操作的不同空状态。
+      - 账单读取失败时展示错误概述和重试入口，不展示旧月份或未经确认的汇总。
+  - id: req-entry-create-and-edit
+    title: 账单新增与编辑闭环
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 新增默认支出和设备本地当前日期，分类不默认选择；用户填写有效金额、固定分类、非未来日期及可选备注后可保存一笔收入或支出。
+      - 编辑状态预填原记录，保存时覆盖原账单且不产生重复记录；切换收支类型会清空原分类并要求重新选择。
+      - 保存成功后返回账单所属月份并给出简短反馈，列表及该能力已提供的月度汇总立即使用最新数据。
+      - 跨月修改交易日期后记录迁移到新自然月，原月和新月的账单汇总均按最新数据更新。
+  - id: req-entry-validation-and-recovery
+    title: 账单表单校验与失败恢复
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 金额必填、大于 0、最多两位小数且不超过 9,999,999.99；分类必填且属于当前类型；日期必填且不晚于本地当前日期；备注去除首尾空格后不超过 50 字符。
+      - 校验失败时在字段附近说明原因、聚焦首个错误字段并保留其他输入；动态错误可被辅助技术感知。
+      - 保存期间展示可见进行中状态并阻止重复提交；保存失败时留在页面、保留全部输入、明确数据未生效并允许重试。
+      - 用户有未保存修改时返回需确认放弃，继续编辑保留草稿，只有确认放弃才离开。
+  - id: req-entry-delete-and-persistence
+    title: 账单删除与本地持久化一致性
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 删除入口仅在编辑状态出现，执行前明确提示不可恢复并二次确认；取消时账单和编辑内容均不改变。
+      - 删除期间显示进行中状态并阻止重复操作；成功后返回账单页、记录消失且该能力已提供的相关月份汇总更新，失败不得产生部分更新。
+      - 新增、编辑或删除成功后，同一账单的类型、金额、分类和日期保持一致；失败时既有数据保持不变。
+      - 刷新或重新打开产品后，已成功保存的账单仍在同一设备保留。
+  - id: req-budget-setting
+    title: 当前月预算设置与持久化
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 预算页只管理设备本地当前自然月；未设置时展示本月累计支出和设置入口，不显示虚构剩余额度。
+      - 用户可设置或修改大于 0、最多两位小数且不超过 9,999,999.99 的预算，修改预算不改变既有账单。
+      - 新自然月不自动沿用上月预算；当前月没有支出时已使用金额为 0，预算仍可设置和修改。
+      - 成功保存的预算刷新或重新打开后继续保留；保存期间阻止重复提交，失败时保留输入和原预算、明确未生效并允许重试。
+  - id: req-budget-progress
+    title: 预算进度与风险状态
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 已使用金额等于当前月全部支出账单之和且不含收入；剩余金额等于预算减已使用，超支时同时展示超出金额。
+      - 页面展示预算、已使用、剩余或超出金额及稳定可读的进度；比例低于 80% 为正常，达到 80% 且低于 100% 为接近预算，达到或超过 100% 为达到预算上限。
+      - 风险状态同时使用文字、图标或金额表达而非只依赖颜色；重要金额不被截断或与操作重叠。
+      - 新增、编辑或删除当前月支出后，下次查看预算即按最新账单重算金额、比例和状态。
+      - 预算读取失败时展示错误和重试，不展示未经确认或旧数据计算的进度。
+  - id: req-statistics-monthly-summary
+    title: 月度统计汇总与月份切换
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 统计页默认当前月，可切换到有账单的历史月份且不能选择未来月份；切换后汇总、图表和列表同步更新。
+      - 所选月收入、支出和结余按账单完整金额计算，与账单页同月份口径完全一致，结余允许为负且金额显示两位小数。
+      - 账单新增、编辑、删除或跨月移动后，下次查看受影响月份统计即呈现最新结果。
+  - id: req-statistics-category-breakdown
+    title: 支出分类统计与排行
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 仅统计所选月支出，按固定支出分类展示金额占比图表和明细列表，收入不参与分类占比。
+      - 分类列表按金额降序，金额之和等于该月支出总额；占比为分类金额除以月支出总额并显示一位小数。
+      - 图表与列表使用一致的分类颜色、标签和金额口径，并提供不依赖颜色或图形即可读取的分类金额与占比。
+  - id: req-statistics-states-and-recovery
+    title: 统计空状态与错误恢复
+    source: docs/prd/features/01-personal-bookkeeping.md
+    priority: high
+    acceptance:
+      - 所选月无任何账单时展示无统计数据状态且不渲染空图表；只有收入时保留正确汇总并在分类区说明暂无支出。
+      - 统计读取失败时展示错误说明和重试入口，不以其他月份或旧数据替代当前结果，重试重新读取当前所选月。
+      - 空状态和错误状态解释原因并提供切换月份、去记账或重试等适用的下一步，加载时保持页面结构和主要入口稳定。
+openspec:
+  - id: personal-ledger-records
+    title: 个人账单记录与月度浏览
+    phase: apply
+    state: in-progress
+    review: approved
+    requirements:
+      - req-ledger-monthly-browsing
+      - req-ledger-filter-and-states
+      - req-entry-create-and-edit
+      - req-entry-validation-and-recovery
+      - req-entry-delete-and-persistence
+    inputs:
+      - id: personal-bookkeeping-ux-ui-baseline
+        kind: ux-ui-baseline
+        source: docs/prd/features/01-personal-bookkeeping-ux-ui.md
+        required: true
+        scope:
+          - 'heading:Page Inventory'
+          - 'heading:信息架构与全局 UI'
+          - 'heading:UI/Visual Foundation'
+          - 'heading:账单页 `page-ledger`'
+          - 'heading:记一笔页 `page-entry`'
+          - 'heading:State Matrix'
+          - 'heading:Form、反馈与可访问性规则'
+          - 'heading:SCN-LEDGER-FIRST-001'
+          - 'heading:SCN-LEDGER-EDIT-FILTER-001'
+          - 'heading:OpenSpec Handoff'
+      - id: personal-bookkeeping-interactive-prototype
+        kind: interactive-prototype
+        source: docs/prd/features/01-personal-bookkeeping-ux-ui.html
+        required: true
+      - id: personal-bookkeeping-design-tokens
+        kind: design-tokens
+        source: src/shared/styles/tokens.css
+        required: true
+    path: openspec/changes/personal-ledger-records
+    artifacts:
+      - proposal.md
+      - design.md
+      - specs/**
+      - tasks.md
+    tasks: openspec/changes/personal-ledger-records/tasks.md
+    depends_on: []
+  - id: monthly-budget-management
+    title: 月度预算管理与支出联动
+    phase: change
+    state: planned
+    requirements:
+      - req-budget-setting
+      - req-budget-progress
+    inputs:
+      - id: personal-bookkeeping-ux-ui-baseline
+        kind: ux-ui-baseline
+        source: docs/prd/features/01-personal-bookkeeping-ux-ui.md
+        required: true
+        scope:
+          - 'heading:UI/Visual Foundation'
+          - 'heading:预算页 `page-budget`'
+          - 'heading:State Matrix'
+          - 'heading:Form、反馈与可访问性规则'
+          - 'heading:SCN-BUDGET-SET-UPDATE-001'
+          - 'heading:OpenSpec Handoff'
+      - id: personal-bookkeeping-interactive-prototype
+        kind: interactive-prototype
+        source: docs/prd/features/01-personal-bookkeeping-ux-ui.html
+        required: true
+      - id: personal-bookkeeping-design-tokens
+        kind: design-tokens
+        source: src/shared/styles/tokens.css
+        required: true
+    path: openspec/changes/monthly-budget-management
+    artifacts:
+      - proposal.md
+      - design.md
+      - specs/**
+      - tasks.md
+    tasks: openspec/changes/monthly-budget-management/tasks.md
+    depends_on:
+      - personal-ledger-records
+  - id: monthly-spending-statistics
+    title: 月度收支与分类统计
+    phase: change
+    state: planned
+    requirements:
+      - req-statistics-monthly-summary
+      - req-statistics-category-breakdown
+      - req-statistics-states-and-recovery
+    inputs:
+      - id: personal-bookkeeping-ux-ui-baseline
+        kind: ux-ui-baseline
+        source: docs/prd/features/01-personal-bookkeeping-ux-ui.md
+        required: true
+        scope:
+          - 'heading:UI/Visual Foundation'
+          - 'heading:统计图表选择'
+          - 'heading:统计页 `page-statistics`'
+          - 'heading:State Matrix'
+          - 'heading:Form、反馈与可访问性规则'
+          - 'heading:SCN-STATISTICS-REVIEW-001'
+          - 'heading:OpenSpec Handoff'
+      - id: personal-bookkeeping-interactive-prototype
+        kind: interactive-prototype
+        source: docs/prd/features/01-personal-bookkeeping-ux-ui.html
+        required: true
+      - id: personal-bookkeeping-design-tokens
+        kind: design-tokens
+        source: src/shared/styles/tokens.css
+        required: true
+    path: openspec/changes/monthly-spending-statistics
+    artifacts:
+      - proposal.md
+      - design.md
+      - specs/**
+      - tasks.md
+    tasks: openspec/changes/monthly-spending-statistics/tasks.md
+    depends_on:
+      - personal-ledger-records
+batches:
+  - id: batch-personal-bookkeeping-core
+    goal: 交付轻记账的账单、预算和统计核心闭环
+    waves:
+      - id: wave-personal-ledger-records
+        parallel: false
+        openspec:
+          - personal-ledger-records
+      - id: wave-monthly-budget-management
+        parallel: false
+        openspec:
+          - monthly-budget-management
+      - id: wave-monthly-spending-statistics
+        parallel: false
+        openspec:
+          - monthly-spending-statistics

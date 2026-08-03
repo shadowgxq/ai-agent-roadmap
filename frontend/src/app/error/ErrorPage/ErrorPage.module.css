@@ -1,0 +1,100 @@
+.root {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.content {
+  width: min(100%, 640px);
+  padding: var(--space-7) 0;
+  border-top: 4px solid var(--color-danger);
+}
+
+.eyebrow {
+  margin: var(--space-4) 0 0;
+  color: var(--color-danger);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.title {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--leading-tight);
+}
+
+.description {
+  max-width: 56ch;
+  margin: var(--space-4) 0 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-md);
+  line-height: var(--leading-relaxed);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.primaryAction,
+.secondaryAction {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primaryAction {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+
+.secondaryAction {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.primaryAction:hover {
+  background: var(--color-primary-strong);
+}
+
+.secondaryAction:hover {
+  border-color: var(--color-primary);
+}
+
+.primaryAction:focus-visible,
+.secondaryAction:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .root {
+    place-items: start;
+    padding: var(--space-5);
+  }
+
+  .content {
+    padding-top: var(--space-6);
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

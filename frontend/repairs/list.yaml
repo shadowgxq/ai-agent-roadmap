@@ -1,0 +1,19 @@
+version: 1
+updated_at: 'YYYY-MM-DD'
+
+current_run: null
+
+selected:
+  files: []
+
+processing: []
+
+fixed_waiting_user_verification: []
+
+verified_waiting_archive: []
+
+blocked: []
+
+archived: []
+
+history: []

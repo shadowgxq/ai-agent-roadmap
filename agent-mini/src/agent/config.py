@@ -73,6 +73,22 @@ class AgentSettings(BaseSettings):
     compact_keep_recent: int = Field(default=4, ge=1)
     compact_model: str | None = None
     compact_max_tokens: int = Field(default=1000, ge=1)
+    compact_input_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    compact_output_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    compact_cache_read_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    compact_cache_creation_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+    )
 
     @field_validator("base_url")
     @classmethod

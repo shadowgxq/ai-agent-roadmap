@@ -68,14 +68,54 @@ class AgentTrace:
 
 @dataclass
 class RunStats:
-    """记录模型调用统计，input_tokens 不包含缓存读写的输入。"""
+    """分别记录 Agent 决策调用、compact 调用与递归 SubAgent 用量。"""
 
     turns: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
+    compact_calls: int = 0
+    compact_input_tokens: int = 0
+    compact_output_tokens: int = 0
+    compact_cache_read_input_tokens: int = 0
+    compact_cache_creation_input_tokens: int = 0
     subagent_runs: list["RunStats"] = field(default_factory=list)
+
+    @property
+    def model_tokens(self) -> int:
+        """当前 Agent 决策模型调用的 token 总量。"""
+        return (
+            self.input_tokens
+            + self.output_tokens
+            + self.cache_read_input_tokens
+            + self.cache_creation_input_tokens
+        )
+
+    @property
+    def compact_tokens(self) -> int:
+        """当前 Agent 发起的 compact 模型调用 token 总量。"""
+        return (
+            self.compact_input_tokens
+            + self.compact_output_tokens
+            + self.compact_cache_read_input_tokens
+            + self.compact_cache_creation_input_tokens
+        )
+
+    @property
+    def total_tokens(self) -> int:
+        """当前 Agent 的决策调用与 compact 调用 token 总量。"""
+        return self.model_tokens + self.compact_tokens
+
+    def add_compact_usage(self, usage: "UsageTokens") -> None:
+        """累计一次已返回响应的 compact 模型调用。"""
+        self.compact_calls += 1
+        self.compact_input_tokens += usage.input_tokens
+        self.compact_output_tokens += usage.output_tokens
+        self.compact_cache_read_input_tokens += usage.cache_read_input_tokens
+        self.compact_cache_creation_input_tokens += (
+            usage.cache_creation_input_tokens
+        )
 
     def aggregate(self) -> "RunStats":
         """返回当前 Agent 及所有子 Agent 的汇总统计。"""
@@ -85,6 +125,15 @@ class RunStats:
             output_tokens=self.output_tokens,
             cache_read_input_tokens=self.cache_read_input_tokens,
             cache_creation_input_tokens=self.cache_creation_input_tokens,
+            compact_calls=self.compact_calls,
+            compact_input_tokens=self.compact_input_tokens,
+            compact_output_tokens=self.compact_output_tokens,
+            compact_cache_read_input_tokens=(
+                self.compact_cache_read_input_tokens
+            ),
+            compact_cache_creation_input_tokens=(
+                self.compact_cache_creation_input_tokens
+            ),
         )
         for child in self.subagent_runs:
             child_total = child.aggregate()
@@ -96,6 +145,15 @@ class RunStats:
             )
             total.cache_creation_input_tokens += (
                 child_total.cache_creation_input_tokens
+            )
+            total.compact_calls += child_total.compact_calls
+            total.compact_input_tokens += child_total.compact_input_tokens
+            total.compact_output_tokens += child_total.compact_output_tokens
+            total.compact_cache_read_input_tokens += (
+                child_total.compact_cache_read_input_tokens
+            )
+            total.compact_cache_creation_input_tokens += (
+                child_total.compact_cache_creation_input_tokens
             )
         return total
 
@@ -328,6 +386,21 @@ async def run(
     if stats is None:
         stats = RunStats()
     tracker = ToolCallTracker()
+
+    def enforce_cost_limit() -> None:
+        """在任意模型调用记账后检查本次运行预算。"""
+        if max_cost_usd is None or cost_estimator is None:
+            return
+        current_cost = cost_estimator(stats)
+        if current_cost is None:
+            raise ValueError("缺少完整的模型价格配置，无法执行费用熔断")
+        if current_cost > max_cost_usd:
+            raise CostLimitExceeded(
+                max_cost_usd=max_cost_usd,
+                actual_cost_usd=current_cost,
+                stats=stats,
+            )
+
     logger.info(
         "Agent 开始: %s",
         trace.agent_id,
@@ -365,6 +438,36 @@ async def run(
             >= compact_threshold * context_window_tokens
         ):
             compact_error: Exception | None = None
+            compact_calls_before = stats.compact_calls
+
+            def record_compact_usage(raw_usage: Any) -> None:
+                usage = extract_usage_tokens(raw_usage)
+                stats.add_compact_usage(usage)
+                logger.info(
+                    "compact 模型用量",
+                    extra={
+                        "event": "agent.context_compact_model_usage",
+                        "trace": trace.event_context(turn),
+                        "data": {
+                            "model": compact_model or model,
+                            "input_tokens": usage.input_tokens,
+                            "cache_read_input_tokens": (
+                                usage.cache_read_input_tokens
+                            ),
+                            "cache_creation_input_tokens": (
+                                usage.cache_creation_input_tokens
+                            ),
+                            "output_tokens": usage.output_tokens,
+                            "total_tokens": (
+                                usage.input_tokens
+                                + usage.cache_read_input_tokens
+                                + usage.cache_creation_input_tokens
+                                + usage.output_tokens
+                            ),
+                        },
+                    },
+                )
+
             try:
                 compacted_messages = await compact(
                     client,
@@ -372,6 +475,7 @@ async def run(
                     model=compact_model or model,
                     keep_recent=compact_keep_recent,
                     max_tokens=compact_max_tokens,
+                    usage_callback=record_compact_usage,
                 )
                 validated_messages = Context(compacted_messages).messages
                 compact_strategy = "summary"
@@ -411,6 +515,9 @@ async def run(
                             },
                         },
                     )
+
+            if stats.compact_calls > compact_calls_before:
+                enforce_cost_limit()
 
             if validated_messages != context.messages:
                 compact_before_tokens = last_context_tokens
@@ -537,16 +644,7 @@ async def run(
         )
         stats.output_tokens += token_usage.output_tokens
 
-        if max_cost_usd is not None and cost_estimator is not None:
-            current_cost = cost_estimator(stats)
-            if current_cost is None:
-                raise ValueError("缺少完整的模型价格配置，无法执行费用熔断")
-            if current_cost > max_cost_usd:
-                raise CostLimitExceeded(
-                    max_cost_usd=max_cost_usd,
-                    actual_cost_usd=current_cost,
-                    stats=stats,
-                )
+        enforce_cost_limit()
 
         context.append_assistant(assistant_message(message))
 

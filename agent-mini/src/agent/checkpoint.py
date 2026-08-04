@@ -22,6 +22,11 @@ class RunStatsSnapshot(BaseModel):
     output_tokens: int = Field(default=0, ge=0)
     cache_read_input_tokens: int = Field(default=0, ge=0)
     cache_creation_input_tokens: int = Field(default=0, ge=0)
+    compact_calls: int = Field(default=0, ge=0)
+    compact_input_tokens: int = Field(default=0, ge=0)
+    compact_output_tokens: int = Field(default=0, ge=0)
+    compact_cache_read_input_tokens: int = Field(default=0, ge=0)
+    compact_cache_creation_input_tokens: int = Field(default=0, ge=0)
     subagent_runs: list["RunStatsSnapshot"] = Field(default_factory=list)
 
     @classmethod
@@ -33,6 +38,15 @@ class RunStatsSnapshot(BaseModel):
             output_tokens=stats.output_tokens,
             cache_read_input_tokens=stats.cache_read_input_tokens,
             cache_creation_input_tokens=stats.cache_creation_input_tokens,
+            compact_calls=stats.compact_calls,
+            compact_input_tokens=stats.compact_input_tokens,
+            compact_output_tokens=stats.compact_output_tokens,
+            compact_cache_read_input_tokens=(
+                stats.compact_cache_read_input_tokens
+            ),
+            compact_cache_creation_input_tokens=(
+                stats.compact_cache_creation_input_tokens
+            ),
             subagent_runs=[cls.from_stats(child)
                            for child in stats.subagent_runs],
         )
@@ -45,6 +59,15 @@ class RunStatsSnapshot(BaseModel):
             output_tokens=self.output_tokens,
             cache_read_input_tokens=self.cache_read_input_tokens,
             cache_creation_input_tokens=self.cache_creation_input_tokens,
+            compact_calls=self.compact_calls,
+            compact_input_tokens=self.compact_input_tokens,
+            compact_output_tokens=self.compact_output_tokens,
+            compact_cache_read_input_tokens=(
+                self.compact_cache_read_input_tokens
+            ),
+            compact_cache_creation_input_tokens=(
+                self.compact_cache_creation_input_tokens
+            ),
             subagent_runs=[child.to_stats() for child in self.subagent_runs],
         )
 

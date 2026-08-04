@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections.abc import Callable
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -105,6 +106,7 @@ async def compact(
     max_tokens: int = 1000,
     max_attempts: int = 2,
     retry_delay_s: float = 1.0,
+    usage_callback: Callable[[Any], None] | None = None,
 ) -> list[dict[str, Any]]:
     """重试总结旧历史，并原样保留任务锚点与最近完整轮次。"""
     if max_attempts < 1:
@@ -148,6 +150,8 @@ async def compact(
                     },
                 ],
             )
+            if usage_callback is not None:
+                usage_callback(response.usage)
 
             summary = (response.choices[0].message.content or "").strip()
             if not summary:

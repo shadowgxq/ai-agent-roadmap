@@ -125,18 +125,8 @@ def log_stats(
 ) -> None:
     """记录一次 Agent 运行累计的模型用量。"""
     total_stats = stats.aggregate()
-    main_tokens = (
-        stats.input_tokens
-        + stats.cache_read_input_tokens
-        + stats.cache_creation_input_tokens
-        + stats.output_tokens
-    )
-    total_tokens = (
-        total_stats.input_tokens
-        + total_stats.cache_read_input_tokens
-        + total_stats.cache_creation_input_tokens
-        + total_stats.output_tokens
-    )
+    main_tokens = stats.total_tokens
+    total_tokens = total_stats.total_tokens
     subagent_turns = total_stats.turns - stats.turns
     subagent_input_tokens = total_stats.input_tokens - stats.input_tokens
     subagent_cache_read_tokens = (
@@ -148,16 +138,23 @@ def log_stats(
         - stats.cache_creation_input_tokens
     )
     subagent_output_tokens = total_stats.output_tokens - stats.output_tokens
+    subagent_compact_calls = total_stats.compact_calls - stats.compact_calls
+    subagent_compact_tokens = (
+        total_stats.compact_tokens - stats.compact_tokens
+    )
     subagent_tokens = total_tokens - main_tokens
     logger.info(
         (
             "运行统计: main_turns=%s, subagent_runs=%s, "
-            "subagent_turns=%s, main_tokens=%s, "
+            "subagent_turns=%s, compact_calls=%s, compact_tokens=%s, "
+            "main_tokens=%s, "
             "subagent_tokens=%s, total_tokens=%s"
         ),
         stats.turns,
         len(stats.subagent_runs),
         subagent_turns,
+        stats.compact_calls,
+        stats.compact_tokens,
         main_tokens,
         subagent_tokens,
         total_tokens,
@@ -175,6 +172,16 @@ def log_stats(
                         stats.cache_creation_input_tokens
                     ),
                     "output_tokens": stats.output_tokens,
+                    "compact_calls": stats.compact_calls,
+                    "compact_input_tokens": stats.compact_input_tokens,
+                    "compact_cache_read_input_tokens": (
+                        stats.compact_cache_read_input_tokens
+                    ),
+                    "compact_cache_creation_input_tokens": (
+                        stats.compact_cache_creation_input_tokens
+                    ),
+                    "compact_output_tokens": stats.compact_output_tokens,
+                    "compact_tokens": stats.compact_tokens,
                     "total_tokens": main_tokens,
                 },
                 "subagents": {
@@ -186,6 +193,8 @@ def log_stats(
                         subagent_cache_creation_tokens
                     ),
                     "output_tokens": subagent_output_tokens,
+                    "compact_calls": subagent_compact_calls,
+                    "compact_tokens": subagent_compact_tokens,
                     "total_tokens": subagent_tokens,
                 },
                 "total": {
@@ -198,6 +207,20 @@ def log_stats(
                         total_stats.cache_creation_input_tokens
                     ),
                     "output_tokens": total_stats.output_tokens,
+                    "compact_calls": total_stats.compact_calls,
+                    "compact_input_tokens": (
+                        total_stats.compact_input_tokens
+                    ),
+                    "compact_cache_read_input_tokens": (
+                        total_stats.compact_cache_read_input_tokens
+                    ),
+                    "compact_cache_creation_input_tokens": (
+                        total_stats.compact_cache_creation_input_tokens
+                    ),
+                    "compact_output_tokens": (
+                        total_stats.compact_output_tokens
+                    ),
+                    "compact_tokens": total_stats.compact_tokens,
                     "total_tokens": total_tokens,
                 },
             },

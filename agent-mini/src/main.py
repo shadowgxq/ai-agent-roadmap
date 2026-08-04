@@ -103,12 +103,16 @@ async def main() -> None:
                     stats.cache_creation_input_tokens
                 ),
                 "output_tokens": stats.output_tokens,
-                "total_tokens": (
-                    stats.input_tokens
-                    + stats.cache_read_input_tokens
-                    + stats.cache_creation_input_tokens
-                    + stats.output_tokens
+                "compact_calls": stats.compact_calls,
+                "compact_input_tokens": stats.compact_input_tokens,
+                "compact_cache_read_input_tokens": (
+                    stats.compact_cache_read_input_tokens
                 ),
+                "compact_cache_creation_input_tokens": (
+                    stats.compact_cache_creation_input_tokens
+                ),
+                "compact_output_tokens": stats.compact_output_tokens,
+                "total_tokens": stats.total_tokens,
                 "finish_reason": final_response.choices[0].finish_reason,
                 "answer": answer,
             },

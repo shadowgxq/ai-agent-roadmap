@@ -89,11 +89,27 @@ class AgentSettings(BaseSettings):
         default=None,
         ge=0,
     )
+    embedding_api_key: str | None = None
+    embedding_base_url: str | None = None
+    embedding_model: str = Field(
+        default="text-embedding-3-small",
+        min_length=1,
+    )
+    embedding_batch_size: int = Field(default=64, ge=1)
 
     @field_validator("base_url")
     @classmethod
     def ensure_openai_v1(cls, value: str) -> str:
         """把网关根地址规范成 OpenAI SDK 需要的 `/v1` 地址。"""
+        value = value.rstrip("/")
+        return value if value.endswith("/v1") else f"{value}/v1"
+
+    @field_validator("embedding_base_url")
+    @classmethod
+    def ensure_embedding_v1(cls, value: str | None) -> str | None:
+        """规范可选的独立 embedding 服务地址。"""
+        if value is None:
+            return None
         value = value.rstrip("/")
         return value if value.endswith("/v1") else f"{value}/v1"
 

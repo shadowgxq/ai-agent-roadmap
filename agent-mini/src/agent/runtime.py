@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import AsyncExitStack
 from pathlib import Path
+from typing import Literal
 from uuid import uuid4
 
 from openai import AsyncOpenAI
@@ -12,6 +13,8 @@ from ..rag import OpenAIEmbedder
 from ..tools import (
     ToolRegistry,
     register_fs_tools,
+    register_grep_tool,
+    register_read_file_tool,
     register_rag_tool,
     register_search_tools,
     register_shell_tools,
@@ -32,6 +35,9 @@ from .loop import AgentTrace, EventCallback, RunStats, run
 from .prompts import build_system_prompt, build_task_message
 
 
+ToolMode = Literal["all", "rag", "search"]
+
+
 async def run_coding_agent(
     task: str,
     workdir: Path,
@@ -44,6 +50,7 @@ async def run_coding_agent(
     max_cost_usd: float | None = None,
     run_id: str | None = None,
     enable_subagent: bool = True,
+    tool_mode: ToolMode = "all",
     context: Context | None = None,
     stats: RunStats | None = None,
     start_turn: int = 0,
@@ -56,6 +63,8 @@ async def run_coding_agent(
     workdir = workdir.resolve()
     if not workdir.is_dir():
         raise NotADirectoryError(f"工作目录不存在或不是目录: {workdir}")
+    if tool_mode not in {"all", "rag", "search"}:
+        raise ValueError(f"不支持的 tool_mode: {tool_mode}")
     selected_model = model if model is not None else settings.model
     selected_max_turns = (
         max_turns if max_turns is not None else settings.max_turns
@@ -83,13 +92,17 @@ async def run_coding_agent(
     main_stats = stats if stats is not None else RunStats()
 
     registry = ToolRegistry()
-    register_fs_tools(registry, workdir)
-    register_search_tools(registry, workdir)
-    register_shell_tools(
-        registry,
-        workdir,
-        max_output_chars=settings.max_tool_output_chars,
-    )
+    if tool_mode == "all":
+        register_fs_tools(registry, workdir)
+        register_search_tools(registry, workdir)
+        register_shell_tools(
+            registry,
+            workdir,
+            max_output_chars=settings.max_tool_output_chars,
+        )
+    elif tool_mode == "search":
+        register_read_file_tool(registry, workdir)
+        register_grep_tool(registry, workdir)
 
     if context is None:
         context = Context()
@@ -145,35 +158,36 @@ async def run_coding_agent(
             max_retries=0,
         ) as client:
             async with AsyncExitStack() as embedding_stack:
-                embedding_client = await (
-                    embedding_stack.enter_async_context(
-                        AsyncOpenAI(
-                            api_key=(
-                                settings.embedding_api_key
-                                or settings.api_key
-                            ),
-                            base_url=(
-                                settings.embedding_base_url
-                                or settings.base_url
-                            ),
-                            max_retries=0,
+                if tool_mode in {"all", "rag"}:
+                    embedding_client = await (
+                        embedding_stack.enter_async_context(
+                            AsyncOpenAI(
+                                api_key=(
+                                    settings.embedding_api_key
+                                    or settings.api_key
+                                ),
+                                base_url=(
+                                    settings.embedding_base_url
+                                    or settings.base_url
+                                ),
+                                max_retries=0,
+                            )
                         )
                     )
-                )
 
-                def create_embedder(model: str) -> OpenAIEmbedder:
-                    return OpenAIEmbedder(
-                        embedding_client,
-                        model=model,
-                        batch_size=settings.embedding_batch_size,
+                    def create_embedder(model: str) -> OpenAIEmbedder:
+                        return OpenAIEmbedder(
+                            embedding_client,
+                            model=model,
+                            batch_size=settings.embedding_batch_size,
+                        )
+
+                    register_rag_tool(
+                        registry,
+                        workdir,
+                        embedder_factory=create_embedder,
                     )
-
-                register_rag_tool(
-                    registry,
-                    workdir,
-                    embedder_factory=create_embedder,
-                )
-                if enable_subagent:
+                if enable_subagent and tool_mode == "all":
                     register_subagent_tool(
                         registry,
                         client=client,

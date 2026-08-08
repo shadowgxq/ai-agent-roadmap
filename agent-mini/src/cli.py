@@ -62,6 +62,13 @@ def parse_args() -> argparse.Namespace:
         help="覆盖 Agent 最大循环轮数。",
     )
     parser.add_argument(
+        "--checkpoint",
+        "--enable-checkpoint",
+        action="store_true",
+        dest="checkpoint_enabled",
+        help="启用 checkpoint，并在任务开始前创建 Git 起点快照；默认关闭。",
+    )
+    parser.add_argument(
         "--no-subagent",
         action="store_false",
         dest="enable_subagent",
@@ -96,16 +103,18 @@ def parse_args() -> argparse.Namespace:
         or args.max_turns is not None
         or args.workdir != Path.cwd()
         or not args.enable_subagent
+        or args.checkpoint_enabled
     ):
         parser.error(
             "--resume 会恢复原始模型、目录、轮数和 SubAgent 配置，"
-            "不能同时覆盖这些参数"
+            "并自动启用 checkpoint，不能同时覆盖这些参数"
         )
     if args.rollback and (
         args.model is not None
         or args.max_turns is not None
         or args.workdir != Path.cwd()
         or not args.enable_subagent
+        or args.checkpoint_enabled
     ):
         parser.error("--rollback 只需要 RUN_ID，不能覆盖运行参数")
     if args.max_turns is not None and args.max_turns < 1:
@@ -308,6 +317,7 @@ async def main() -> None:
         start_turn = 0
         start_sha = None
 
+    checkpoint_enabled = args.checkpoint_enabled or bool(args.resume)
     trace = {"run_id": run_id, "agent_id": "main", "role": "main"}
     log_file = configure_logging(args.log_file or settings.log_file)
     logger.info(
@@ -323,6 +333,7 @@ async def main() -> None:
                 "model": model,
                 "max_turns": max_turns,
                 "enable_subagent": enable_subagent,
+                "checkpoint_enabled": checkpoint_enabled,
                 "start_turn": start_turn,
             },
         },
@@ -344,7 +355,7 @@ async def main() -> None:
             stats=stats,
             start_turn=start_turn,
             start_sha=start_sha,
-            checkpoint_enabled=True,
+            checkpoint_enabled=checkpoint_enabled,
         )
     except MaxTurnsExceeded as exc:
         logger.error(

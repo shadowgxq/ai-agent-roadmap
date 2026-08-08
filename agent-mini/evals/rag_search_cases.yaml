@@ -1,0 +1,59 @@
+- id: rag_tool_registration
+  question: "RAG 搜索工具如何注册到主 Agent，工具调用链经过哪些文件？"
+  expected_groups:
+    - ["runtime.py", "register_rag_tool"]
+    - ["tools/rag.py", "rag_search"]
+
+- id: semantic_retrieval
+  question: "查询向量如何和代码索引计算余弦相似度，并返回 top-k 结果？"
+  expected_groups:
+    - ["retriever.py", "retrieve"]
+    - ["cosine_similarity"]
+
+- id: ast_chunking
+  question: "Python 文件如何按函数、异步函数和类进行代码切块？"
+  expected_groups:
+    - ["indexer.py", "chunk_python_file"]
+    - ["ast"]
+
+- id: embedding_batch_order
+  question: "Embedding API 如何批量请求代码块，并保证响应顺序和输入顺序一致？"
+  expected_groups:
+    - ["embeddings.py", "OpenAIEmbedder"]
+    - ["batch_size"]
+
+- id: tool_registry
+  question: "工具 schema 如何生成，模型返回工具调用后又是在哪里校验和执行的？"
+  expected_groups:
+    - ["registry.py", "schemas"]
+    - ["execute_with_status"]
+
+- id: checkpoint_snapshot
+  question: "Agent 任务开始前如何创建 Git 起点快照，之后又如何支持回滚？"
+  expected_groups:
+    - ["git_snapshot.py", "ensure_start_snapshot"]
+    - ["rollback_to_sha"]
+
+- id: context_compaction
+  question: "上下文超过阈值后，Agent 如何压缩历史消息，并避免破坏工具调用消息配对？"
+  expected_groups:
+    - ["loop.py", "compact"]
+    - ["hard_truncate"]
+
+- id: rag_output_limit
+  question: "RAG 返回结果如何限制单块代码和总结果长度，避免占满上下文？"
+  expected_groups:
+    - ["tools/rag.py", "MAX_TOTAL_CHARS"]
+    - ["MAX_CHARS_PER_CHUNK"]
+
+- id: cli_checkpoint_switch
+  question: "命令行如何默认关闭 Git checkpoint，又如何通过参数显式开启？"
+  expected_groups:
+    - ["cli.py", "checkpoint_enabled"]
+    - ["--checkpoint"]
+
+- id: subagent_registration
+  question: "探索型 SubAgent 是如何注册的，主 Agent 传递了哪些运行上下文？"
+  expected_groups:
+    - ["spawn_subagent.py", "register_subagent_tool"]
+    - ["parent_trace"]

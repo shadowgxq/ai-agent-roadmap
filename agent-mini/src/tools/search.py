@@ -35,6 +35,14 @@ def register_search_tools(
     workdir: Path,
 ) -> None:
     """注册绑定到指定工作目录的搜索工具。"""
+    register_grep_tool(registry, workdir)
+
+
+def register_grep_tool(
+    registry: ToolRegistry,
+    workdir: Path,
+) -> None:
+    """只注册 grep 工具。"""
     root = workdir.resolve()
 
     @registry.tool

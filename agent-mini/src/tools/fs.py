@@ -21,6 +21,15 @@ def register_readonly_fs_tools(
     workdir: Path,
 ) -> None:
     """注册绑定到指定工作目录的只读文件工具。"""
+    register_read_file_tool(registry, workdir)
+    register_list_dir_tool(registry, workdir)
+
+
+def register_read_file_tool(
+    registry: ToolRegistry,
+    workdir: Path,
+) -> None:
+    """只注册读取文件工具。"""
 
     @registry.tool
     def read_file(
@@ -49,6 +58,13 @@ def register_readonly_fs_tools(
         lines = target.read_text(encoding="utf-8").splitlines()
         start = offset - 1
         return "\n".join(lines[start:start + limit])
+
+
+def register_list_dir_tool(
+    registry: ToolRegistry,
+    workdir: Path,
+) -> None:
+    """只注册列目录工具。"""
 
     @registry.tool
     def list_dir(path: str = ".") -> str:

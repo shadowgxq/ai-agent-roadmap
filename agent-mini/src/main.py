@@ -1,6 +1,7 @@
 """使用 run_shell 演示异步命令执行流程。"""
 
 import asyncio
+from contextlib import AsyncExitStack
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -12,8 +13,10 @@ if __package__:
     from .agent.loop import run
     from .agent.prompts import build_system_prompt, build_task_message
     from .agent.logging_config import configure_logging, get_logger
+    from .rag import OpenAIEmbedder
     from .tools import (
         register_fs_tools,
+        register_rag_tool,
         register_search_tools,
         register_shell_tools,
         registry,
@@ -24,8 +27,10 @@ else:
     from agent.loop import run
     from agent.prompts import build_system_prompt, build_task_message
     from agent.logging_config import configure_logging, get_logger
+    from rag import OpenAIEmbedder
     from tools import (
         register_fs_tools,
+        register_rag_tool,
         register_search_tools,
         register_shell_tools,
         registry,
@@ -72,22 +77,51 @@ async def main() -> None:
         base_url=settings.base_url,
         max_retries=0,
     ) as client:
-        final_response, stats = await run(
-            client,
-            context,
-            registry,
-            model=settings.model,
-            system_prompt=system_prompt,
-            max_turns=settings.max_turns,
-            max_tokens=3000,
-            context_window_tokens=settings.context_window_tokens,
-            prompt_cache=settings.prompt_cache_config,
-            compact_enabled=settings.compact_enabled,
-            compact_threshold=settings.compact_threshold,
-            compact_keep_recent=settings.compact_keep_recent,
-            compact_model=settings.compact_model,
-            compact_max_tokens=settings.compact_max_tokens,
-        )
+        async with AsyncExitStack() as embedding_stack:
+            embedding_client = await (
+                embedding_stack.enter_async_context(
+                    AsyncOpenAI(
+                        api_key=(
+                            settings.embedding_api_key
+                            or settings.api_key
+                        ),
+                        base_url=(
+                            settings.embedding_base_url
+                            or settings.base_url
+                        ),
+                        max_retries=0,
+                    )
+                )
+            )
+
+            def create_embedder(model: str) -> OpenAIEmbedder:
+                return OpenAIEmbedder(
+                    embedding_client,
+                    model=model,
+                    batch_size=settings.embedding_batch_size,
+                )
+
+            register_rag_tool(
+                registry,
+                PROJECT_ROOT,
+                embedder_factory=create_embedder,
+            )
+            final_response, stats = await run(
+                client,
+                context,
+                registry,
+                model=settings.model,
+                system_prompt=system_prompt,
+                max_turns=settings.max_turns,
+                max_tokens=3000,
+                context_window_tokens=settings.context_window_tokens,
+                prompt_cache=settings.prompt_cache_config,
+                compact_enabled=settings.compact_enabled,
+                compact_threshold=settings.compact_threshold,
+                compact_keep_recent=settings.compact_keep_recent,
+                compact_model=settings.compact_model,
+                compact_max_tokens=settings.compact_max_tokens,
+            )
 
     answer = extract_text(final_response)
     logger.info(

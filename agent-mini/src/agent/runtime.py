@@ -1,15 +1,18 @@
 """组装并运行一次 Coding Agent。"""
 
 import asyncio
+from contextlib import AsyncExitStack
 from pathlib import Path
 from uuid import uuid4
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
+from ..rag import OpenAIEmbedder
 from ..tools import (
     ToolRegistry,
     register_fs_tools,
+    register_rag_tool,
     register_search_tools,
     register_shell_tools,
     register_subagent_tool,
@@ -141,42 +144,72 @@ async def run_coding_agent(
             base_url=settings.base_url,
             max_retries=0,
         ) as client:
-            if enable_subagent:
-                register_subagent_tool(
-                    registry,
-                    client=client,
-                    workdir=workdir,
-                    model=selected_model,
-                    parent_trace=trace,
-                    parent_stats=main_stats,
-                    prompt_cache=settings.prompt_cache_config,
-                    context_window_tokens=selected_context_window_tokens,
+            async with AsyncExitStack() as embedding_stack:
+                embedding_client = await (
+                    embedding_stack.enter_async_context(
+                        AsyncOpenAI(
+                            api_key=(
+                                settings.embedding_api_key
+                                or settings.api_key
+                            ),
+                            base_url=(
+                                settings.embedding_base_url
+                                or settings.base_url
+                            ),
+                            max_retries=0,
+                        )
+                    )
                 )
-            return await run(
-                client,
-                context,
-                registry,
-                model=selected_model,
-                system_prompt=build_system_prompt(),
-                max_turns=selected_max_turns,
-                max_tokens=max_tokens,
-                context_window_tokens=selected_context_window_tokens,
-                cost_estimator=lambda stats: estimate_cost(stats, settings),
-                max_cost_usd=max_cost_usd,
-                prompt_cache=settings.prompt_cache_config,
-                stats=main_stats,
-                trace=trace,
-                start_turn=start_turn,
-                compact_enabled=settings.compact_enabled,
-                compact_threshold=settings.compact_threshold,
-                compact_keep_recent=settings.compact_keep_recent,
-                compact_model=settings.compact_model,
-                compact_max_tokens=settings.compact_max_tokens,
-                checkpoint_callback=(
-                    persist_checkpoint if checkpoint_enabled else None
-                ),
-                event_callback=event_callback,
-            )
+
+                def create_embedder(model: str) -> OpenAIEmbedder:
+                    return OpenAIEmbedder(
+                        embedding_client,
+                        model=model,
+                        batch_size=settings.embedding_batch_size,
+                    )
+
+                register_rag_tool(
+                    registry,
+                    workdir,
+                    embedder_factory=create_embedder,
+                )
+                if enable_subagent:
+                    register_subagent_tool(
+                        registry,
+                        client=client,
+                        workdir=workdir,
+                        model=selected_model,
+                        parent_trace=trace,
+                        parent_stats=main_stats,
+                        prompt_cache=settings.prompt_cache_config,
+                        context_window_tokens=selected_context_window_tokens,
+                    )
+                return await run(
+                    client,
+                    context,
+                    registry,
+                    model=selected_model,
+                    system_prompt=build_system_prompt(),
+                    max_turns=selected_max_turns,
+                    max_tokens=max_tokens,
+                    context_window_tokens=selected_context_window_tokens,
+                    cost_estimator=lambda stats: estimate_cost(
+                        stats, settings),
+                    max_cost_usd=max_cost_usd,
+                    prompt_cache=settings.prompt_cache_config,
+                    stats=main_stats,
+                    trace=trace,
+                    start_turn=start_turn,
+                    compact_enabled=settings.compact_enabled,
+                    compact_threshold=settings.compact_threshold,
+                    compact_keep_recent=settings.compact_keep_recent,
+                    compact_model=settings.compact_model,
+                    compact_max_tokens=settings.compact_max_tokens,
+                    checkpoint_callback=(
+                        persist_checkpoint if checkpoint_enabled else None
+                    ),
+                    event_callback=event_callback,
+                )
     except (asyncio.CancelledError, KeyboardInterrupt):
         if checkpoint_enabled:
             persist_failure_checkpoint("interrupted")

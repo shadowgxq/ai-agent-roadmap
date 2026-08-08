@@ -8,6 +8,7 @@ from .registry import (
     registry,
     tool,
 )
+from .rag import register_rag_tool
 from .spawn_subagent import register_subagent_tool
 from .search import register_search_tools
 from .shell import register_shell_tools
@@ -24,6 +25,7 @@ __all__ = [
     "register_fs_tools",
     "register_readonly_fs_tools",
     "resolve_path",
+    "register_rag_tool",
     "register_search_tools",
     "register_shell_tools",
     "register_subagent_tool",

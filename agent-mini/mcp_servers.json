@@ -4,7 +4,7 @@
       "command": "uv",
       "args": [
         "--directory",
-        "../mcp-server-playground",
+        "../mcps/mcp-server-playground",
         "run",
         "python",
         "server.py"

@@ -44,3 +44,5 @@ Thumbs.db
 
 # Project specific
 weeks/_
+
+**/node_modules/

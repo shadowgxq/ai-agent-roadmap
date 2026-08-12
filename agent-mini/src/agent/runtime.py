@@ -11,6 +11,7 @@ from openai.types.chat import ChatCompletion
 
 from ..rag import OpenAIEmbedder
 from ..tools import (
+    MCPClientManager,
     ToolRegistry,
     register_fs_tools,
     register_grep_tool,
@@ -157,10 +158,10 @@ async def run_coding_agent(
             base_url=settings.base_url,
             max_retries=0,
         ) as client:
-            async with AsyncExitStack() as embedding_stack:
+            async with AsyncExitStack() as resource_stack:
                 if tool_mode in {"all", "rag"}:
                     embedding_client = await (
-                        embedding_stack.enter_async_context(
+                        resource_stack.enter_async_context(
                             AsyncOpenAI(
                                 api_key=(
                                     settings.embedding_api_key
@@ -187,6 +188,13 @@ async def run_coding_agent(
                         workdir,
                         embedder_factory=create_embedder,
                     )
+                if settings.mcp_enabled and tool_mode == "all":
+                    mcp_manager = await resource_stack.enter_async_context(
+                        MCPClientManager(
+                            settings.resolved_mcp_config_file
+                        )
+                    )
+                    await mcp_manager.connect_all(registry)
                 if enable_subagent and tool_mode == "all":
                     register_subagent_tool(
                         registry,

@@ -13,6 +13,7 @@ from pydantic import BaseModel, TypeAdapter
 
 
 ToolHandler = Callable[..., Any]
+JSONToolHandler = Callable[[dict[str, Any]], Any]
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,7 @@ class RegisteredTool:
     description: str
     input_schema: dict[str, Any]
     handler: ToolHandler
+    accepts_json_object: bool = False
 
 
 @dataclass(frozen=True)
@@ -230,6 +232,26 @@ class ToolRegistry:
             return decorator
         return decorator(handler)
 
+    def register_json_tool(
+        self,
+        handler: JSONToolHandler,
+        *,
+        name: str,
+        description: str,
+        input_schema: dict[str, Any],
+    ) -> JSONToolHandler:
+        """注册已经自带 JSON Schema、并直接接收完整输入对象的工具。"""
+        if name in self._tools:
+            raise ValueError(f"工具已注册: {name}")
+        self._tools[name] = RegisteredTool(
+            name=name,
+            description=description,
+            input_schema=deepcopy(input_schema),
+            handler=handler,
+            accepts_json_object=True,
+        )
+        return handler
+
     def schemas(self) -> list[dict[str, Any]]:
         """导出 Messages API 使用的工具 schema。"""
         return [
@@ -254,10 +276,18 @@ class ToolRegistry:
                 raise KeyError(f"未注册工具: {name}")
 
             registered = self._tools[name]
-            arguments = _prepare_arguments(registered.handler, input_data)
-            result = registered.handler(**arguments)
+            if registered.accepts_json_object:
+                result = registered.handler(deepcopy(input_data))
+            else:
+                arguments = _prepare_arguments(
+                    registered.handler,
+                    input_data,
+                )
+                result = registered.handler(**arguments)
             if inspect.isawaitable(result):
                 result = await result
+            if isinstance(result, ToolExecutionResult):
+                return result
             return ToolExecutionResult(content=_serialize_result(result))
         except Exception as exc:
             return ToolExecutionResult(

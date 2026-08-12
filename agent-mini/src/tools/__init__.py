@@ -7,6 +7,7 @@ from .fs import (
     register_readonly_fs_tools,
     resolve_path,
 )
+from .mcp_client import MCPClientManager
 from .registry import (
     RegisteredTool,
     ToolExecutionResult,
@@ -25,6 +26,7 @@ __all__ = [
     "RegisteredTool",
     "ToolExecutionResult",
     "ToolRegistry",
+    "MCPClientManager",
     "get_weather",
     "registry",
     "tool",

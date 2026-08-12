@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "playground": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "../mcp-server-playground",
+        "run",
+        "python",
+        "server.py"
+      ],
+      "cwd": "."
+    }
+  }
+}

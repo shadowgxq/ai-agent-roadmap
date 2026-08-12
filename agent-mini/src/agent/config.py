@@ -96,6 +96,8 @@ class AgentSettings(BaseSettings):
         min_length=1,
     )
     embedding_batch_size: int = Field(default=64, ge=1)
+    mcp_enabled: bool = False
+    mcp_config_file: Path = PROJECT_ROOT / "mcp_servers.json"
 
     @field_validator("base_url")
     @classmethod
@@ -121,3 +123,10 @@ class AgentSettings(BaseSettings):
             key=self.prompt_cache_key,
             retention=self.prompt_cache_retention,
         )
+
+    @property
+    def resolved_mcp_config_file(self) -> Path:
+        """把相对 MCP 配置路径固定到 agent-mini 项目目录。"""
+        if self.mcp_config_file.is_absolute():
+            return self.mcp_config_file
+        return PROJECT_ROOT / self.mcp_config_file

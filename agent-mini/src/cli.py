@@ -9,24 +9,14 @@ from uuid import uuid4
 from openai import APIError
 
 
-if __package__:
-    from .agent.checkpoint import load_checkpoint
-    from .agent.config import AgentSettings
-    from .agent.context import Context
-    from .agent.cost import estimate_cost
-    from .agent.git_snapshot import GitSnapshotError, rollback_to_sha
-    from .agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
-    from .agent.runtime import run_coding_agent
-    from .agent.logging_config import configure_logging, get_logger
-else:
-    from agent.checkpoint import load_checkpoint
-    from agent.config import AgentSettings
-    from agent.context import Context
-    from agent.cost import estimate_cost
-    from agent.git_snapshot import GitSnapshotError, rollback_to_sha
-    from agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
-    from agent.runtime import run_coding_agent
-    from agent.logging_config import configure_logging, get_logger
+from .agent.checkpoint import load_checkpoint
+from .agent.config import AgentSettings
+from .agent.context import Context
+from .agent.cost import estimate_cost
+from .agent.git_snapshot import GitSnapshotError, rollback_to_sha
+from .agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
+from .agent.runtime import run_coding_agent
+from .agent.logging_config import configure_logging, get_logger
 
 
 logger = get_logger("cli")

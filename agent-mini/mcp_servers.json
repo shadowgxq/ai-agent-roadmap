@@ -10,6 +10,17 @@
         "server.py"
       ],
       "cwd": "."
+    },
+    "lighthouse": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "../mcps/mcp-server-lighthouse",
+        "run",
+        "python",
+        "server.py"
+      ],
+      "cwd": "."
     }
   }
 }

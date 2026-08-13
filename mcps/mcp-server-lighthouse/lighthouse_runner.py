@@ -53,6 +53,14 @@ class LighthouseReport(BaseModel):
     issues: list[AuditIssue]
 
 
+class LighthouseComparison(BaseModel):
+    """两个页面的审计结果和分类分数差值。"""
+
+    first: LighthouseReport
+    second: LighthouseReport
+    score_deltas: dict[str, int]
+
+
 class LighthouseError(RuntimeError):
     """Lighthouse 执行或报告解析失败。"""
 
@@ -350,4 +358,22 @@ def summarize_report(
         scores=scores,
         metrics=metrics,
         issues=issues[:max_issues],
+    )
+
+
+def compare_reports(
+    first: LighthouseReport,
+    second: LighthouseReport,
+) -> LighthouseComparison:
+    """比较两个已压缩报告，差值定义为 second - first。"""
+
+    shared_categories = sorted(set(first.scores) & set(second.scores))
+    score_deltas = {
+        category: second.scores[category] - first.scores[category]
+        for category in shared_categories
+    }
+    return LighthouseComparison(
+        first=first,
+        second=second,
+        score_deltas=score_deltas,
     )

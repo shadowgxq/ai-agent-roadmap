@@ -1,7 +1,7 @@
 [project]
 name = "mcp-server-lighthouse"
 version = "0.1.0"
-description = "Add your description here"
+description = "Expose Lighthouse web audits through Model Context Protocol"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,3 +9,14 @@ dependencies = [
     "pydantic>=2.13.4",
     "python-dotenv>=1.0",
 ]
+
+[project.scripts]
+mcp-server-lighthouse = "server:main"
+lighthouse-audit = "main:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["lighthouse_runner", "main", "server"]

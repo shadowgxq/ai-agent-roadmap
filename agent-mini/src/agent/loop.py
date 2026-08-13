@@ -616,24 +616,24 @@ async def run(
         }
         if context_tokens is None:
             context_message = (
-                f"上下文用量: turn={turn} context_tokens=unknown "
+                # f"上下文用量: turn={turn} context_tokens=unknown "
                 f"window={context_window_tokens} usage=unknown%"
             )
         else:
             context_message = (
-                f"上下文用量: turn={turn} context_tokens={context_tokens} "
+                # f"上下文用量: turn={turn} context_tokens={context_tokens} "
                 f"window={context_window_tokens} "
                 f"usage={context_usage_percent:.2f}%"
             )
-        logger.info(
-            "上下文用量",
-            extra={
-                "event": "agent.context_usage",
-                "trace": trace.event_context(turn),
-                "console_message": context_message,
-                "data": context_usage_data,
-            },
-        )
+        # logger.info(
+        #     "上下文用量",
+        #     extra={
+        #         "event": "agent.context_usage",
+        #         "trace": trace.event_context(turn),
+        #         "console_message": context_message,
+        #         "data": context_usage_data,
+        #     },
+        # )
         await emit_event(event_callback, "context_usage", context_usage_data)
 
         stats.turns += 1

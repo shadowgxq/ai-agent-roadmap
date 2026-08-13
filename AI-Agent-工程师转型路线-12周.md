@@ -3,6 +3,8 @@
 > 从前端工程师到 AI Agent 工程师的可执行转型方案。
 > 假设业余投入每周 10–15 小时（每天 1.5–2 小时），总周期 **12 周**；全职学习所有周期减半。
 > 本文档既是**学习计划**，也是**进度追踪表**——直接在文中的 checklist 上打勾。
+>
+> W1–W12 是原理与产品化主线；完成后继续执行 [W13–W20 企业级强化路线](AI-Agent-工程师企业强化路线-W13-W20.md)，补齐 LangGraph、企业 RAG、持久化、异步任务、权限与多租户。
 
 ---
 
@@ -96,7 +98,7 @@
 | Web 框架 | **FastAPI** | streaming/SSE 支持好，异步原生 |
 | LLM API | **Claude API（Anthropic SDK）** 为主 | tool use 设计最规范；预算紧张时可用兼容 API 的国内模型替代，概念完全通用 |
 | 数据校验 | **Pydantic v2** | tool schema 和结构化输出都靠它 |
-| 前端（W11–W12） | **Next.js + Vercel AI SDK** | 复用你的前端强项，流式事件处理成熟 |
+| 前端（W11–W12） | **现有 Vite + React + TypeScript 工程** | 仓库已有 `/agent` 页面、API client 和原生 `EventSource` 接线，继续扩展而不重建前端 |
 | 向量库 | **sqlite-vec 或内存向量（numpy）** | 学习期实验够用、零运维；pgvector 归入「面试能聊」即可 |
 | 可观测性 | **Langfuse**（自部署或免费版） | 开源、够用、trace 树直观 |
 | 包管理 | **uv** | 现代 Python 标准，快 |
@@ -692,12 +694,12 @@ evals/
 **概念清单**：
 
 - **多类型流式事件处理**：后端输出结构化 SSE 事件（`text` / `tool_call` / `tool_result` / `diff` / `done`），前端分类型渲染。
-- **Vercel AI SDK 的 `useChat` / data stream**：处理多类型流式事件的成熟方案。
+- **React 中的结构化 SSE 状态管理**：用原生 `EventSource` 消费多类型事件，按 `sequence` 保序/去重，用显式 `done` 事件判定终态。
 - **容器隔离**：agent 会执行任意代码，**必须**在 Docker 容器里隔离执行环境（安全红线）。
 
 **阅读材料**：
 
-- **Vercel AI SDK** 文档（`useChat`、data stream protocol）
+- React `useEffect` / custom Hook 与 MDN `EventSource` 文档，重点是连接生命周期、断线与事件 ID。
 - Claude Code Web / Devin 的 UI 形态截图，抄交互不抄实现
 
 **自测题**：
@@ -715,7 +717,7 @@ evals/
 
 **技术要点**：
 
-- **前端**：Next.js + Vercel AI SDK 的 `useChat` / data stream，处理多类型流式事件（文本、tool_use、diff）——这是有难度的前端工程，正好展示你的功力。
+- **前端**：扩展现有 `frontend/` 中的 React `/agent` 页面，沿用 `axios` API 边界和原生 `EventSource`，处理文本、tool call、diff 和终态事件；不新增 Next.js 或第二套前端。
 - **后端**：FastAPI 输出结构化 SSE 事件流（`event: text / tool_call / tool_result / diff / done`）。
 - **部署**：前端 Vercel，后端 VPS 或 Railway；agent 执行环境用 **Docker 容器隔离**（安全上必须）。
 - 首页放 **2–3 个预置 demo 任务**，让面试官 30 秒内看到效果。
@@ -746,7 +748,7 @@ evals/
 
 - Anthropic 工程博客：context engineering、subagent、prompt caching 相关文章
 - **Langfuse** 的 evals 指南
-- **Vercel AI SDK** 文档（W11 前读）
+- **React** 与 **MDN EventSource** 文档（W11 前按需复习）
 
 ### 刻意不学（投入产出比过低）
 
@@ -756,9 +758,9 @@ evals/
 
 > 这些对「AI Agent 应用工程师」岗位收益极低。你的战场是**在现成模型之上做工程**，不是造模型。
 
-### 框架「面试能聊」即可（W12 末花 2–3 天）
+### 框架预习（W12 末花 2–3 天）
 
-- 速览 **LangGraph** 官方教程，把第 5 周的 workflow 用它重写一个，达到「面试能聊清楚它和手写的区别」的程度即可。
+- 速览 **LangGraph** 官方教程，把第 5 周的 workflow 用它重写一个，先建立与手写实现的映射；W13–W20 再进入持久化、human-in-the-loop 和企业项目实战。
 - 花半天读 **Claude Agent SDK** 文档（顺带扫一眼 OpenAI Agents SDK）——你的 agent-mini 本质就是 Claude Code 的简化版，对照自己的实现讲清「SDK 替你做了什么、你手写时是怎么做的」，这半天在面试里性价比极高。
 - 能一句话讲清 **pgvector** 等生产级向量库与 W7 轻量实验方案的定位差异。
 - **不要**一开始就用框架——先手写才懂原理。
@@ -863,3 +865,5 @@ evals/
 
 > **现在就开始第 1 周第一个动手任务**：`uv init` 一个项目，发出你的第一次 API 调用，打印 token 和费用。
 > 十二周后，你手里会有一个能公开访问的 agent、一个开源 MCP server、一套 evals 和一篇有数据的博客——这套组合拳，比任何证书都有说服力。
+>
+> W12 验收通过后，从 [W13｜LangChain / LangGraph 框架映射](weeks/W13.md) 开始企业级强化，不再另起一套前端。

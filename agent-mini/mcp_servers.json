@@ -9,7 +9,10 @@
         "python",
         "server.py"
       ],
-      "cwd": "."
+      "cwd": ".",
+      "resources": [
+        "lesson://MCP"
+      ]
     },
     "lighthouse": {
       "command": "uv",

@@ -18,6 +18,7 @@ from .registry import ToolExecutionResult, ToolRegistry
 
 
 _SERVER_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+_RESOURCE_TEMPLATE_VARIABLE = re.compile(r"\{[^{}]+\}")
 
 
 class MCPServerConfig(BaseModel):
@@ -30,6 +31,8 @@ class MCPServerConfig(BaseModel):
     env: dict[str, str] | None = None
     cwd: str | None = None
     enabled: bool = True
+    resources: list[str] = Field(default_factory=list)
+    resource_max_chars: int = Field(default=4000, ge=1, le=20_000)
 
 
 class MCPServersConfig(BaseModel):
@@ -84,12 +87,70 @@ def _serialize_call_result(result: types.CallToolResult) -> str:
     return json.dumps(payload, ensure_ascii=False, default=str)
 
 
+def _resource_template_matches(template: str, uri: str) -> bool:
+    """匹配 MCP 的简单 URI 模板变量，例如 lesson://{topic}。"""
+    parts = _RESOURCE_TEMPLATE_VARIABLE.split(template)
+    pattern_parts: list[str] = []
+    for index, part in enumerate(parts):
+        pattern_parts.append(re.escape(part))
+        if index < len(parts) - 1:
+            pattern_parts.append("[^/?#]+")
+    return re.fullmatch("".join(pattern_parts), uri) is not None
+
+
+def _truncate_resource_text(value: str, max_chars: int) -> str:
+    """限制资源进入上下文的长度，保留尾部省略标记。"""
+    normalized = value.strip()
+    if len(normalized) <= max_chars:
+        return normalized
+    return f"{normalized[: max_chars - 1]}…"
+
+
+def _serialize_resource_result(
+    result: types.ReadResourceResult,
+    *,
+    server_name: str,
+    requested_uri: str,
+    max_chars: int,
+) -> str:
+    """把 MCP resource 转成带来源标记的安全文本上下文。"""
+    blocks: list[str] = []
+    remaining_chars = max_chars
+    for content in result.contents:
+        content_uri = getattr(content, "uri", requested_uri)
+        if isinstance(content, types.TextResourceContents):
+            if remaining_chars <= 0:
+                break
+            text = _truncate_resource_text(content.text, remaining_chars)
+            blocks.append(
+                f"[MCP resource server={server_name} uri={content_uri}]\n"
+                f"{text}"
+            )
+            remaining_chars -= len(text)
+            continue
+
+        # 二进制内容不能直接作为 prompt 注入，避免把 base64 数据扩大上下文。
+        mime_type = getattr(content, "mime_type", None) or "unknown"
+        blocks.append(
+            f"[MCP resource server={server_name} uri={content_uri}]\n"
+            f"(binary resource omitted; mime_type={mime_type})"
+        )
+
+    if not blocks:
+        return (
+            f"[MCP resource server={server_name} uri={requested_uri}]\n"
+            "(resource returned no readable content)"
+        )
+    return "\n\n".join(blocks)
+
+
 class MCPClientManager:
     """维护 MCP 子进程、session 以及动态工具注册的生命周期。"""
 
     def __init__(self, config_path: Path) -> None:
         self.config_path = config_path.resolve()
         self._stack = AsyncExitStack()
+        self._resource_blocks: list[str] = []
 
     async def __aenter__(self) -> MCPClientManager:
         await self._stack.__aenter__()
@@ -143,6 +204,11 @@ class MCPClientManager:
             ClientSession(read_stream, write_stream)
         )
         await session.initialize()
+        await self._load_configured_resources(
+            server_name,
+            session,
+            config,
+        )
         remote_tools = await self._list_all_tools(session)
 
         for remote_tool in remote_tools:
@@ -175,6 +241,54 @@ class MCPClientManager:
 
         return len(remote_tools)
 
+    @property
+    def resource_context(self) -> str:
+        """返回已按配置读取的 MCP resource 上下文。"""
+        return "\n\n".join(self._resource_blocks)
+
+    async def _load_configured_resources(
+        self,
+        server_name: str,
+        session: ClientSession,
+        config: MCPServerConfig,
+    ) -> None:
+        """发现并读取一个 server 配置白名单中的 resource。"""
+        if not config.resources:
+            return
+
+        resources = await self._list_all_resources(session)
+        templates = await self._list_all_resource_templates(session)
+        known_uris = {resource.uri for resource in resources}
+        known_templates = [template.uri_template for template in templates]
+
+        for uri in config.resources:
+            if uri not in known_uris and not any(
+                _resource_template_matches(template, uri)
+                for template in known_templates
+            ):
+                available = sorted(known_uris | set(known_templates))
+                available_text = ", ".join(available) or "无"
+                raise ValueError(
+                    f"MCP server {server_name} 未暴露 resource URI“{uri}”；"
+                    f"可用资源：{available_text}"
+                )
+
+            try:
+                result = await session.read_resource(uri)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"读取 MCP resource 失败：server={server_name}, uri={uri}: {exc}"
+                ) from exc
+
+            self._resource_blocks.append(
+                _serialize_resource_result(
+                    result,
+                    server_name=server_name,
+                    requested_uri=uri,
+                    max_chars=config.resource_max_chars,
+                )
+            )
+
     async def _list_all_tools(
         self,
         session: ClientSession,
@@ -193,6 +307,44 @@ class MCPClientManager:
             cursor = result.next_cursor
             if cursor is None:
                 return tools
+
+    async def _list_all_resources(
+        self,
+        session: ClientSession,
+    ) -> list[types.Resource]:
+        """跟随 cursor 拉取 server 暴露的固定 resource。"""
+        resources: list[types.Resource] = []
+        cursor: str | None = None
+        while True:
+            params = (
+                types.PaginatedRequestParams(cursor=cursor)
+                if cursor is not None
+                else None
+            )
+            result = await session.list_resources(params=params)
+            resources.extend(result.resources)
+            cursor = result.next_cursor
+            if cursor is None:
+                return resources
+
+    async def _list_all_resource_templates(
+        self,
+        session: ClientSession,
+    ) -> list[types.ResourceTemplate]:
+        """跟随 cursor 拉取 server 暴露的 resource template。"""
+        templates: list[types.ResourceTemplate] = []
+        cursor: str | None = None
+        while True:
+            params = (
+                types.PaginatedRequestParams(cursor=cursor)
+                if cursor is not None
+                else None
+            )
+            result = await session.list_resource_templates(params=params)
+            templates.extend(result.resource_templates)
+            cursor = result.next_cursor
+            if cursor is None:
+                return templates
 
     def _resolve_cwd(self, configured_cwd: str | None) -> Path | None:
         if configured_cwd is None:

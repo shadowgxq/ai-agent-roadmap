@@ -159,6 +159,7 @@ async def run_coding_agent(
             max_retries=0,
         ) as client:
             async with AsyncExitStack() as resource_stack:
+                resource_context = ""
                 if tool_mode in {"all", "rag"}:
                     embedding_client = await (
                         resource_stack.enter_async_context(
@@ -195,6 +196,7 @@ async def run_coding_agent(
                         )
                     )
                     await mcp_manager.connect_all(registry)
+                    resource_context = mcp_manager.resource_context
                 if enable_subagent and tool_mode == "all":
                     register_subagent_tool(
                         registry,
@@ -211,7 +213,7 @@ async def run_coding_agent(
                     context,
                     registry,
                     model=selected_model,
-                    system_prompt=build_system_prompt(),
+                    system_prompt=build_system_prompt(resource_context),
                     max_turns=selected_max_turns,
                     max_tokens=max_tokens,
                     context_window_tokens=selected_context_window_tokens,

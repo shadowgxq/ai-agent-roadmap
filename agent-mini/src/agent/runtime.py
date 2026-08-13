@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
+from langfuse import Langfuse
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
@@ -32,7 +33,7 @@ from .config import AgentSettings
 from .context import Context
 from .cost import estimate_cost
 from .git_snapshot import ensure_start_snapshot, get_head_sha
-from .loop import AgentTrace, EventCallback, RunStats, run
+from .loop import AgentTrace, EventCallback, RunStats, message_text, run
 from .prompts import build_system_prompt, build_task_message
 
 
@@ -159,6 +160,29 @@ async def run_coding_agent(
             max_retries=0,
         ) as client:
             async with AsyncExitStack() as resource_stack:
+                langfuse_client: Langfuse | None = None
+                root_observation = None
+                if settings.langfuse_configured:
+                    langfuse_client = Langfuse(
+                        public_key=settings.langfuse_public_key,
+                        secret_key=settings.langfuse_secret_key,
+                        base_url=settings.langfuse_base_url,
+                    )
+                    resource_stack.callback(langfuse_client.flush)
+                    root_observation = resource_stack.enter_context(
+                        langfuse_client.start_as_current_observation(
+                            as_type="agent",
+                            name="agent-mini.run",
+                            input={"task": task},
+                            metadata={
+                                "run_id": selected_run_id,
+                                "workdir": str(workdir),
+                                "model": selected_model,
+                                "max_turns": selected_max_turns,
+                            },
+                        )
+                    )
+
                 resource_context = ""
                 if tool_mode in {"all", "rag"}:
                     embedding_client = await (
@@ -207,8 +231,9 @@ async def run_coding_agent(
                         parent_stats=main_stats,
                         prompt_cache=settings.prompt_cache_config,
                         context_window_tokens=selected_context_window_tokens,
+                        langfuse_client=langfuse_client,
                     )
-                return await run(
+                result = await run(
                     client,
                     context,
                     registry,
@@ -233,7 +258,36 @@ async def run_coding_agent(
                         persist_checkpoint if checkpoint_enabled else None
                     ),
                     event_callback=event_callback,
+                    langfuse_client=langfuse_client,
                 )
+                if root_observation is not None:
+                    final_response, final_stats = result
+                    total_stats = final_stats.aggregate()
+                    local_cost_usd = estimate_cost(final_stats, settings)
+                    root_observation.update(
+                        output={
+                            "answer": message_text(
+                                final_response.choices[0].message
+                            )
+                        },
+                        metadata={
+                            "run_id": selected_run_id,
+                            "workdir": str(workdir),
+                            "model": selected_model,
+                            "max_turns": selected_max_turns,
+                            "turns": total_stats.turns,
+                            "input_tokens": total_stats.input_tokens,
+                            "output_tokens": total_stats.output_tokens,
+                            "cache_read_input_tokens": (
+                                total_stats.cache_read_input_tokens
+                            ),
+                            "cache_creation_input_tokens": (
+                                total_stats.cache_creation_input_tokens
+                            ),
+                            "local_cost_usd": local_cost_usd,
+                        },
+                    )
+                return result
     except (asyncio.CancelledError, KeyboardInterrupt):
         if checkpoint_enabled:
             persist_failure_checkpoint("interrupted")

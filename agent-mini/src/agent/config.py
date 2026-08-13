@@ -99,6 +99,11 @@ class AgentSettings(BaseSettings):
     mcp_enabled: bool = False
     mcp_config_file: Path = PROJECT_ROOT / "mcp_servers.json"
 
+    langfuse_enabled: bool = False
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_base_url: str = "https://cloud.langfuse.com"
+
     @field_validator("base_url")
     @classmethod
     def ensure_openai_v1(cls, value: str) -> str:
@@ -130,3 +135,12 @@ class AgentSettings(BaseSettings):
         if self.mcp_config_file.is_absolute():
             return self.mcp_config_file
         return PROJECT_ROOT / self.mcp_config_file
+
+    @property
+    def langfuse_configured(self) -> bool:
+        """Langfuse 已启用且必要凭证完整。"""
+        return (
+            self.langfuse_enabled
+            and bool(self.langfuse_public_key)
+            and bool(self.langfuse_secret_key)
+        )

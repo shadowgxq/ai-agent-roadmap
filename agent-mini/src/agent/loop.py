@@ -5,10 +5,12 @@ import json
 import random
 import time
 from collections.abc import Awaitable, Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from typing import Any, Literal
 from uuid import uuid4
 
+from langfuse import Langfuse
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
@@ -356,6 +358,7 @@ async def run(
     compact_keep_recent: int = 4,
     compact_model: str | None = None,
     compact_max_tokens: int = 1000,
+    langfuse_client: Langfuse | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """运行 Agent，直到模型结束或达到最大轮数。"""
     if start_turn < 0 or start_turn > max_turns:
@@ -556,6 +559,7 @@ async def run(
             prompt_cache=prompt_cache,
             trace=trace,
             turn=turn,
+            langfuse_client=langfuse_client,
         )
         message = response.choices[0].message
         text = message_text(message)
@@ -695,6 +699,7 @@ async def run(
             tracker,
             trace=trace,
             turn=turn,
+            langfuse_client=langfuse_client,
         )
         context.append_tool_results(tool_results)
         context.assert_paired()
@@ -771,24 +776,94 @@ async def call_llm(
     prompt_cache: PromptCacheConfig | None = None,
     trace: AgentTrace | None = None,
     turn: int | None = None,
+    langfuse_client: Langfuse | None = None,
 ) -> ChatCompletion:
 
     for attempt in range(max_attempts):
         try:
-            return await client.chat.completions.create(
-                model=model,
-                max_tokens=max_tokens,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    *context.messages,
-                ],
-                tools=openai_tools(tools),
-                **(
-                    prompt_cache.request_kwargs()
-                    if prompt_cache is not None
-                    else {}
-                ),
+            messages = [
+                {"role": "system", "content": system_prompt},
+                *context.messages,
+            ]
+            observation_context = (
+                langfuse_client.start_as_current_observation(
+                    as_type="generation",
+                    name="agent.llm",
+                    model=model,
+                    input=messages,
+                    metadata={
+                        "turn": turn,
+                        "attempt": attempt + 1,
+                        "max_attempts": max_attempts,
+                        "max_tokens": max_tokens,
+                    },
+                )
+                if langfuse_client is not None
+                else nullcontext()
             )
+            request_error: APIConnectionError | APIStatusError | None = None
+            response: ChatCompletion | None = None
+            with observation_context as generation:
+                try:
+                    response = await client.chat.completions.create(
+                        model=model,
+                        max_tokens=max_tokens,
+                        messages=messages,
+                        tools=openai_tools(tools),
+                        **(
+                            prompt_cache.request_kwargs()
+                            if prompt_cache is not None
+                            else {}
+                        ),
+                    )
+                except (APIConnectionError, APIStatusError) as exc:
+                    request_error = exc
+                    if generation is not None:
+                        generation.update(
+                            level="ERROR",
+                            status_message=type(exc).__name__,
+                            metadata={
+                                "turn": turn,
+                                "attempt": attempt + 1,
+                                "max_attempts": max_attempts,
+                                "max_tokens": max_tokens,
+                                "error_type": type(exc).__name__,
+                                "status_code": getattr(
+                                    exc, "status_code", None
+                                ),
+                            },
+                        )
+                if generation is not None and response is not None:
+                    usage = extract_usage_tokens(response.usage)
+                    generation.update(
+                        output=assistant_message(
+                            response.choices[0].message
+                        ),
+                        usage_details={
+                            "input": usage.input_tokens,
+                            "output": usage.output_tokens,
+                            "cache_read_input_tokens": (
+                                usage.cache_read_input_tokens
+                            ),
+                            "cache_creation_input_tokens": (
+                                usage.cache_creation_input_tokens
+                            ),
+                        },
+                        metadata={
+                            "turn": turn,
+                            "attempt": attempt + 1,
+                            "max_attempts": max_attempts,
+                            "max_tokens": max_tokens,
+                            "finish_reason": (
+                                response.choices[0].finish_reason
+                            ),
+                        },
+                    )
+            if request_error is not None:
+                raise request_error
+            if response is None:
+                raise RuntimeError("模型调用没有返回响应")
+            return response
         except (APIConnectionError, APIStatusError) as exc:
             is_last_attempt = attempt == max_attempts - 1
             if not is_retryable_llm_error(exc) or is_last_attempt:
@@ -841,6 +916,13 @@ def assistant_message(message: ChatCompletionMessage) -> dict[str, Any]:
     return result
 
 
+def summarize_tool_output(content: str, limit: int = 2000) -> str:
+    """只给 Langfuse 保存有限长度的工具输出，Agent 仍使用完整结果。"""
+    if len(content) <= limit:
+        return content
+    return content[:limit] + f"\n...[truncated, total={len(content)} chars]"
+
+
 async def execute_tools(
     message: ChatCompletionMessage,
     registry: Any,
@@ -849,6 +931,7 @@ async def execute_tools(
     *,
     trace: AgentTrace | None = None,
     turn: int | None = None,
+    langfuse_client: Langfuse | None = None,
 ) -> list[dict[str, Any]]:
     """按顺序执行 function calls，并生成匹配的 tool messages。"""
     if tool_timeout <= 0:
@@ -888,66 +971,91 @@ async def execute_tools(
             )
             continue
 
-        if tracker is not None and not tracker.allow(name, input_data):
-            content = (
-                "检测到相同工具调用已连续重复 "
-                f"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。"
-            )
-            logger.warning(
-                "拦截重复调用: %s %s",
-                name,
-                input_data,
-                extra={
-                    "event": "agent.tool_blocked",
-                    "trace": trace_context,
-                    "data": {
-                        "tool": name,
-                        "status": "blocked",
-                        "arguments": input_data,
-                    },
+        observation_context = (
+            langfuse_client.start_as_current_observation(
+                as_type="tool",
+                name=name,
+                input=input_data,
+                metadata={
+                    "turn": turn,
+                    "tool_call_id": tool_call.id,
                 },
             )
-        else:
-            logger.info(
-                "工具开始: %s",
-                name,
-                extra={
-                    "event": "agent.tool_started",
-                    "trace": trace_context,
-                    "console_message": f"调用工具: {name} {input_data}",
-                    "data": {
-                        "tool": name,
-                        "arguments": input_data,
-                    },
-                },
-            )
-            try:
-                execution = await asyncio.wait_for(
-                    registry.execute_with_status(name, input_data),
-                    timeout=tool_timeout,
-                )
-                content = execution.content
-                status = "error" if execution.is_error else "ok"
-            except TimeoutError:
+            if langfuse_client is not None
+            else nullcontext()
+        )
+        with observation_context as tool_observation:
+            if tracker is not None and not tracker.allow(name, input_data):
                 content = (
-                    f"工具 {name} 执行超时（超过 {tool_timeout:g} 秒）"
+                    "检测到相同工具调用已连续重复 "
+                    f"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。"
                 )
-                status = "timeout"
-            logger.info(
-                "工具完成: %s (%s)",
-                name,
-                status,
-                extra={
-                    "event": "agent.tool_completed",
-                    "trace": trace_context,
-                    "console_message": f"工具结果: {content}",
-                    "data": {
-                        "tool": name,
-                        "status": status,
-                        "content": content,
+                status = "blocked"
+                logger.warning(
+                    "拦截重复调用: %s %s",
+                    name,
+                    input_data,
+                    extra={
+                        "event": "agent.tool_blocked",
+                        "trace": trace_context,
+                        "data": {
+                            "tool": name,
+                            "status": status,
+                            "arguments": input_data,
+                        },
                     },
-                },
-            )
+                )
+            else:
+                logger.info(
+                    "工具开始: %s",
+                    name,
+                    extra={
+                        "event": "agent.tool_started",
+                        "trace": trace_context,
+                        "console_message": f"调用工具: {name} {input_data}",
+                        "data": {
+                            "tool": name,
+                            "arguments": input_data,
+                        },
+                    },
+                )
+                try:
+                    execution = await asyncio.wait_for(
+                        registry.execute_with_status(name, input_data),
+                        timeout=tool_timeout,
+                    )
+                    content = execution.content
+                    status = "error" if execution.is_error else "ok"
+                except TimeoutError:
+                    content = (
+                        f"工具 {name} 执行超时（超过 {tool_timeout:g} 秒）"
+                    )
+                    status = "timeout"
+                logger.info(
+                    "工具完成: %s (%s)",
+                    name,
+                    status,
+                    extra={
+                        "event": "agent.tool_completed",
+                        "trace": trace_context,
+                        "console_message": f"工具结果: {content}",
+                        "data": {
+                            "tool": name,
+                            "status": status,
+                            "content": content,
+                        },
+                    },
+                )
+
+            if tool_observation is not None:
+                tool_observation.update(
+                    output=summarize_tool_output(content),
+                    metadata={
+                        "turn": turn,
+                        "tool_call_id": tool_call.id,
+                        "status": status,
+                    },
+                )
 
         tool_results.append(
             {

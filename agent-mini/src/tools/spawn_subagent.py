@@ -3,6 +3,7 @@
 from pathlib import Path
 from uuid import uuid4
 
+from langfuse import Langfuse
 from openai import AsyncOpenAI
 
 from ..agent.cache import PromptCacheConfig
@@ -39,6 +40,7 @@ def register_subagent_tool(
     prompt_cache: PromptCacheConfig | None = None,
     max_tokens: int = 1000,
     context_window_tokens: int = 128_000,
+    langfuse_client: Langfuse | None = None,
 ) -> None:
     """注册绑定到当前模型和工作目录的探索型 SubAgent。"""
 
@@ -79,6 +81,7 @@ def register_subagent_tool(
             prompt_cache=prompt_cache,
             stats=child_stats,
             trace=child_trace,
+            langfuse_client=langfuse_client,
         )
 
         summary = message_text(response.choices[0].message)

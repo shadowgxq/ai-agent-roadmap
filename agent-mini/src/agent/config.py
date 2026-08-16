@@ -46,6 +46,10 @@ class AgentSettings(BaseSettings):
             "DEEPSEEK_MODEL",
         ),
     )
+    judge_model: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("JUDGE_MODEL"),
+    )
     log_file: Path = PROJECT_ROOT / "logs" / "agent.json"
     max_turns: int = 30
     max_tool_output_chars: int = 10_000

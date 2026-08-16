@@ -1,0 +1,18 @@
+task: |
+  用户反馈个人资料名称显示不一致。请在不改变公开函数签名的前提下，
+  根据仓库现有测试和行为约束修复问题；不要凭空引入新的产品规则，
+  修改后运行完整测试。
+eval_type: command
+difficulty: L3
+capabilities:
+  - ambiguous_requirements
+  - repository_understanding
+  - backward_compatibility
+  - verification
+suite:
+  - core
+  - full
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 0.8
+

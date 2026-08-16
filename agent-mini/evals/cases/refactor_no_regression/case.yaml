@@ -1,0 +1,13 @@
+task: |
+  命令解析模块有重复逻辑。请在保持现有行为的前提下完成合理重构，
+  同时修复当前失败的注释和空白处理测试；不要删除公开函数，最后运行完整测试。
+eval_type: command
+difficulty: L3
+capabilities:
+  - multi_file
+  - refactor
+  - no_regression
+suite: [core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 1.0

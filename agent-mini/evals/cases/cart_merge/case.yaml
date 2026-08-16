@@ -1,4 +1,0 @@
-task: 修复购物车合并时重复商品数量被覆盖的问题，修改完成后运行测试确认问题已经解决
-verify_cmd: uv run --with pytest python -m pytest -q
-timeout_s: 60
-max_cost_usd: 0.5

@@ -1,0 +1,12 @@
+task: |
+  阅读这个小型 Agent 项目，解释 Agent Loop、Context、ToolRegistry 和 MCP Adapter
+  各自的职责，以及一次工具调用如何从模型回到循环。请给出清晰、准确的架构说明。
+eval_type: judge
+difficulty: L3
+capabilities:
+  - repository_understanding
+  - explanation
+  - subjective_task
+suite: [core, full]
+judge_reference_file: reference.md
+max_cost_usd: 1.0

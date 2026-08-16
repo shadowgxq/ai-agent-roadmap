@@ -1,0 +1,13 @@
+task: |
+  客户端超时配置的测试失败。请先判断问题来自配置契约还是读取代码，
+  保持现有配置文件格式不变，修复正确的一侧并运行完整测试。
+eval_type: command
+difficulty: L2
+capabilities:
+  - repository_search
+  - configuration_reasoning
+  - minimal_fix
+suite: [core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 0.8

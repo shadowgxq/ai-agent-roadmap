@@ -1,7 +1,9 @@
 """在指定工作目录内执行 Shell 命令。"""
 
 import asyncio
+import os
 from pathlib import Path
+import sys
 
 from .registry import ToolRegistry
 
@@ -35,6 +37,18 @@ def register_shell_tools(
         raise ValueError("max_output_chars 必须大于 0")
 
     root = workdir.resolve()
+    environment = os.environ.copy()
+    if os.name != "nt":
+        path_entries = [
+            str(Path(sys.executable).parent),
+            str(Path.home() / ".local" / "bin"),
+            environment.get("PATH", ""),
+        ]
+        environment["PATH"] = os.pathsep.join(
+            entry for entry in path_entries if entry
+        )
+        for temp_variable in ("TMPDIR", "TMP", "TEMP"):
+            environment[temp_variable] = "/tmp"
 
     @registry.tool
     async def run_shell(command: str) -> str:
@@ -51,6 +65,7 @@ def register_shell_tools(
             cwd=root,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=environment,
         )
 
         try:

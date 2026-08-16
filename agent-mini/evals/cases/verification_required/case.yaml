@@ -1,0 +1,13 @@
+task: |
+  队列处理器在空队列和正常队列场景下行为不正确。请修复实现，
+  不要只根据单个失败断言猜测，运行完整测试验证边界和顺序行为。
+eval_type: command
+difficulty: L5
+capabilities:
+  - verification
+  - boundary_logic
+  - recovery
+suite: [core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 1.0

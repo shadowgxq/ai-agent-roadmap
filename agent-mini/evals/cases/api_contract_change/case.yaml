@@ -1,0 +1,13 @@
+task: |
+  metrics 模块需要支持可选的 include_count 参数：默认保持旧返回行为，
+  传入 True 时额外返回 count。请实现新的 API 契约并确保旧调用不回归。
+eval_type: command
+difficulty: L3
+capabilities:
+  - api_contract
+  - backward_compatibility
+  - verification
+suite: [smoke, core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 1.0

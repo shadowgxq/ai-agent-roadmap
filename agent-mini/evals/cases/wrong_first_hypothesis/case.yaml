@@ -1,0 +1,13 @@
+task: |
+  缓存读取测试失败，表面上像是 loader 被重复调用。请验证假设、定位真正的状态判断问题，
+  修复后运行完整测试，确保缓存中的 0、False 和 None 都能正确处理。
+eval_type: command
+difficulty: L5
+capabilities:
+  - recovery
+  - hypothesis_testing
+  - verification
+suite: [smoke, core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 1.0

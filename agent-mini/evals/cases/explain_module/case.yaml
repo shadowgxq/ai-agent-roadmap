@@ -1,0 +1,12 @@
+task: |
+  阅读项目中的 cache 模块，解释 CacheEntry 的数据含义、read_entry 的过期边界行为、
+  关键实现选择和测试覆盖情况。请用面向工程师的简洁语言回答。
+eval_type: judge
+difficulty: L2
+capabilities:
+  - repository_understanding
+  - explanation
+  - subjective_task
+suite: [smoke, core, full]
+judge_reference_file: reference.md
+max_cost_usd: 0.8

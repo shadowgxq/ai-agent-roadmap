@@ -1,0 +1,13 @@
+task: |
+  对这个订单服务做一次代码评审报告。请指出影响正确性或可维护性的具体问题，
+  说明风险和建议修复方向；不要直接修改代码，也不要把没有证据的猜测当成问题。
+eval_type: judge
+difficulty: L3
+capabilities:
+  - repository_understanding
+  - code_review
+  - accuracy
+  - subjective_task
+suite: [core, full]
+judge_reference_file: reference.md
+max_cost_usd: 1.0

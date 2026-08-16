@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import sys
 from contextlib import AsyncExitStack
 from pathlib import Path
 from types import TracebackType
@@ -19,6 +21,19 @@ from .registry import ToolExecutionResult, ToolRegistry
 
 _SERVER_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 _RESOURCE_TEMPLATE_VARIABLE = re.compile(r"\{[^{}]+\}")
+
+
+def _resolve_server_command(command: str) -> str:
+    """解析 MCP 子进程命令，兼容 WSL 中未继承完整 PATH 的情况。"""
+    if shutil.which(command) is not None:
+        return command
+    if command == "python":
+        return sys.executable
+    if command == "uv":
+        user_uv = Path.home() / ".local" / "bin" / "uv"
+        if user_uv.is_file():
+            return str(user_uv)
+    return command
 
 
 class MCPServerConfig(BaseModel):
@@ -192,7 +207,7 @@ class MCPClientManager:
         streams = await self._stack.enter_async_context(
             stdio_client(
                 StdioServerParameters(
-                    command=config.command,
+                    command=_resolve_server_command(config.command),
                     args=config.args,
                     env=config.env,
                     cwd=cwd,

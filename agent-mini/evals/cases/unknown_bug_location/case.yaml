@@ -1,0 +1,13 @@
+task: |
+  结算摘要中的折扣金额偶尔不正确。请自主定位根因并修复，
+  不要只修改测试期望，完成后运行完整测试确认没有回归。
+eval_type: command
+difficulty: L2
+capabilities:
+  - repository_search
+  - root_cause_analysis
+  - minimal_fix
+suite: [smoke, core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 0.8

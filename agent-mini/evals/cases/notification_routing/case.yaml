@@ -1,4 +1,14 @@
-task: 这是一个多目录通知项目。请先使用 spawn_subagent 探索偏好读取、类别路由、渠道构造和通知服务的数据流，再修复失败测试并运行测试确认问题已经解决
+task: 这是一个多目录通知项目。通知结果目前存在异常，问题可能分布在偏好读取、类别路由、渠道构造和通知服务之间。请自主定位根因并修复，确保现有行为不发生回归，最后运行测试确认问题已经解决
+eval_type: command
+difficulty: L4
+capabilities:
+  - planning
+  - repository_search
+  - multi_file
+  - subagent
+suite:
+  - core
+  - full
 verify_cmd: uv run --with pytest python -m pytest -q
 timeout_s: 120
 max_cost_usd: 1.5

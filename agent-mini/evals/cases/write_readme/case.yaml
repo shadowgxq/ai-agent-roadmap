@@ -1,0 +1,13 @@
+task: |
+  阅读这个小型文本工具项目，为新用户写一份简洁 README，说明安装方式、命令行用法、
+  输入输出格式和一个可运行示例。不要凭空添加仓库中不存在的功能。
+eval_type: judge
+difficulty: L3
+capabilities:
+  - repository_understanding
+  - technical_writing
+  - completeness
+  - subjective_task
+suite: [core, full]
+judge_reference_file: reference.md
+max_cost_usd: 1.0

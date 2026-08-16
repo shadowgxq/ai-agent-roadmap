@@ -1,0 +1,16 @@
+task: |
+  事故通知路由测试失败。请使用可用的策略 MCP 工具了解 critical 事件的渠道规则，
+  同时检查本地路由实现，完成修复并运行完整测试。
+eval_type: command
+difficulty: L4
+capabilities:
+  - mcp
+  - tool_routing
+  - repository_search
+  - verification
+suite: [core, full]
+mcp_config_file: mcp_servers.json
+tool_mode: all
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 120
+max_cost_usd: 1.5

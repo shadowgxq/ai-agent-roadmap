@@ -1,0 +1,13 @@
+task: |
+  权限校验同时存在普通用户、编辑者和管理员行为。请修复当前失败场景，
+  注意修复一个角色时不能让其他角色权限回归，完成后运行完整测试。
+eval_type: command
+difficulty: L5
+capabilities:
+  - recovery
+  - regression_prevention
+  - verification
+suite: [core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 1.0

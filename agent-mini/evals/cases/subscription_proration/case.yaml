@@ -1,4 +1,0 @@
-task: 这是一个多目录订阅计费项目。请先使用 spawn_subagent 探索套餐目录、计费周期、按比例计费和发票服务之间的日期语义，再修复失败测试并运行测试确认问题已经解决
-verify_cmd: uv run --with pytest python -m pytest -q
-timeout_s: 120
-max_cost_usd: 1.5

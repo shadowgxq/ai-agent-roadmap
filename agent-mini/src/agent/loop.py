@@ -83,6 +83,7 @@ class RunStats:
     compact_cache_read_input_tokens: int = 0
     compact_cache_creation_input_tokens: int = 0
     subagent_runs: list["RunStats"] = field(default_factory=list)
+    trace_id: str | None = None
     trace_url: str | None = None
 
     @property
@@ -137,6 +138,7 @@ class RunStats:
             compact_cache_creation_input_tokens=(
                 self.compact_cache_creation_input_tokens
             ),
+            trace_id=self.trace_id,
             trace_url=self.trace_url,
         )
         for child in self.subagent_runs:

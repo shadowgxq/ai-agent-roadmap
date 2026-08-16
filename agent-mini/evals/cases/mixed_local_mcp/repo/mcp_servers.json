@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "incident_policy": {
+      "command": "python",
+      "args": ["mcp_server.py"],
+      "cwd": "."
+    }
+  }
+}

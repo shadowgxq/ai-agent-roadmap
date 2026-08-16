@@ -1,0 +1,17 @@
+task: |
+  报表中的排行榜顺序让用户困惑。请基于仓库已有用例恢复一致行为，
+  保持公开 API、稳定排序和无关调用方不变；先理解现有约束，再完成修复和验证。
+eval_type: command
+difficulty: L3
+capabilities:
+  - ambiguous_requirements
+  - behavior_inference
+  - backward_compatibility
+  - verification
+suite:
+  - core
+  - full
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 0.8
+

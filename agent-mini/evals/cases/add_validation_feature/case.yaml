@@ -1,0 +1,13 @@
+task: |
+  为用户创建接口增加输入校验：邮箱必须包含一个合法的 @ 分隔，年龄不能为负数，
+  成功时保持现有返回结构。请补齐实现并运行完整测试。
+eval_type: command
+difficulty: L3
+capabilities:
+  - multi_file
+  - feature_implementation
+  - verification
+suite: [core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 1.0

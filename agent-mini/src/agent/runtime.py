@@ -277,6 +277,9 @@ async def run_coding_agent(
                     final_response, final_stats = result
                     total_stats = final_stats.aggregate()
                     local_cost_usd = estimate_cost(final_stats, settings)
+                    main_stats.trace_id = (
+                        langfuse_client.get_current_trace_id()
+                    )
                     trace_url = langfuse_client.get_trace_url()
                     main_stats.trace_url = trace_url
                     final_metadata = dict(root_metadata)

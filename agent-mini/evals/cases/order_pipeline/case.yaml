@@ -1,4 +1,15 @@
-task: 这是一个多目录结算项目。请先使用 spawn_subagent 探索订单从领域模型、折扣、运费到结算服务的完整数据流，再修复失败测试并运行测试确认问题已经解决
+task: 这是一个多目录结算项目。订单处理流程目前存在异常，问题可能分布在领域模型、折扣、运费和结算服务之间。请自主定位根因并修复，确保现有行为不发生回归，最后运行测试确认问题已经解决
+eval_type: command
+difficulty: L4
+capabilities:
+  - planning
+  - repository_search
+  - multi_file
+  - subagent
+suite:
+  - smoke
+  - core
+  - full
 verify_cmd: uv run --with pytest python -m pytest -q
 timeout_s: 120
 max_cost_usd: 1.5

@@ -1,0 +1,13 @@
+task: |
+  发票金额格式化测试失败，但失败信息只显示最终字符串。
+  请从调用链向上追查真实根因，修复实现并运行完整测试。
+eval_type: command
+difficulty: L2
+capabilities:
+  - repository_search
+  - root_cause_analysis
+  - verification
+suite: [core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 0.8

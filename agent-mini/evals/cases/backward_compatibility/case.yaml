@@ -1,0 +1,13 @@
+task: |
+  用户资料需要新增可选的 timezone 字段，默认使用 UTC；旧的两参数构造方式必须继续可用，
+  新字段也要能在渲染结果中体现。请完成兼容性修改并运行完整测试。
+eval_type: command
+difficulty: L3
+capabilities:
+  - api_contract
+  - backward_compatibility
+  - multi_file
+suite: [core, full]
+verify_cmd: uv run --with pytest python -m pytest -q
+timeout_s: 60
+max_cost_usd: 1.0

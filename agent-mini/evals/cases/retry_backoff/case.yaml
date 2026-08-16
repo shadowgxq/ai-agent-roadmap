@@ -1,4 +1,11 @@
 task: 修复重试退避时间计算中的轮次偏移错误，修改完成后运行测试确认问题已经解决
+eval_type: command
+difficulty: L1
+capabilities:
+  - basic_fix
+  - algorithm_logic
+suite:
+  - regression
 verify_cmd: uv run --with pytest python -m pytest -q
 timeout_s: 60
 max_cost_usd: 0.5

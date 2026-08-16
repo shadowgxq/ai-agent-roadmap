@@ -295,6 +295,7 @@ async def run_coding_agent(
                                 total_stats.cache_creation_input_tokens
                             ),
                             "local_cost_usd": local_cost_usd,
+                            "trajectory": total_stats.trajectory_metrics(),
                         }
                     )
                     if trace_url is not None:

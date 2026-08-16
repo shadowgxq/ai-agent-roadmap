@@ -1,17 +1,14 @@
 task: |
-  报表中的排行榜顺序让用户困惑。请基于仓库已有用例恢复一致行为，
-  保持公开 API、稳定排序和无关调用方不变；先理解现有约束，再完成修复和验证。
-eval_type: command
+  用户希望“让报表结果更快一点，但不能增加资源消耗”。请处理这个需求。
+  不要假定“更快”只有一种含义，也不要在目标和约束尚未明确时直接修改代码。
+eval_type: judge
 difficulty: L3
 capabilities:
   - ambiguous_requirements
-  - behavior_inference
-  - backward_compatibility
-  - verification
+  - clarification
+  - subjective_task
 suite:
   - core
   - full
-verify_cmd: uv run --with pytest python -m pytest -q
-timeout_s: 60
-max_cost_usd: 0.8
-
+judge_reference_file: reference.md
+max_cost_usd: 1.0

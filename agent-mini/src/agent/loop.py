@@ -3,6 +3,7 @@
 import asyncio
 import json
 import random
+import re
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import nullcontext
@@ -68,9 +69,29 @@ class AgentTrace:
         return context
 
 
+def _is_verification_command(command: Any) -> bool:
+    """判断 Shell 命令是否明显在执行测试或验证。"""
+    if not isinstance(command, str):
+        return False
+
+    verification_patterns = (
+        r"\bpytest\b",
+        r"\bpython(?:3)?\s+-m\s+(?:pytest|unittest)\b",
+        r"\b(?:npm|pnpm|yarn)\s+(?:run\s+)?test\b",
+        r"\b(?:go\s+test|cargo\s+test|make\s+test)\b",
+    )
+    for segment in re.split(r"&&|\|\||[;\n]", command.lower()):
+        segment = segment.strip()
+        if re.match(r"^(?:rg|grep|git\s+grep|find|sed|awk|cat)\b", segment):
+            continue
+        if any(re.search(pattern, segment) for pattern in verification_patterns):
+            return True
+    return False
+
+
 @dataclass
 class RunStats:
-    """分别记录 Agent 决策调用、compact 调用与递归 SubAgent 用量。"""
+    """记录模型用量、递归 SubAgent 用量和执行轨迹指标。"""
 
     turns: int = 0
     input_tokens: int = 0
@@ -82,6 +103,12 @@ class RunStats:
     compact_output_tokens: int = 0
     compact_cache_read_input_tokens: int = 0
     compact_cache_creation_input_tokens: int = 0
+    tool_call_count: int = 0
+    mcp_tool_call_count: int = 0
+    subagent_tool_call_count: int = 0
+    verification_command_count: int = 0
+    tool_failure_count: int = 0
+    recovered_after_tool_failure: bool = False
     subagent_runs: list["RunStats"] = field(default_factory=list)
     trace_id: str | None = None
     trace_url: str | None = None
@@ -111,6 +138,61 @@ class RunStats:
         """当前 Agent 的决策调用与 compact 调用 token 总量。"""
         return self.model_tokens + self.compact_tokens
 
+    @property
+    def subagent_used(self) -> bool:
+        """本次运行是否实际调用过 SubAgent 工具。"""
+        return self.subagent_tool_call_count > 0
+
+    @property
+    def mcp_used(self) -> bool:
+        """本次运行是否实际调用过 MCP 工具。"""
+        return self.mcp_tool_call_count > 0
+
+    @property
+    def verification_command_used(self) -> bool:
+        """本次运行是否实际执行过测试或验证命令。"""
+        return self.verification_command_count > 0
+
+    def record_tool_call(
+        self,
+        name: str,
+        input_data: dict[str, Any] | None = None,
+    ) -> None:
+        """记录一次模型发起的工具调用及其来源/用途。"""
+        self.tool_call_count += 1
+        if name == "spawn_subagent":
+            self.subagent_tool_call_count += 1
+        if "__" in name:
+            self.mcp_tool_call_count += 1
+        if name == "run_shell" and _is_verification_command(
+            (input_data or {}).get("command")
+        ):
+            self.verification_command_count += 1
+
+    def record_tool_result(self, status: str, content: str = "") -> None:
+        """记录工具失败，并识别失败后的后续恢复。"""
+        failed = status != "ok"
+        if not failed and isinstance(content, str):
+            match = re.match(r"\s*exit_code:\s*(-?\d+)", content)
+            failed = match is not None and int(match.group(1)) != 0
+        if failed:
+            self.tool_failure_count += 1
+        elif self.tool_failure_count > 0:
+            self.recovered_after_tool_failure = True
+
+    def trajectory_metrics(self) -> dict[str, Any]:
+        """返回适合日志、报告和 Langfuse metadata 的轨迹指标。"""
+        return {
+            "subagent_used": self.subagent_used,
+            "mcp_used": self.mcp_used,
+            "verification_command_used": self.verification_command_used,
+            "tool_call_count": self.tool_call_count,
+            "tool_failure_count": self.tool_failure_count,
+            "recovered_after_tool_failure": (
+                self.recovered_after_tool_failure
+            ),
+        }
+
     def add_compact_usage(self, usage: "UsageTokens") -> None:
         """累计一次已返回响应的 compact 模型调用。"""
         self.compact_calls += 1
@@ -138,6 +220,14 @@ class RunStats:
             compact_cache_creation_input_tokens=(
                 self.compact_cache_creation_input_tokens
             ),
+            tool_call_count=self.tool_call_count,
+            mcp_tool_call_count=self.mcp_tool_call_count,
+            subagent_tool_call_count=self.subagent_tool_call_count,
+            verification_command_count=self.verification_command_count,
+            tool_failure_count=self.tool_failure_count,
+            recovered_after_tool_failure=(
+                self.recovered_after_tool_failure
+            ),
             trace_id=self.trace_id,
             trace_url=self.trace_url,
         )
@@ -160,6 +250,19 @@ class RunStats:
             )
             total.compact_cache_creation_input_tokens += (
                 child_total.compact_cache_creation_input_tokens
+            )
+            total.tool_call_count += child_total.tool_call_count
+            total.mcp_tool_call_count += child_total.mcp_tool_call_count
+            total.subagent_tool_call_count += (
+                child_total.subagent_tool_call_count
+            )
+            total.verification_command_count += (
+                child_total.verification_command_count
+            )
+            total.tool_failure_count += child_total.tool_failure_count
+            total.recovered_after_tool_failure = (
+                total.recovered_after_tool_failure
+                or child_total.recovered_after_tool_failure
             )
         return total
 
@@ -714,6 +817,7 @@ async def run(
             message,
             registry,
             tracker,
+            stats=stats,
             trace=trace,
             turn=turn,
             langfuse_client=langfuse_client,
@@ -946,6 +1050,7 @@ async def execute_tools(
     tracker: ToolCallTracker | None = None,
     tool_timeout: float = 300.0,
     *,
+    stats: RunStats | None = None,
     trace: AgentTrace | None = None,
     turn: int | None = None,
     langfuse_client: Langfuse | None = None,
@@ -967,6 +1072,9 @@ async def execute_tools(
                 raise TypeError("工具输入必须是 object")
         except (TypeError, json.JSONDecodeError) as exc:
             content = f"工具 {name} 参数 JSON 无效: {exc}"
+            if stats is not None:
+                stats.record_tool_call(name)
+                stats.record_tool_result("invalid_arguments", content)
             logger.error(
                 content,
                 extra={
@@ -1002,6 +1110,8 @@ async def execute_tools(
             else nullcontext()
         )
         with observation_context as tool_observation:
+            if stats is not None:
+                stats.record_tool_call(name, input_data)
             if tracker is not None and not tracker.allow(name, input_data):
                 content = (
                     "检测到相同工具调用已连续重复 "
@@ -1064,6 +1174,8 @@ async def execute_tools(
                     },
                 )
 
+            if stats is not None:
+                stats.record_tool_result(status, content)
             if tool_observation is not None:
                 tool_observation.update(
                     output=summarize_tool_output(content),

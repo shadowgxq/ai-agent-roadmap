@@ -13,7 +13,7 @@ import tempfile
 from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import sys
 from time import perf_counter
@@ -109,6 +109,7 @@ class EvalResult:
     trace_url: str | None = None
     judge_model: str | None = None
     judge_independent: bool | None = None
+    trajectory: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """保证日志和汇总始终拿到独立的能力列表。"""
@@ -340,6 +341,7 @@ async def run_case(
     trace_url: str | None = None
     judge_model: str | None = None
     judge_independent: bool | None = None
+    trajectory: dict[str, Any] = {}
     case: EvalCase | None = None
 
     try:
@@ -383,6 +385,7 @@ async def run_case(
             turns = stats.turns
             trace_id = stats.trace_id
             trace_url = stats.trace_url
+            trajectory = stats.aggregate().trajectory_metrics()
             estimated_cost = estimate_cost(stats, case_settings)
             if estimated_cost is None:
                 raise ValueError("缺少完整的模型价格配置，无法计算 Eval 费用")
@@ -444,6 +447,7 @@ async def run_case(
                             trace_url=trace_url,
                             judge_model=judge_model,
                             judge_independent=judge_independent,
+                            trajectory=trajectory,
                         )
                 cost_usd += judge_run.cost_usd
                 if cost_usd > case.max_cost_usd:
@@ -464,6 +468,7 @@ async def run_case(
                         trace_url=trace_url,
                         judge_model=judge_model,
                         judge_independent=judge_independent,
+                        trajectory=trajectory,
                     )
                 result = EvalResult(
                     case_name=case_name,
@@ -481,6 +486,7 @@ async def run_case(
             result.trace_url = trace_url
             result.judge_model = judge_model
             result.judge_independent = judge_independent
+            result.trajectory = trajectory
             return result
     except CostLimitExceeded as exc:
         return EvalResult(
@@ -493,6 +499,7 @@ async def run_case(
             reason=str(exc),
             trace_id=exc.stats.trace_id,
             trace_url=exc.stats.trace_url,
+            trajectory=exc.stats.aggregate().trajectory_metrics(),
         )
     except MaxTurnsExceeded as exc:
         estimated_cost = estimate_cost(exc.stats, settings)
@@ -506,6 +513,7 @@ async def run_case(
             reason=str(exc),
             trace_id=exc.stats.trace_id,
             trace_url=exc.stats.trace_url,
+            trajectory=exc.stats.aggregate().trajectory_metrics(),
         )
     except asyncio.TimeoutError:
         return EvalResult(
@@ -518,6 +526,7 @@ async def run_case(
             reason=f"Agent 运行超过 {case.agent_timeout_s if case else 180} 秒",
             trace_id=trace_id,
             trace_url=trace_url,
+            trajectory=trajectory,
         )
     except subprocess.TimeoutExpired as exc:
         return EvalResult(
@@ -530,6 +539,7 @@ async def run_case(
             reason=f"验证命令超过 {exc.timeout} 秒",
             trace_id=trace_id,
             trace_url=trace_url,
+            trajectory=trajectory,
         )
     except Exception as exc:
         return EvalResult(
@@ -542,6 +552,7 @@ async def run_case(
             reason=f"{type(exc).__name__}: {exc}",
             trace_id=trace_id,
             trace_url=trace_url,
+            trajectory=trajectory,
         )
 
 
@@ -568,6 +579,7 @@ def log_result(result: EvalResult) -> None:
         "trace_url": result.trace_url,
         "judge_model": result.judge_model,
         "judge_independent": result.judge_independent,
+        "trajectory": result.trajectory,
     }
     if result.judge_result is not None:
         data["judge"] = result.judge_result.model_dump()
@@ -602,6 +614,40 @@ def _average(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def summarize_trajectory(results: list[EvalResult]) -> dict[str, Any]:
+    """汇总每个 case 的轨迹指标，不把它们误当成结果分数。"""
+    return {
+        "tool_call_count": sum(
+            int(result.trajectory.get("tool_call_count", 0))
+            for result in results
+        ),
+        "tool_failure_count": sum(
+            int(result.trajectory.get("tool_failure_count", 0))
+            for result in results
+        ),
+        "subagent_used_cases": sum(
+            bool(result.trajectory.get("subagent_used", False))
+            for result in results
+        ),
+        "mcp_used_cases": sum(
+            bool(result.trajectory.get("mcp_used", False))
+            for result in results
+        ),
+        "verification_command_used_cases": sum(
+            bool(result.trajectory.get("verification_command_used", False))
+            for result in results
+        ),
+        "recovered_after_tool_failure_cases": sum(
+            bool(
+                result.trajectory.get(
+                    "recovered_after_tool_failure", False
+                )
+            )
+            for result in results
+        ),
+    }
+
+
 def log_summary(results: list[EvalResult]) -> None:
     """输出 command/judge 结果和能力维度汇总。"""
     command_results = [
@@ -619,6 +665,7 @@ def log_summary(results: list[EvalResult]) -> None:
     turns = sum(result.turns for result in results)
     duration = sum(result.duration_s for result in results)
     cost = sum(result.cost_usd for result in results)
+    trajectory = summarize_trajectory(results)
 
     command_pass = sum(result.status == "pass" for result in command_results)
     command_total = len(command_results)
@@ -690,6 +737,16 @@ def log_summary(results: list[EvalResult]) -> None:
             )
     lines.extend(
         [
+            (
+                "Trajectory: "
+                f"tool_calls={trajectory['tool_call_count']}, "
+                f"subagent_cases={trajectory['subagent_used_cases']}, "
+                f"mcp_cases={trajectory['mcp_used_cases']}, "
+                "verification_cases="
+                f"{trajectory['verification_command_used_cases']}, "
+                "recovered_cases="
+                f"{trajectory['recovered_after_tool_failure_cases']}"
+            ),
             f"Total: {len(results)} cases, {turns} turns, "
             f"{duration:.2f}s, ${cost:.6f}",
             f"Status: {counts}",
@@ -726,6 +783,7 @@ def log_summary(results: list[EvalResult]) -> None:
                 "turns": turns,
                 "duration_s": duration,
                 "cost_usd": cost,
+                "trajectory": trajectory,
             },
         },
     )
@@ -752,6 +810,7 @@ def write_report(
         for result in results
         if result.eval_type == "judge" and result.judge_result is not None
     ]
+    trajectory = summarize_trajectory(results)
     path = path.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -780,6 +839,7 @@ def write_report(
             "turns": sum(result.turns for result in results),
             "duration_s": sum(result.duration_s for result in results),
             "cost_usd": sum(result.cost_usd for result in results),
+            "trajectory": trajectory,
         },
         "results": [
             {
@@ -796,6 +856,7 @@ def write_report(
                 "trace_url": result.trace_url,
                 "judge_model": result.judge_model,
                 "judge_independent": result.judge_independent,
+                "trajectory": result.trajectory,
                 "judge": (
                     result.judge_result.model_dump()
                     if result.judge_result is not None

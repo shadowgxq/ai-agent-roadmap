@@ -243,6 +243,7 @@ def log_stats(
                     ),
                     "compact_tokens": total_stats.compact_tokens,
                     "total_tokens": total_tokens,
+                    "trajectory": total_stats.trajectory_metrics(),
                 },
             },
         },

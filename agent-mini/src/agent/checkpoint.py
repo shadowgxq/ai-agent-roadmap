@@ -27,6 +27,12 @@ class RunStatsSnapshot(BaseModel):
     compact_output_tokens: int = Field(default=0, ge=0)
     compact_cache_read_input_tokens: int = Field(default=0, ge=0)
     compact_cache_creation_input_tokens: int = Field(default=0, ge=0)
+    tool_call_count: int = Field(default=0, ge=0)
+    mcp_tool_call_count: int = Field(default=0, ge=0)
+    subagent_tool_call_count: int = Field(default=0, ge=0)
+    verification_command_count: int = Field(default=0, ge=0)
+    tool_failure_count: int = Field(default=0, ge=0)
+    recovered_after_tool_failure: bool = False
     subagent_runs: list["RunStatsSnapshot"] = Field(default_factory=list)
 
     @classmethod
@@ -46,6 +52,14 @@ class RunStatsSnapshot(BaseModel):
             ),
             compact_cache_creation_input_tokens=(
                 stats.compact_cache_creation_input_tokens
+            ),
+            tool_call_count=stats.tool_call_count,
+            mcp_tool_call_count=stats.mcp_tool_call_count,
+            subagent_tool_call_count=stats.subagent_tool_call_count,
+            verification_command_count=stats.verification_command_count,
+            tool_failure_count=stats.tool_failure_count,
+            recovered_after_tool_failure=(
+                stats.recovered_after_tool_failure
             ),
             subagent_runs=[cls.from_stats(child)
                            for child in stats.subagent_runs],
@@ -67,6 +81,14 @@ class RunStatsSnapshot(BaseModel):
             ),
             compact_cache_creation_input_tokens=(
                 self.compact_cache_creation_input_tokens
+            ),
+            tool_call_count=self.tool_call_count,
+            mcp_tool_call_count=self.mcp_tool_call_count,
+            subagent_tool_call_count=self.subagent_tool_call_count,
+            verification_command_count=self.verification_command_count,
+            tool_failure_count=self.tool_failure_count,
+            recovered_after_tool_failure=(
+                self.recovered_after_tool_failure
             ),
             subagent_runs=[child.to_stats() for child in self.subagent_runs],
         )

@@ -1,6 +1,7 @@
 """探索型 SubAgent 工具。"""
 
 from pathlib import Path
+from contextlib import nullcontext
 from uuid import uuid4
 
 from langfuse import Langfuse
@@ -69,23 +70,40 @@ def register_subagent_tool(
             role="subagent",
         )
 
-        response, _ = await run(
-            client,
-            child_context,
-            child_registry,
-            model=model,
-            system_prompt=SUBAGENT_SYSTEM_PROMPT,
-            max_turns=15,
-            max_tokens=max_tokens,
-            context_window_tokens=context_window_tokens,
-            prompt_cache=prompt_cache,
-            stats=child_stats,
-            trace=child_trace,
-            langfuse_client=langfuse_client,
+        observation_context = (
+            langfuse_client.start_as_current_observation(
+                as_type="agent",
+                name="subagent",
+                input={"task": task},
+                metadata={
+                    "agent_id": child_trace.agent_id,
+                    "parent_agent_id": parent_trace.agent_id,
+                    "run_id": parent_trace.run_id,
+                },
+            )
+            if langfuse_client is not None
+            else nullcontext()
         )
+        with observation_context as subagent_observation:
+            response, _ = await run(
+                client,
+                child_context,
+                child_registry,
+                model=model,
+                system_prompt=SUBAGENT_SYSTEM_PROMPT,
+                max_turns=15,
+                max_tokens=max_tokens,
+                context_window_tokens=context_window_tokens,
+                prompt_cache=prompt_cache,
+                stats=child_stats,
+                trace=child_trace,
+                langfuse_client=langfuse_client,
+            )
 
-        summary = message_text(response.choices[0].message)
+            summary = message_text(response.choices[0].message)
+            if not summary:
+                raise RuntimeError("SubAgent 没有返回最终总结")
+            if subagent_observation is not None:
+                subagent_observation.update(output=summary)
 
-        if not summary:
-            raise RuntimeError("SubAgent 没有返回最终总结")
         return summary

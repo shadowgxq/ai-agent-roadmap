@@ -48,6 +48,7 @@ class EvalResult:
     duration_s: float = 0.0
     cost_usd: float = 0.0
     reason: str = ""
+    trace_url: str | None = None
 
 
 class EvalCase(BaseModel):
@@ -57,6 +58,8 @@ class EvalCase(BaseModel):
     verify_cmd: str
     timeout_s: int = Field(default=60, gt=0)
     max_cost_usd: float = Field(default=5, gt=0)
+    trace_metadata: dict[str, Any] = Field(default_factory=dict)
+    trace_tags: list[str] = Field(default_factory=list)
 
 
 def discover_cases(cases_root: Path) -> list[Path]:
@@ -177,6 +180,16 @@ async def run_case(
                 workdir=workspace,
                 settings=settings,
                 max_cost_usd=case.max_cost_usd,
+                trace_metadata={
+                    "case_id": case_name,
+                    "experiment": "baseline",
+                    **case.trace_metadata,
+                },
+                trace_tags=[
+                    "eval",
+                    "baseline",
+                    *case.trace_tags,
+                ],
             )
             turns = stats.turns
             estimated_cost = estimate_cost(stats, settings)
@@ -236,6 +249,7 @@ async def run_case(
     )
     result.turns = turns
     result.cost_usd = cost_usd
+    result.trace_url = stats.trace_url
 
     return result
 
@@ -260,9 +274,22 @@ def log_result(result: EvalResult) -> None:
                 "duration_s": result.duration_s,
                 "cost_usd": result.cost_usd,
                 "reason": result.reason or None,
+                "trace_url": result.trace_url,
             },
         },
     )
+    if result.trace_url:
+        logger.info(
+            "Trace URL: %s",
+            result.trace_url,
+            extra={
+                "event": "eval.trace_url",
+                "data": {
+                    "case": result.case_name,
+                    "url": result.trace_url,
+                },
+            },
+        )
     if result.reason:
         logger.info(
             "原因:\n%s",

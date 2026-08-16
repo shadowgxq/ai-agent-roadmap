@@ -3,10 +3,10 @@
 import asyncio
 from contextlib import AsyncExitStack
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
-from langfuse import Langfuse
+from langfuse import Langfuse, propagate_attributes
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
@@ -60,6 +60,8 @@ async def run_coding_agent(
     runs_dir: Path = DEFAULT_RUNS_DIR,
     start_sha: str | None = None,
     event_callback: EventCallback | None = None,
+    trace_metadata: dict[str, Any] | None = None,
+    trace_tags: list[str] | None = None,
 ) -> tuple[ChatCompletion, RunStats]:
     """组装依赖并在指定目录运行一次 Coding Agent。"""
     workdir = workdir.resolve()
@@ -169,17 +171,28 @@ async def run_coding_agent(
                         base_url=settings.langfuse_base_url,
                     )
                     resource_stack.callback(langfuse_client.flush)
+                    root_metadata = dict(trace_metadata or {})
+                    root_metadata.update(
+                        {
+                            "run_id": selected_run_id,
+                            "workdir": str(workdir),
+                            "model": selected_model,
+                            "max_turns": selected_max_turns,
+                        }
+                    )
+                    if trace_metadata or trace_tags:
+                        resource_stack.enter_context(
+                            propagate_attributes(
+                                metadata=trace_metadata or None,
+                                tags=trace_tags or None,
+                            )
+                        )
                     root_observation = resource_stack.enter_context(
                         langfuse_client.start_as_current_observation(
                             as_type="agent",
                             name="agent-mini.run",
                             input={"task": task},
-                            metadata={
-                                "run_id": selected_run_id,
-                                "workdir": str(workdir),
-                                "model": selected_model,
-                                "max_turns": selected_max_turns,
-                            },
+                            metadata=root_metadata,
                         )
                     )
 
@@ -264,17 +277,11 @@ async def run_coding_agent(
                     final_response, final_stats = result
                     total_stats = final_stats.aggregate()
                     local_cost_usd = estimate_cost(final_stats, settings)
-                    root_observation.update(
-                        output={
-                            "answer": message_text(
-                                final_response.choices[0].message
-                            )
-                        },
-                        metadata={
-                            "run_id": selected_run_id,
-                            "workdir": str(workdir),
-                            "model": selected_model,
-                            "max_turns": selected_max_turns,
+                    trace_url = langfuse_client.get_trace_url()
+                    main_stats.trace_url = trace_url
+                    final_metadata = dict(root_metadata)
+                    final_metadata.update(
+                        {
                             "turns": total_stats.turns,
                             "input_tokens": total_stats.input_tokens,
                             "output_tokens": total_stats.output_tokens,
@@ -285,7 +292,17 @@ async def run_coding_agent(
                                 total_stats.cache_creation_input_tokens
                             ),
                             "local_cost_usd": local_cost_usd,
+                        }
+                    )
+                    if trace_url is not None:
+                        final_metadata["trace_url"] = trace_url
+                    root_observation.update(
+                        output={
+                            "answer": message_text(
+                                final_response.choices[0].message
+                            )
                         },
+                        metadata=final_metadata,
                     )
                 return result
     except (asyncio.CancelledError, KeyboardInterrupt):

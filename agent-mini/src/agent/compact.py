@@ -3,8 +3,10 @@
 import asyncio
 import json
 from collections.abc import Callable
+from contextlib import nullcontext
 from typing import Any
 
+from langfuse import Langfuse
 from openai import AsyncOpenAI
 
 from .logging_config import get_logger
@@ -106,7 +108,10 @@ async def compact(
     max_tokens: int = 1000,
     max_attempts: int = 2,
     retry_delay_s: float = 1.0,
-    usage_callback: Callable[[Any], None] | None = None,
+    usage_callback: Callable[[Any], dict[str, int] | None] | None = None,
+    langfuse_client: Langfuse | None = None,
+    turn: int | None = None,
+    before_tokens: int | None = None,
 ) -> list[dict[str, Any]]:
     """重试总结旧历史，并原样保留任务锚点与最近完整轮次。"""
     if max_attempts < 1:
@@ -136,32 +141,90 @@ async def compact(
 
     for attempt in range(1, max_attempts + 1):
         try:
-            response = await client.chat.completions.create(
-                model=model,
-                max_tokens=max_tokens,
-                messages=[
-                    {"role": "system", "content": COMPACT_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": (
-                            f"<original_task>\n{original_task}\n</original_task>\n"
-                            f"<conversation>\n{history}\n</conversation>"
-                        ),
+            request_messages = [
+                {"role": "system", "content": COMPACT_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        f"<original_task>\n{original_task}\n</original_task>\n"
+                        f"<conversation>\n{history}\n</conversation>"
+                    ),
+                },
+            ]
+            span_context = (
+                langfuse_client.start_as_current_observation(
+                    as_type="span",
+                    name="compact-context",
+                    input={
+                        "before_tokens": before_tokens,
+                        "before_message_count": len(messages),
+                        "compact_message_count": len(old_messages),
                     },
-                ],
+                    metadata={
+                        "turn": turn,
+                        "attempt": attempt,
+                        "max_attempts": max_attempts,
+                    },
+                )
+                if langfuse_client is not None
+                else nullcontext()
             )
-            if usage_callback is not None:
-                usage_callback(response.usage)
+            with span_context as compact_span:
+                generation_context = (
+                    langfuse_client.start_as_current_observation(
+                        as_type="generation",
+                        name="compact-summary",
+                        model=model,
+                        input=request_messages,
+                        metadata={
+                            "turn": turn,
+                            "attempt": attempt,
+                            "max_attempts": max_attempts,
+                            "max_tokens": max_tokens,
+                        },
+                    )
+                    if langfuse_client is not None
+                    else nullcontext()
+                )
+                with generation_context as generation:
+                    response = await client.chat.completions.create(
+                        model=model,
+                        max_tokens=max_tokens,
+                        messages=request_messages,
+                    )
+                    usage_details = (
+                        usage_callback(response.usage)
+                        if usage_callback is not None
+                        else None
+                    )
+                    summary = (
+                        response.choices[0].message.content or ""
+                    ).strip()
+                    if not summary:
+                        raise RuntimeError("compact 模型没有返回摘要")
+                    if generation is not None:
+                        generation.update(
+                            output=summary,
+                            usage_details=usage_details,
+                        )
 
-            summary = (response.choices[0].message.content or "").strip()
-            if not summary:
-                raise RuntimeError("compact 模型没有返回摘要")
-
-            summary_message = {
-                "role": "user",
-                "content": f"{SUMMARY_PREFIX}{summary}",
-            }
-            return [*task_anchor, summary_message, *recent_messages]
+                summary_message = {
+                    "role": "user",
+                    "content": f"{SUMMARY_PREFIX}{summary}",
+                }
+                compacted_messages = [
+                    *task_anchor,
+                    summary_message,
+                    *recent_messages,
+                ]
+                if compact_span is not None:
+                    compact_span.update(
+                        output={
+                            "after_message_count": len(compacted_messages),
+                            "strategy": "summary",
+                        },
+                    )
+                return compacted_messages
         except Exception as exc:
             if attempt == max_attempts:
                 raise RuntimeError(

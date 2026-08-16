@@ -65,6 +65,22 @@ def parse_args() -> argparse.Namespace:
         help="禁用探索型 SubAgent，用于对比实验。",
     )
     parser.add_argument(
+        "--case-id",
+        default=None,
+        help="可选的 Eval case 标识，写入 Langfuse trace metadata。",
+    )
+    parser.add_argument(
+        "--experiment",
+        default=None,
+        help="可选的实验名称，写入 Langfuse trace metadata。",
+    )
+    parser.add_argument(
+        "--trace-tag",
+        action="append",
+        default=[],
+        help="Langfuse trace 标签；可重复传入多个。",
+    )
+    parser.add_argument(
         "--resume",
         metavar="RUN_ID",
         help="从指定 run_id 的 checkpoint 恢复任务。",
@@ -94,6 +110,9 @@ def parse_args() -> argparse.Namespace:
         or args.workdir != Path.cwd()
         or not args.enable_subagent
         or args.checkpoint_enabled
+        or args.case_id is not None
+        or args.experiment is not None
+        or args.trace_tag
     ):
         parser.error(
             "--resume 会恢复原始模型、目录、轮数和 SubAgent 配置，"
@@ -105,6 +124,9 @@ def parse_args() -> argparse.Namespace:
         or args.workdir != Path.cwd()
         or not args.enable_subagent
         or args.checkpoint_enabled
+        or args.case_id is not None
+        or args.experiment is not None
+        or args.trace_tag
     ):
         parser.error("--rollback 只需要 RUN_ID，不能覆盖运行参数")
     if args.max_turns is not None and args.max_turns < 1:
@@ -286,6 +308,8 @@ async def main() -> None:
         context_window_tokens = checkpoint.context_window_tokens
         max_cost_usd = checkpoint.max_cost_usd
         enable_subagent = checkpoint.enable_subagent
+        trace_metadata = None
+        trace_tags = None
         context = Context(checkpoint.messages)
         stats = checkpoint.stats.to_stats()
         start_turn = checkpoint.turn
@@ -302,6 +326,15 @@ async def main() -> None:
         context_window_tokens = settings.context_window_tokens
         max_cost_usd = None
         enable_subagent = args.enable_subagent
+        trace_metadata = {
+            key: value
+            for key, value in {
+                "case_id": args.case_id,
+                "experiment": args.experiment,
+            }.items()
+            if value is not None
+        }
+        trace_tags = list(args.trace_tag)
         context = None
         stats = None
         start_turn = 0
@@ -346,6 +379,8 @@ async def main() -> None:
             start_turn=start_turn,
             start_sha=start_sha,
             checkpoint_enabled=checkpoint_enabled,
+            trace_metadata=trace_metadata or None,
+            trace_tags=trace_tags or None,
         )
     except MaxTurnsExceeded as exc:
         logger.error(
@@ -390,6 +425,16 @@ async def main() -> None:
 
     log_stats(stats, trace=trace)
     log_cost(stats, settings, trace=trace)
+    if stats.trace_url:
+        logger.info(
+            "Langfuse Trace URL: %s",
+            stats.trace_url,
+            extra={
+                "event": "run.trace_url",
+                "trace": trace,
+                "data": {"url": stats.trace_url},
+            },
+        )
     finish_reason = final_response.choices[0].finish_reason
     answer = extract_text(final_response)
     logger.info(

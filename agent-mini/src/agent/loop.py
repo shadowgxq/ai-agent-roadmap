@@ -83,6 +83,7 @@ class RunStats:
     compact_cache_read_input_tokens: int = 0
     compact_cache_creation_input_tokens: int = 0
     subagent_runs: list["RunStats"] = field(default_factory=list)
+    trace_url: str | None = None
 
     @property
     def model_tokens(self) -> int:
@@ -136,6 +137,7 @@ class RunStats:
             compact_cache_creation_input_tokens=(
                 self.compact_cache_creation_input_tokens
             ),
+            trace_url=self.trace_url,
         )
         for child in self.subagent_runs:
             child_total = child.aggregate()
@@ -443,7 +445,7 @@ async def run(
             compact_error: Exception | None = None
             compact_calls_before = stats.compact_calls
 
-            def record_compact_usage(raw_usage: Any) -> None:
+            def record_compact_usage(raw_usage: Any) -> dict[str, int]:
                 usage = extract_usage_tokens(raw_usage)
                 stats.add_compact_usage(usage)
                 logger.info(
@@ -470,6 +472,16 @@ async def run(
                         },
                     },
                 )
+                return {
+                    "input": usage.input_tokens,
+                    "output": usage.output_tokens,
+                    "cache_read_input_tokens": (
+                        usage.cache_read_input_tokens
+                    ),
+                    "cache_creation_input_tokens": (
+                        usage.cache_creation_input_tokens
+                    ),
+                }
 
             try:
                 compacted_messages = await compact(
@@ -479,6 +491,9 @@ async def run(
                     keep_recent=compact_keep_recent,
                     max_tokens=compact_max_tokens,
                     usage_callback=record_compact_usage,
+                    langfuse_client=langfuse_client,
+                    turn=turn,
+                    before_tokens=last_context_tokens,
                 )
                 validated_messages = Context(compacted_messages).messages
                 compact_strategy = "summary"

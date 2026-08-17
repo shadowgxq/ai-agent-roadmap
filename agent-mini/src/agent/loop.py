@@ -109,6 +109,7 @@ class RunStats:
     verification_command_count: int = 0
     tool_failure_count: int = 0
     recovered_after_tool_failure: bool = False
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     subagent_runs: list["RunStats"] = field(default_factory=list)
     trace_id: str | None = None
     trace_url: str | None = None
@@ -157,6 +158,9 @@ class RunStats:
         self,
         name: str,
         input_data: dict[str, Any] | None = None,
+        *,
+        tool_call_id: str | None = None,
+        turn: int | None = None,
     ) -> None:
         """记录一次模型发起的工具调用及其来源/用途。"""
         self.tool_call_count += 1
@@ -168,8 +172,23 @@ class RunStats:
             (input_data or {}).get("command")
         ):
             self.verification_command_count += 1
+        self.tool_calls.append(
+            {
+                "id": tool_call_id,
+                "name": name,
+                "arguments": dict(input_data or {}),
+                "turn": turn,
+                "status": "pending",
+            }
+        )
 
-    def record_tool_result(self, status: str, content: str = "") -> None:
+    def record_tool_result(
+        self,
+        status: str,
+        content: str = "",
+        *,
+        tool_call_id: str | None = None,
+    ) -> None:
         """记录工具失败，并识别失败后的后续恢复。"""
         failed = status != "ok"
         if not failed and isinstance(content, str):
@@ -179,6 +198,12 @@ class RunStats:
             self.tool_failure_count += 1
         elif self.tool_failure_count > 0:
             self.recovered_after_tool_failure = True
+        for record in reversed(self.tool_calls):
+            if tool_call_id is not None and record.get("id") != tool_call_id:
+                continue
+            if record.get("status") == "pending":
+                record["status"] = status
+                break
 
     def trajectory_metrics(self) -> dict[str, Any]:
         """返回适合日志、报告和 Langfuse metadata 的轨迹指标。"""
@@ -228,6 +253,7 @@ class RunStats:
             recovered_after_tool_failure=(
                 self.recovered_after_tool_failure
             ),
+            tool_calls=[dict(call) for call in self.tool_calls],
             trace_id=self.trace_id,
             trace_url=self.trace_url,
         )
@@ -263,6 +289,9 @@ class RunStats:
             total.recovered_after_tool_failure = (
                 total.recovered_after_tool_failure
                 or child_total.recovered_after_tool_failure
+            )
+            total.tool_calls.extend(
+                dict(call) for call in child_total.tool_calls
             )
         return total
 
@@ -1073,8 +1102,17 @@ async def execute_tools(
         except (TypeError, json.JSONDecodeError) as exc:
             content = f"工具 {name} 参数 JSON 无效: {exc}"
             if stats is not None:
-                stats.record_tool_call(name)
-                stats.record_tool_result("invalid_arguments", content)
+                stats.record_tool_call(
+                    name,
+                    {},
+                    tool_call_id=tool_call.id,
+                    turn=turn,
+                )
+                stats.record_tool_result(
+                    "invalid_arguments",
+                    content,
+                    tool_call_id=tool_call.id,
+                )
             logger.error(
                 content,
                 extra={
@@ -1111,7 +1149,12 @@ async def execute_tools(
         )
         with observation_context as tool_observation:
             if stats is not None:
-                stats.record_tool_call(name, input_data)
+                stats.record_tool_call(
+                    name,
+                    input_data,
+                    tool_call_id=tool_call.id,
+                    turn=turn,
+                )
             if tracker is not None and not tracker.allow(name, input_data):
                 content = (
                     "检测到相同工具调用已连续重复 "
@@ -1175,7 +1218,11 @@ async def execute_tools(
                 )
 
             if stats is not None:
-                stats.record_tool_result(status, content)
+                stats.record_tool_result(
+                    status,
+                    content,
+                    tool_call_id=tool_call.id,
+                )
             if tool_observation is not None:
                 tool_observation.update(
                     output=summarize_tool_output(content),

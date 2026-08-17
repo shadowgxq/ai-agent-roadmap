@@ -1,4 +1,4 @@
-.PHONY: agent help eval eval-case eval-core eval-regression eval-smoke eval-judge eval-full eval-all
+.PHONY: agent help eval eval-case eval-core eval-regression eval-smoke eval-judge eval-session04 eval-full eval-all
 
 UV ?= uv
 EVAL_RUNNER := $(UV) run python evals/run.py
@@ -25,7 +25,8 @@ help:
 	@echo "  make eval-regression              运行 regression（6 个）"
 	@echo "  make eval-smoke                   运行 smoke（6 个）"
 	@echo "  make eval-judge                   运行 Judge（5 个）"
-	@echo "  make eval-full 或 make eval-all   运行全量（28 个）"
+	@echo "  make eval-session04              运行 Session04 行为约束（4 个）"
+	@echo "  make eval-full 或 make eval-all   运行全量（32 个）"
 	@echo ""
 	@echo "可选变量：SUITE=core CASE=name EXPERIMENT=name REPORT_FILE=path UV=uv"
 
@@ -47,6 +48,9 @@ eval-smoke:
 
 eval-judge:
 	$(MAKE) eval SUITE=judge CASE="ambiguous_tradeoff explain_architecture explain_module write_readme code_review_report"
+
+eval-session04:
+	$(MAKE) eval SUITE=session04
 
 eval-full:
 	$(MAKE) eval SUITE=full

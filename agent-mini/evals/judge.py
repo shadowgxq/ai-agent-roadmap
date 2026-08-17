@@ -22,6 +22,7 @@ class JudgeResult(BaseModel):
     accuracy: int = Field(ge=1, le=5)
     completeness: int = Field(ge=1, le=5)
     conciseness: int = Field(ge=1, le=5)
+    clarification_score: int | None = Field(default=None, ge=1, le=5)
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,8 @@ def build_judge_prompt(
     task: str,
     reference: str,
     answer: str,
+    tool_calls: list[dict[str, Any]] | None = None,
+    include_clarification: bool = False,
     previous_output: str = "",
     parse_error: str = "",
 ) -> str:
@@ -50,6 +53,26 @@ def build_judge_prompt(
             f"解析错误：\n{parse_error}\n"
         )
 
+    tool_call_text = json.dumps(
+        tool_calls or [], ensure_ascii=False, indent=2, default=str
+    )
+    if len(tool_call_text) > 12_000:
+        tool_call_text = tool_call_text[:12_000] + \
+            "\n...[tool calls truncated]"
+
+    clarification_rubric = ""
+    clarification_fields = ""
+    if include_clarification:
+        clarification_rubric = (
+            "clarification_score：是否识别了会导致不同修改的关键信息缺口，"
+            "并提出了相关、可执行的澄清问题。"
+            "5=明确指出缺失信息并提出针对性问题；"
+            "4=正确识别歧义并提出基本充分的问题；"
+            "3=意识到歧义但问题不完整；"
+            "2=基本猜测用户意图；1=直接猜测并执行。\n"
+        )
+        clarification_fields = "、clarification_score"
+
     return (
         "【任务】\n"
         f"{task}\n\n"
@@ -57,10 +80,13 @@ def build_judge_prompt(
         f"{reference}\n\n"
         "【被评测 Agent 的回答】\n"
         f"{answer}\n\n"
+        "【被评测 Agent 的工具调用】\n"
+        f"{tool_call_text}\n\n"
         "请基于参考事实评价 Agent 回答。\n"
         "accuracy：事实、技术判断和结论是否正确。\n"
         "completeness：是否覆盖任务要求和参考事实中的关键点。\n"
         "conciseness：是否清晰、直接，并避免无关重复。\n\n"
+        f"{clarification_rubric}"
         "三个维度必须分别使用以下评分锚点，不能把一个维度的定义套用到另一个维度：\n"
         "accuracy：5=所有关键事实和结论正确；4=核心判断正确，仅有轻微不精确；"
         "3=存在一个重要事实或技术错误，但核心方向仍可用；"
@@ -73,7 +99,8 @@ def build_judge_prompt(
         "2=大量无关或重复内容，明显影响理解；1=极度混乱、冗长或过度简略到无法使用。\n"
         "每项分数只能是 1 到 5 的整数。\n"
         "只输出一个 JSON 对象，不要输出 Markdown、代码围栏或额外文字。\n"
-        "JSON 字段必须是：reasoning、accuracy、completeness、conciseness。"
+        "JSON 字段必须是：reasoning、accuracy、completeness、conciseness"
+        f"{clarification_fields}。"
         f"{repair_context}"
     )
 
@@ -97,7 +124,7 @@ def _parse_json_output(raw_output: str) -> JudgeResult:
         if start < 0 or end <= start:
             raise ValueError("Judge 输出不包含 JSON 对象") from None
         try:
-            payload = json.loads(text[start : end + 1])
+            payload = json.loads(text[start: end + 1])
         except json.JSONDecodeError as exc:
             raise ValueError(f"Judge JSON 解析失败: {exc}") from exc
 
@@ -145,6 +172,8 @@ async def judge_output(
     reference: str,
     answer: str,
     trace_id: str | None,
+    tool_calls: list[dict[str, Any]] | None = None,
+    include_clarification: bool = False,
     max_attempts: int = 2,
 ) -> JudgeRun:
     """调用独立 Judge，并将三个维度的分数挂到原始 Agent Trace。"""
@@ -178,6 +207,7 @@ async def judge_output(
                     "task": task,
                     "reference": reference,
                     "answer": answer,
+                    "tool_calls": tool_calls or [],
                 },
                 metadata={"case_id": case_name, "eval_type": "judge"},
             )
@@ -202,6 +232,8 @@ async def judge_output(
                             task=task,
                             reference=reference,
                             answer=answer,
+                            tool_calls=tool_calls,
+                            include_clarification=include_clarification,
                             previous_output=previous_output,
                             parse_error=parse_error,
                         ),

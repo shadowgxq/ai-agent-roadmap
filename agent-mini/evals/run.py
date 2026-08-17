@@ -1,6 +1,15 @@
 """发现、运行并汇总 agent-mini Eval Framework v2 cases。"""
 
 from __future__ import annotations
+from src.agent.runtime import run_coding_agent
+from src.agent.loop import (
+    CostLimitExceeded,
+    MaxTurnsExceeded,
+    message_text,
+)
+from src.agent.logging_config import configure_logging, get_logger
+from src.agent.cost import estimate_cost
+from src.agent.config import AgentSettings
 
 import argparse
 import asyncio
@@ -29,20 +38,22 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.agent.config import AgentSettings
-from src.agent.cost import estimate_cost
-from src.agent.logging_config import configure_logging, get_logger
-from src.agent.loop import (
-    CostLimitExceeded,
-    MaxTurnsExceeded,
-    message_text,
-)
-from src.agent.runtime import run_coding_agent
-
 
 if __package__:
+    from .assertions import (
+        AssertionResult,
+        evaluate_behavior,
+        format_failures,
+        snapshot_workspace,
+    )
     from .judge import JudgeResult, judge_output
 else:
+    from assertions import (
+        AssertionResult,
+        evaluate_behavior,
+        format_failures,
+        snapshot_workspace,
+    )
     from judge import JudgeResult, judge_output
 
 
@@ -51,7 +62,7 @@ CASES_ROOT = EVALS_ROOT / "cases"
 REGRESSION_ROOT = EVALS_ROOT / "regression"
 logger = get_logger("evals")
 
-EvalType = Literal["command", "judge"]
+EvalType = Literal["command", "judge", "behavior"]
 ToolMode = Literal["all", "rag", "search"]
 
 
@@ -110,6 +121,8 @@ class EvalResult:
     judge_model: str | None = None
     judge_independent: bool | None = None
     trajectory: dict[str, Any] = field(default_factory=dict)
+    assertions: list[dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """保证日志和汇总始终拿到独立的能力列表。"""
@@ -127,6 +140,8 @@ class EvalCase(BaseModel):
     suite: list[str] = Field(default_factory=lambda: ["core"])
     verify_cmd: str | None = None
     judge_reference_file: str | None = None
+    expected: dict[str, Any] = Field(default_factory=dict)
+    min_clarification_score: int = Field(default=4, ge=1, le=5)
     agent_timeout_s: int = Field(default=180, gt=0)
     timeout_s: int = Field(default=60, gt=0)
     max_cost_usd: float = Field(default=5, gt=0)
@@ -144,6 +159,12 @@ class EvalCase(BaseModel):
             raise ValueError("command case 必须配置 verify_cmd")
         if self.eval_type == "judge" and not self.judge_reference_file:
             raise ValueError("judge case 必须配置 judge_reference_file")
+        if self.eval_type == "behavior" and not self.expected:
+            raise ValueError("behavior case 必须配置 expected")
+        if self.expected.get("should_clarify") and not self.judge_reference_file:
+            raise ValueError(
+                "should_clarify behavior case 必须配置 judge_reference_file"
+            )
         if self.mcp_config_file and self.tool_mode != "all":
             raise ValueError("配置 MCP 时 tool_mode 必须为 all")
         return self
@@ -265,7 +286,7 @@ def build_verification_result(
     if completed.returncode == 0:
         return EvalResult(
             case_name=case_name,
-            eval_type="command",
+            eval_type=case.eval_type,
             status="pass",
             difficulty=case.difficulty,
             capabilities=case.capabilities,
@@ -283,7 +304,7 @@ def build_verification_result(
     reason = output[-2000:] or f"验证命令退出码: {completed.returncode}"
     return EvalResult(
         case_name=case_name,
-        eval_type="command",
+        eval_type=case.eval_type,
         status="fail",
         difficulty=case.difficulty,
         capabilities=case.capabilities,
@@ -342,6 +363,8 @@ async def run_case(
     judge_model: str | None = None
     judge_independent: bool | None = None
     trajectory: dict[str, Any] = {}
+    assertions: list[dict[str, Any]] = []
+    tool_calls: list[dict[str, Any]] = []
     case: EvalCase | None = None
 
     try:
@@ -356,6 +379,7 @@ async def run_case(
 
         with temporary_workspace(case_dir) as workspace:
             case_settings = build_case_settings(settings, case, workspace)
+            before_snapshot = snapshot_workspace(workspace)
             final_response, stats = await asyncio.wait_for(
                 run_coding_agent(
                     task=case.task,
@@ -385,7 +409,10 @@ async def run_case(
             turns = stats.turns
             trace_id = stats.trace_id
             trace_url = stats.trace_url
-            trajectory = stats.aggregate().trajectory_metrics()
+            aggregate_stats = stats.aggregate()
+            trajectory = aggregate_stats.trajectory_metrics()
+            tool_calls = aggregate_stats.tool_calls
+            after_snapshot = snapshot_workspace(workspace)
             estimated_cost = estimate_cost(stats, case_settings)
             if estimated_cost is None:
                 raise ValueError("缺少完整的模型价格配置，无法计算 Eval 费用")
@@ -404,7 +431,37 @@ async def run_case(
                     completed=completed,
                     duration_s=perf_counter() - started_at,
                 )
-            else:
+            elif case.eval_type == "behavior":
+                behavior_assertions = evaluate_behavior(
+                    tool_calls=tool_calls,
+                    expected=case.expected,
+                    before=before_snapshot,
+                    after=after_snapshot,
+                )
+                assertions = [
+                    assertion.to_dict()
+                    for assertion in behavior_assertions
+                ]
+                deterministic_pass = all(
+                    assertion.passed for assertion in behavior_assertions
+                )
+                result = EvalResult(
+                    case_name=case_name,
+                    eval_type="behavior",
+                    status="pass" if deterministic_pass else "fail",
+                    difficulty=case.difficulty,
+                    capabilities=case.capabilities,
+                    duration_s=perf_counter() - started_at,
+                    reason=(
+                        ""
+                        if deterministic_pass
+                        else "行为断言失败: "
+                        + format_failures(behavior_assertions)
+                    ),
+                    assertions=assertions,
+                    tool_calls=tool_calls,
+                )
+            if case.eval_type == "judge" or case.judge_reference_file:
                 reference = read_judge_reference(case_dir, case)
                 judge_model = case_settings.judge_model or case_settings.model
                 judge_independent = (
@@ -427,13 +484,18 @@ async def run_case(
                                 reference=reference,
                                 answer=agent_answer,
                                 trace_id=trace_id,
+                                tool_calls=tool_calls,
+                                include_clarification=(
+                                    case.expected.get("should_clarify")
+                                    is True
+                                ),
                             ),
                             timeout=case.agent_timeout_s,
                         )
                     except asyncio.TimeoutError:
                         return EvalResult(
                             case_name=case_name,
-                            eval_type="judge",
+                            eval_type=case.eval_type,
                             status="error",
                             difficulty=case.difficulty,
                             capabilities=case.capabilities,
@@ -448,12 +510,14 @@ async def run_case(
                             judge_model=judge_model,
                             judge_independent=judge_independent,
                             trajectory=trajectory,
+                            assertions=assertions,
+                            tool_calls=tool_calls,
                         )
                 cost_usd += judge_run.cost_usd
                 if cost_usd > case.max_cost_usd:
                     return EvalResult(
                         case_name=case_name,
-                        eval_type="judge",
+                        eval_type=case.eval_type,
                         status="fail",
                         difficulty=case.difficulty,
                         capabilities=case.capabilities,
@@ -469,16 +533,49 @@ async def run_case(
                         judge_model=judge_model,
                         judge_independent=judge_independent,
                         trajectory=trajectory,
+                        assertions=assertions,
+                        tool_calls=tool_calls,
                     )
-                result = EvalResult(
-                    case_name=case_name,
-                    eval_type="judge",
-                    status="scored",
-                    difficulty=case.difficulty,
-                    capabilities=case.capabilities,
-                    duration_s=perf_counter() - started_at,
-                    judge_result=judge_run.result,
-                )
+                if case.eval_type == "judge":
+                    result = EvalResult(
+                        case_name=case_name,
+                        eval_type="judge",
+                        status="scored",
+                        difficulty=case.difficulty,
+                        capabilities=case.capabilities,
+                        duration_s=perf_counter() - started_at,
+                        judge_result=judge_run.result,
+                    )
+                else:
+                    result.judge_result = judge_run.result
+                    if case.expected.get("should_clarify") is True:
+                        score = judge_run.result.clarification_score
+                        clarification_pass = (
+                            score is not None
+                            and score >= case.min_clarification_score
+                        )
+                        clarification_assertion = AssertionResult(
+                            name="should_clarify",
+                            passed=clarification_pass,
+                            expected=(
+                                f"clarification_score >= "
+                                f"{case.min_clarification_score}"
+                            ),
+                            actual=score,
+                            detail=judge_run.result.reasoning,
+                        ).to_dict()
+                        assertions.append(clarification_assertion)
+                        result.assertions = assertions
+                        if not clarification_pass:
+                            result.status = "fail"
+                            result.reason = (
+                                result.reason + "; "
+                                if result.reason
+                                else ""
+                            ) + (
+                                "Judge 澄清断言失败: "
+                                f"clarification_score={score}"
+                            )
 
             result.turns = turns
             result.cost_usd = cost_usd
@@ -487,6 +584,8 @@ async def run_case(
             result.judge_model = judge_model
             result.judge_independent = judge_independent
             result.trajectory = trajectory
+            result.assertions = assertions
+            result.tool_calls = tool_calls
             return result
     except CostLimitExceeded as exc:
         return EvalResult(
@@ -500,6 +599,7 @@ async def run_case(
             trace_id=exc.stats.trace_id,
             trace_url=exc.stats.trace_url,
             trajectory=exc.stats.aggregate().trajectory_metrics(),
+            tool_calls=exc.stats.aggregate().tool_calls,
         )
     except MaxTurnsExceeded as exc:
         estimated_cost = estimate_cost(exc.stats, settings)
@@ -514,6 +614,7 @@ async def run_case(
             trace_id=exc.stats.trace_id,
             trace_url=exc.stats.trace_url,
             trajectory=exc.stats.aggregate().trajectory_metrics(),
+            tool_calls=exc.stats.aggregate().tool_calls,
         )
     except asyncio.TimeoutError:
         return EvalResult(
@@ -527,6 +628,8 @@ async def run_case(
             trace_id=trace_id,
             trace_url=trace_url,
             trajectory=trajectory,
+            assertions=assertions,
+            tool_calls=tool_calls,
         )
     except subprocess.TimeoutExpired as exc:
         return EvalResult(
@@ -540,6 +643,8 @@ async def run_case(
             trace_id=trace_id,
             trace_url=trace_url,
             trajectory=trajectory,
+            assertions=assertions,
+            tool_calls=tool_calls,
         )
     except Exception as exc:
         return EvalResult(
@@ -553,6 +658,8 @@ async def run_case(
             trace_id=trace_id,
             trace_url=trace_url,
             trajectory=trajectory,
+            assertions=assertions,
+            tool_calls=tool_calls,
         )
 
 
@@ -580,6 +687,8 @@ def log_result(result: EvalResult) -> None:
         "judge_model": result.judge_model,
         "judge_independent": result.judge_independent,
         "trajectory": result.trajectory,
+        "assertions": result.assertions,
+        "tool_calls": result.tool_calls,
     }
     if result.judge_result is not None:
         data["judge"] = result.judge_result.model_dump()
@@ -588,6 +697,10 @@ def log_result(result: EvalResult) -> None:
             f" completeness={result.judge_result.completeness}"
             f" conciseness={result.judge_result.conciseness}"
         )
+        if result.judge_result.clarification_score is not None:
+            summary += (
+                f" clarification={result.judge_result.clarification_score}"
+            )
     logger.info(summary, extra={"event": "eval.case_completed", "data": data})
     if result.trace_url:
         logger.info(
@@ -653,10 +766,13 @@ def log_summary(results: list[EvalResult]) -> None:
     command_results = [
         result for result in results if result.eval_type == "command"
     ]
+    behavior_results = [
+        result for result in results if result.eval_type == "behavior"
+    ]
     judge_results = [
         result
         for result in results
-        if result.eval_type == "judge" and result.judge_result is not None
+        if result.judge_result is not None
     ]
     counts = {
         status: sum(result.status == status for result in results)
@@ -672,18 +788,27 @@ def log_summary(results: list[EvalResult]) -> None:
     command_rate = (
         command_pass / command_total * 100 if command_total else None
     )
-    judge_averages = {
-        dimension: _average(
-            [getattr(result.judge_result, dimension)
-             for result in judge_results]
-        )
-        for dimension in ("accuracy", "completeness", "conciseness")
-    }
+    judge_averages: dict[str, float | None] = {}
+    for dimension in (
+        "accuracy",
+        "completeness",
+        "conciseness",
+        "clarification_score",
+    ):
+        values = [
+            getattr(result.judge_result, dimension)
+            for result in judge_results
+            if getattr(result.judge_result, dimension) is not None
+        ]
+        if values:
+            judge_averages[dimension] = _average(values)
 
     capability_data: dict[str, dict[str, Any]] = defaultdict(
         lambda: {
             "command_total": 0,
             "command_pass": 0,
+            "behavior_total": 0,
+            "behavior_pass": 0,
             "judge_scores": defaultdict(list),
         }
     )
@@ -693,10 +818,17 @@ def log_summary(results: list[EvalResult]) -> None:
             if result.eval_type == "command":
                 item["command_total"] += 1
                 item["command_pass"] += result.status == "pass"
-            elif result.judge_result is not None:
+            elif result.eval_type == "behavior":
+                item["behavior_total"] += 1
+                item["behavior_pass"] += result.status == "pass"
+            if result.judge_result is not None:
                 for dimension in ("accuracy", "completeness", "conciseness"):
                     item["judge_scores"][dimension].append(
                         getattr(result.judge_result, dimension)
+                    )
+                if result.judge_result.clarification_score is not None:
+                    item["judge_scores"]["clarification_score"].append(
+                        result.judge_result.clarification_score
                     )
 
     lines = ["Eval Summary", "=" * 30]
@@ -704,6 +836,14 @@ def log_summary(results: list[EvalResult]) -> None:
         lines.append(
             f"Command: {command_pass}/{command_total} PASS"
             f" ({command_rate:.1f}%)"
+        )
+    if behavior_results:
+        behavior_pass = sum(
+            result.status == "pass" for result in behavior_results
+        )
+        lines.append(
+            f"Behavior: {behavior_pass}/{len(behavior_results)} PASS"
+            f" ({behavior_pass / len(behavior_results) * 100:.1f}%)"
         )
     if judge_results:
         lines.append(
@@ -722,6 +862,13 @@ def log_summary(results: list[EvalResult]) -> None:
             lines.append(
                 f"  {capability}: "
                 f"{item['command_pass']}/{item['command_total']} "
+                f"({rate:.1f}%)"
+            )
+        elif item["behavior_total"]:
+            rate = item["behavior_pass"] / item["behavior_total"] * 100
+            lines.append(
+                f"  {capability}: behavior "
+                f"{item['behavior_pass']}/{item['behavior_total']} "
                 f"({rate:.1f}%)"
             )
         else:
@@ -767,15 +914,13 @@ def log_summary(results: list[EvalResult]) -> None:
                     name: {
                         "command_total": item["command_total"],
                         "command_pass": item["command_pass"],
+                        "behavior_total": item["behavior_total"],
+                        "behavior_pass": item["behavior_pass"],
                         "judge_averages": {
                             dimension: _average(
                                 item["judge_scores"][dimension]
                             )
-                            for dimension in (
-                                "accuracy",
-                                "completeness",
-                                "conciseness",
-                            )
+                            for dimension in item["judge_scores"]
                         },
                     }
                     for name, item in capability_data.items()
@@ -805,16 +950,19 @@ def write_report(
     command_results = [
         result for result in results if result.eval_type == "command"
     ]
+    behavior_results = [
+        result for result in results if result.eval_type == "behavior"
+    ]
     judge_results = [
         result
         for result in results
-        if result.eval_type == "judge" and result.judge_result is not None
+        if result.judge_result is not None
     ]
     trajectory = summarize_trajectory(results)
     path = path.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "experiment": experiment,
         "suite": suite,
         "cases": [path.name for path in selected_cases],
@@ -825,15 +973,23 @@ def write_report(
                 result.status == "pass" for result in command_results
             ),
             "command_total": len(command_results),
+            "behavior_pass": sum(
+                result.status == "pass" for result in behavior_results
+            ),
+            "behavior_total": len(behavior_results),
             "judge_averages": {
                 dimension: _average(
-                    [getattr(result.judge_result, dimension)
-                     for result in judge_results]
+                    [
+                        getattr(result.judge_result, dimension)
+                        for result in judge_results
+                        if getattr(result.judge_result, dimension) is not None
+                    ]
                 )
                 for dimension in (
                     "accuracy",
                     "completeness",
                     "conciseness",
+                    "clarification_score",
                 )
             },
             "turns": sum(result.turns for result in results),
@@ -857,6 +1013,8 @@ def write_report(
                 "judge_model": result.judge_model,
                 "judge_independent": result.judge_independent,
                 "trajectory": result.trajectory,
+                "assertions": result.assertions,
+                "tool_calls": result.tool_calls,
                 "judge": (
                     result.judge_result.model_dump()
                     if result.judge_result is not None

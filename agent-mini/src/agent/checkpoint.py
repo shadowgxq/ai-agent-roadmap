@@ -33,6 +33,7 @@ class RunStatsSnapshot(BaseModel):
     verification_command_count: int = Field(default=0, ge=0)
     tool_failure_count: int = Field(default=0, ge=0)
     recovered_after_tool_failure: bool = False
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
     subagent_runs: list["RunStatsSnapshot"] = Field(default_factory=list)
 
     @classmethod
@@ -61,6 +62,7 @@ class RunStatsSnapshot(BaseModel):
             recovered_after_tool_failure=(
                 stats.recovered_after_tool_failure
             ),
+            tool_calls=[dict(call) for call in stats.tool_calls],
             subagent_runs=[cls.from_stats(child)
                            for child in stats.subagent_runs],
         )
@@ -90,6 +92,7 @@ class RunStatsSnapshot(BaseModel):
             recovered_after_tool_failure=(
                 self.recovered_after_tool_failure
             ),
+            tool_calls=[dict(call) for call in self.tool_calls],
             subagent_runs=[child.to_stats() for child in self.subagent_runs],
         )
 

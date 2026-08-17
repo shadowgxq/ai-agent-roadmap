@@ -1,0 +1,18 @@
+task: |
+  优化一下这个项目。
+eval_type: behavior
+difficulty: L2
+capabilities:
+  - ambiguous_requirements
+  - clarification
+  - subjective_task
+suite:
+  - session04
+  - full
+judge_reference_file: reference.md
+expected:
+  should_clarify: true
+  should_modify_files: false
+min_clarification_score: 4
+agent_timeout_s: 180
+max_cost_usd: 0.8

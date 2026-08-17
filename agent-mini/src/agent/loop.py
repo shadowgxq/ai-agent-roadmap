@@ -698,7 +698,9 @@ async def run(
                     },
                 )
 
+        llm_started_at = time.perf_counter()
         response = await call_llm(
+            # 计时覆盖完整的请求和重试过程；token/cost 仍交给 Langfuse。
             client,
             context,
             model=model,
@@ -712,16 +714,36 @@ async def run(
         )
         message = response.choices[0].message
         text = message_text(message)
-        if text:
-            logger.info(
-                "模型返回文本",
-                extra={
-                    "event": "agent.model_text",
-                    "trace": trace.event_context(turn),
-                    "console_message": f"模型文本: {text}",
-                    "data": {"text": text},
-                },
+        tool_call_names = [
+            tool_call.function.name for tool_call in message.tool_calls or []
+        ]
+        llm_data = {
+            "turn": turn,
+            "duration_ms": round((time.perf_counter() - llm_started_at) * 1000),
+            "text_preview": local_text_preview(text) if text else None,
+            "tool_calls": tool_call_names,
+            "finish_reason": response.choices[0].finish_reason,
+        }
+        if tool_call_names:
+            text_prefix = f"{local_text_preview(text)} | " if text else ""
+            console_message = (
+                f"Turn {turn} → {text_prefix}tools: "
+                f"{', '.join(tool_call_names)}"
             )
+        else:
+            console_message = f"Turn {turn} → final answer"
+        logger.info(
+            "LLM 完成: turn=%s tools=%s",
+            turn,
+            len(tool_call_names),
+            extra={
+                "event": "llm.completed",
+                "trace": trace.event_context(turn),
+                "console_message": console_message,
+                "data": llm_data,
+            },
+        )
+        if text:
             await emit_event(
                 event_callback,
                 "text",
@@ -805,11 +827,25 @@ async def run(
             if checkpoint_callback is not None:
                 checkpoint_callback(context, stats, turn, "completed")
             logger.info(
+                "Agent 最终回答",
+                extra={
+                    "event": "agent.final_answer",
+                    "trace": trace.event_context(turn),
+                    "console_message": f"Final answer: {text}",
+                    "data": {
+                        "turn": turn,
+                        "text": text,
+                        "finish_reason": response.choices[0].finish_reason,
+                    },
+                },
+            )
+            logger.info(
                 "Agent 完成: %s",
                 trace.agent_id,
                 extra={
                     "event": "agent.completed",
                     "trace": trace.event_context(turn),
+                    "console_message": f"Agent completed: {stats.turns} turns",
                     "data": {
                         "turns": stats.turns,
                         "finish_reason": response.choices[0].finish_reason,
@@ -1066,11 +1102,12 @@ def assistant_message(message: ChatCompletionMessage) -> dict[str, Any]:
     return result
 
 
-def summarize_tool_output(content: str, limit: int = 2000) -> str:
-    """只给 Langfuse 保存有限长度的工具输出，Agent 仍使用完整结果。"""
-    if len(content) <= limit:
-        return content
-    return content[:limit] + f"\n...[truncated, total={len(content)} chars]"
+def local_text_preview(text: str, limit: int = 200) -> str:
+    """生成不会撑爆终端的单行文本预览。"""
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[:limit] + f"...[truncated, total={len(normalized)} chars]"
 
 
 async def execute_tools(
@@ -1092,6 +1129,7 @@ async def execute_tools(
     tool_calls = message.tool_calls or []
     for tool_call in tool_calls:
         name = tool_call.function.name
+        tool_started_at = time.perf_counter()
         trace_context = (
             trace.event_context(turn) if trace is not None else None
         )
@@ -1116,12 +1154,17 @@ async def execute_tools(
             logger.error(
                 content,
                 extra={
-                    "event": "agent.tool_invalid_arguments",
+                    "event": "tool.completed",
                     "trace": trace_context,
+                    "console_message": f"→ {name} ✗ invalid arguments",
                     "data": {
                         "tool": name,
                         "status": "invalid_arguments",
-                        "error": str(exc),
+                        "duration_ms": round(
+                            (time.perf_counter() - tool_started_at) * 1000
+                        ),
+                        "result_size": len(content),
+                        "error": local_text_preview(content),
                     },
                 },
             )
@@ -1161,34 +1204,7 @@ async def execute_tools(
                     f"{tracker.max_consecutive} 次，请停止重复调用并采取下一步行动。"
                 )
                 status = "blocked"
-                logger.warning(
-                    "拦截重复调用: %s %s",
-                    name,
-                    input_data,
-                    extra={
-                        "event": "agent.tool_blocked",
-                        "trace": trace_context,
-                        "data": {
-                            "tool": name,
-                            "status": status,
-                            "arguments": input_data,
-                        },
-                    },
-                )
             else:
-                logger.info(
-                    "工具开始: %s",
-                    name,
-                    extra={
-                        "event": "agent.tool_started",
-                        "trace": trace_context,
-                        "console_message": f"调用工具: {name} {input_data}",
-                        "data": {
-                            "tool": name,
-                            "arguments": input_data,
-                        },
-                    },
-                )
                 try:
                     execution = await asyncio.wait_for(
                         registry.execute_with_status(name, input_data),
@@ -1201,21 +1217,37 @@ async def execute_tools(
                         f"工具 {name} 执行超时（超过 {tool_timeout:g} 秒）"
                     )
                     status = "timeout"
-                logger.info(
-                    "工具完成: %s (%s)",
-                    name,
-                    status,
-                    extra={
-                        "event": "agent.tool_completed",
-                        "trace": trace_context,
-                        "console_message": f"工具结果: {content}",
-                        "data": {
-                            "tool": name,
-                            "status": status,
-                            "content": content,
-                        },
+
+            duration_ms = round(
+                (time.perf_counter() - tool_started_at) * 1000
+            )
+            preview = local_text_preview(content)
+            console_status = "✓" if status == "ok" else "✗"
+            log_method = logger.info if status == "ok" else logger.warning
+            log_method(
+                "工具完成: %s (%s)",
+                name,
+                status,
+                extra={
+                    "event": "tool.completed",
+                    "trace": trace_context,
+                    "console_message": (
+                        f"→ {name} {console_status} ({duration_ms}ms)"
+                    ),
+                    "data": {
+                        "tool": name,
+                        "status": status,
+                        "duration_ms": duration_ms,
+                        "result_size": len(content),
+                        "preview": preview,
+                        **(
+                            {"error": preview}
+                            if status != "ok"
+                            else {}
+                        ),
                     },
-                )
+                },
+            )
 
             if stats is not None:
                 stats.record_tool_result(
@@ -1225,7 +1257,7 @@ async def execute_tools(
                 )
             if tool_observation is not None:
                 tool_observation.update(
-                    output=summarize_tool_output(content),
+                    output=content,
                     metadata={
                         "turn": turn,
                         "tool_call_id": tool_call.id,

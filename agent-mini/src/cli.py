@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -94,7 +95,7 @@ def parse_args() -> argparse.Namespace:
         "--log-file",
         type=Path,
         default=None,
-        help="JSON 运行日志；默认 logs/agent.json，每次运行覆盖写入。",
+        help="JSONL 运行日志；默认 logs/agent.jsonl，按运行追加写入。",
     )
 
     args = parser.parse_args()
@@ -345,11 +346,12 @@ async def main() -> None:
     trace = {"run_id": run_id, "agent_id": "main", "role": "main"}
     log_file = configure_logging(args.log_file or settings.log_file)
     logger.info(
-        "详细日志: %s",
+        "[RUN] %s",
         log_file,
         extra={
             "event": "run.resumed" if args.resume else "run.started",
             "trace": trace,
+            "console_message": f"[RUN] {task}",
             "data": {
                 "task": task,
                 "workdir": str(workdir),
@@ -364,6 +366,7 @@ async def main() -> None:
     )
 
     try:
+        run_started_at = perf_counter()
         final_response, stats = await run_coding_agent(
             task=task,
             workdir=workdir,
@@ -382,47 +385,21 @@ async def main() -> None:
             checkpoint_enabled=checkpoint_enabled,
             trace_metadata=trace_metadata or None,
             trace_tags=trace_tags or None,
+            log_start=False,
+            log_completion=False,
         )
     except MaxTurnsExceeded as exc:
-        logger.error(
-            "运行失败: %s",
-            exc,
-            extra={"event": "run.max_turns_exceeded", "trace": trace},
-        )
         log_stats(exc.stats, trace=trace)
         log_cost(exc.stats, settings, trace=trace)
-        logger.error(
-            "可使用 --rollback %s 恢复任务开始前的文件状态。",
-            run_id,
-            extra={"event": "run.rollback_available", "trace": trace},
-        )
         return
     except CostLimitExceeded as exc:
-        logger.error(
-            "运行因费用上限停止: %s",
-            exc,
-            extra={"event": "run.cost_limit_exceeded", "trace": trace},
-        )
         log_stats(exc.stats, trace=trace)
         log_cost(exc.stats, settings, trace=trace)
-        logger.error(
-            "可使用 --rollback %s 恢复任务开始前的文件状态。",
-            run_id,
-            extra={"event": "run.rollback_available", "trace": trace},
-        )
         return
-    except APIError as exc:
-        logger.error(
-            "模型请求失败: %s",
-            exc,
-            extra={"event": "run.api_error", "trace": trace},
-        )
-        logger.error(
-            "可使用 --rollback %s 恢复任务开始前的文件状态。",
-            run_id,
-            extra={"event": "run.rollback_available", "trace": trace},
-        )
+    except APIError:
         return
+    except Exception:
+        raise
 
     log_stats(stats, trace=trace)
     log_cost(stats, settings, trace=trace)
@@ -437,14 +414,18 @@ async def main() -> None:
             },
         )
     finish_reason = final_response.choices[0].finish_reason
-    answer = extract_text(final_response)
     logger.info(
         "运行完成",
         extra={
             "event": "run.completed",
             "trace": trace,
-            "console_message": f"最终回答: {answer}",
-            "data": {"finish_reason": finish_reason, "answer": answer},
+            "data": {
+                "status": "completed",
+                "finish_reason": finish_reason,
+                "trace_id": stats.trace_id,
+                "trace_url": stats.trace_url,
+                "duration_s": round(perf_counter() - run_started_at, 3),
+            },
         },
     )
 

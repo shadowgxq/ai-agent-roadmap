@@ -50,7 +50,7 @@ class AgentSettings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("JUDGE_MODEL"),
     )
-    log_file: Path = PROJECT_ROOT / "logs" / "agent.json"
+    log_file: Path = PROJECT_ROOT / "logs" / "agent.jsonl"
     max_turns: int = 30
     max_tool_output_chars: int = 10_000
     context_window_tokens: int = Field(

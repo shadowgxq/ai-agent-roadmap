@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import AsyncExitStack
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -34,10 +35,12 @@ from .context import Context
 from .cost import estimate_cost
 from .git_snapshot import ensure_start_snapshot, get_head_sha
 from .loop import AgentTrace, EventCallback, RunStats, message_text, run
+from .logging_config import get_logger
 from .prompts import build_system_prompt, build_task_message
 
 
 ToolMode = Literal["all", "rag", "search"]
+logger = get_logger("agent.runtime")
 
 
 async def run_coding_agent(
@@ -62,6 +65,8 @@ async def run_coding_agent(
     event_callback: EventCallback | None = None,
     trace_metadata: dict[str, Any] | None = None,
     trace_tags: list[str] | None = None,
+    log_start: bool = True,
+    log_completion: bool = True,
 ) -> tuple[ChatCompletion, RunStats]:
     """组装依赖并在指定目录运行一次 Coding Agent。"""
     workdir = workdir.resolve()
@@ -94,6 +99,7 @@ async def run_coding_agent(
         role="main",
     )
     main_stats = stats if stats is not None else RunStats()
+    run_started_at = perf_counter()
 
     registry = ToolRegistry()
     if tool_mode == "all":
@@ -154,6 +160,23 @@ async def run_coding_agent(
             # 工具调用尚未得到全部结果；保留上一份完整轮次的 checkpoint。
             return
         persist_checkpoint(context, main_stats, main_stats.turns, status)
+
+    if log_start:
+        logger.info(
+            "Agent 开始: %s",
+            trace.agent_id,
+            extra={
+                "event": "run.resumed" if start_turn else "run.started",
+                "trace": trace.event_context(),
+                "data": {
+                    "task": task,
+                    "workdir": str(workdir),
+                    "model": selected_model,
+                    "max_turns": selected_max_turns,
+                    "start_turn": start_turn,
+                },
+            },
+        )
 
     try:
         async with AsyncOpenAI(
@@ -308,12 +331,47 @@ async def run_coding_agent(
                         },
                         metadata=final_metadata,
                     )
+                if log_completion:
+                    final_response, final_stats = result
+                    logger.info(
+                        "运行完成",
+                        extra={
+                            "event": "run.completed",
+                            "trace": trace.event_context(final_stats.turns),
+                            "data": {
+                                "status": "completed",
+                                "finish_reason": (
+                                    final_response.choices[0].finish_reason
+                                ),
+                                "trace_id": final_stats.trace_id,
+                                "trace_url": final_stats.trace_url,
+                                "duration_s": round(
+                                    perf_counter() - run_started_at,
+                                    3,
+                                ),
+                            },
+                        },
+                    )
                 return result
     except (asyncio.CancelledError, KeyboardInterrupt):
         if checkpoint_enabled:
             persist_failure_checkpoint("interrupted")
         raise
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "Agent 运行失败: %s",
+            exc,
+            extra={
+                "event": "run.error",
+                "trace": trace.event_context(),
+                "data": {
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "run_id": selected_run_id,
+                    "rollback_run_id": selected_run_id,
+                },
+            },
+        )
         if checkpoint_enabled:
             persist_failure_checkpoint("failed")
         raise

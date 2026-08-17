@@ -10,6 +10,13 @@ from src.agent.loop import (
 from src.agent.logging_config import configure_logging, get_logger
 from src.agent.cost import estimate_cost
 from src.agent.config import AgentSettings
+from evals.analysis import (
+    aggregate_usage,
+    classify_failure,
+    summarize_buckets,
+    summarize_failure_categories,
+    usage_metrics,
+)
 
 import argparse
 import asyncio
@@ -19,7 +26,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -91,7 +97,7 @@ def parse_args() -> argparse.Namespace:
         "--log-file",
         type=Path,
         default=None,
-        help="JSON 运行日志；默认 logs/agent.json，每次运行覆盖写入。",
+        help="JSONL 运行日志；默认 logs/agent.jsonl，按运行追加写入。",
     )
     parser.add_argument(
         "--report-file",
@@ -123,6 +129,8 @@ class EvalResult:
     trajectory: dict[str, Any] = field(default_factory=dict)
     assertions: list[dict[str, Any]] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    failure_categories: list[str] = field(default_factory=list)
+    usage: dict[str, int | float | None] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """保证日志和汇总始终拿到独立的能力列表。"""
@@ -353,7 +361,7 @@ async def run_case(
     *,
     experiment: str = "baseline",
 ) -> EvalResult:
-    """运行一个 case，并按 command/judge 分派验证器。"""
+    """运行一个 case，并按 command/judge/behavior 分派验证器。"""
     case_name = case_dir.name
     started_at = perf_counter()
     turns = 0
@@ -365,6 +373,7 @@ async def run_case(
     trajectory: dict[str, Any] = {}
     assertions: list[dict[str, Any]] = []
     tool_calls: list[dict[str, Any]] = []
+    usage: dict[str, int | float | None] = {}
     case: EvalCase | None = None
 
     try:
@@ -412,6 +421,7 @@ async def run_case(
             aggregate_stats = stats.aggregate()
             trajectory = aggregate_stats.trajectory_metrics()
             tool_calls = aggregate_stats.tool_calls
+            usage = usage_metrics(aggregate_stats)
             after_snapshot = snapshot_workspace(workspace)
             estimated_cost = estimate_cost(stats, case_settings)
             if estimated_cost is None:
@@ -512,6 +522,7 @@ async def run_case(
                             trajectory=trajectory,
                             assertions=assertions,
                             tool_calls=tool_calls,
+                            usage=usage,
                         )
                 cost_usd += judge_run.cost_usd
                 if cost_usd > case.max_cost_usd:
@@ -535,6 +546,7 @@ async def run_case(
                         trajectory=trajectory,
                         assertions=assertions,
                         tool_calls=tool_calls,
+                        usage=usage,
                     )
                 if case.eval_type == "judge":
                     result = EvalResult(
@@ -586,6 +598,8 @@ async def run_case(
             result.trajectory = trajectory
             result.assertions = assertions
             result.tool_calls = tool_calls
+            result.failure_categories = classify_failure(result)
+            result.usage = usage
             return result
     except CostLimitExceeded as exc:
         return EvalResult(
@@ -600,6 +614,7 @@ async def run_case(
             trace_url=exc.stats.trace_url,
             trajectory=exc.stats.aggregate().trajectory_metrics(),
             tool_calls=exc.stats.aggregate().tool_calls,
+            usage=usage_metrics(exc.stats),
         )
     except MaxTurnsExceeded as exc:
         estimated_cost = estimate_cost(exc.stats, settings)
@@ -615,6 +630,7 @@ async def run_case(
             trace_url=exc.stats.trace_url,
             trajectory=exc.stats.aggregate().trajectory_metrics(),
             tool_calls=exc.stats.aggregate().tool_calls,
+            usage=usage_metrics(exc.stats),
         )
     except asyncio.TimeoutError:
         return EvalResult(
@@ -630,6 +646,7 @@ async def run_case(
             trajectory=trajectory,
             assertions=assertions,
             tool_calls=tool_calls,
+            usage=usage,
         )
     except subprocess.TimeoutExpired as exc:
         return EvalResult(
@@ -645,6 +662,7 @@ async def run_case(
             trajectory=trajectory,
             assertions=assertions,
             tool_calls=tool_calls,
+            usage=usage,
         )
     except Exception as exc:
         return EvalResult(
@@ -660,17 +678,18 @@ async def run_case(
             trajectory=trajectory,
             assertions=assertions,
             tool_calls=tool_calls,
+            usage=usage,
         )
 
 
 def log_result(result: EvalResult) -> None:
-    """记录一个 case 的状态、评分、消耗和失败原因。"""
+    """只在终端显示一个 case 的状态、评分和失败原因。"""
     label = result.status.upper()
+    failure_categories = result.failure_categories or classify_failure(result)
     summary = (
         f"[{label}] {result.case_name} ({result.eval_type}) | "
         f"turns={result.turns} | "
-        f"duration={result.duration_s:.2f}s | "
-        f"cost=${result.cost_usd:.6f}"
+        f"duration={result.duration_s:.2f}s"
     )
     data: dict[str, Any] = {
         "case": result.case_name,
@@ -680,7 +699,6 @@ def log_result(result: EvalResult) -> None:
         "capabilities": result.capabilities,
         "turns": result.turns,
         "duration_s": result.duration_s,
-        "cost_usd": result.cost_usd,
         "reason": result.reason or None,
         "trace_id": result.trace_id,
         "trace_url": result.trace_url,
@@ -688,7 +706,7 @@ def log_result(result: EvalResult) -> None:
         "judge_independent": result.judge_independent,
         "trajectory": result.trajectory,
         "assertions": result.assertions,
-        "tool_calls": result.tool_calls,
+        "failure_categories": failure_categories,
     }
     if result.judge_result is not None:
         data["judge"] = result.judge_result.model_dump()
@@ -701,6 +719,14 @@ def log_result(result: EvalResult) -> None:
             summary += (
                 f" clarification={result.judge_result.clarification_score}"
             )
+    if result.reason:
+        reason_preview = " ".join(result.reason.split())
+        if len(reason_preview) > 200:
+            reason_preview = (
+                reason_preview[:200]
+                + f"...[truncated, total={len(reason_preview)} chars]"
+            )
+        summary += f" | reason={reason_preview}"
     logger.info(summary, extra={"event": "eval.case_completed", "data": data})
     if result.trace_url:
         logger.info(
@@ -718,6 +744,18 @@ def log_result(result: EvalResult) -> None:
             extra={
                 "event": "eval.case_reason",
                 "data": {"case": result.case_name, "reason": result.reason},
+            },
+        )
+    if failure_categories:
+        logger.info(
+            "失败分类: %s",
+            ", ".join(failure_categories),
+            extra={
+                "event": "eval.failure_classified",
+                "data": {
+                    "case": result.case_name,
+                    "categories": failure_categories,
+                },
             },
         )
 
@@ -762,7 +800,7 @@ def summarize_trajectory(results: list[EvalResult]) -> dict[str, Any]:
 
 
 def log_summary(results: list[EvalResult]) -> None:
-    """输出 command/judge 结果和能力维度汇总。"""
+    """只输出评测结果、行为指标和性能摘要。"""
     command_results = [
         result for result in results if result.eval_type == "command"
     ]
@@ -782,6 +820,7 @@ def log_summary(results: list[EvalResult]) -> None:
     duration = sum(result.duration_s for result in results)
     cost = sum(result.cost_usd for result in results)
     trajectory = summarize_trajectory(results)
+    failure_categories = summarize_failure_categories(results)
 
     command_pass = sum(result.status == "pass" for result in command_results)
     command_total = len(command_results)
@@ -803,35 +842,18 @@ def log_summary(results: list[EvalResult]) -> None:
         if values:
             judge_averages[dimension] = _average(values)
 
-    capability_data: dict[str, dict[str, Any]] = defaultdict(
-        lambda: {
-            "command_total": 0,
-            "command_pass": 0,
-            "behavior_total": 0,
-            "behavior_pass": 0,
-            "judge_scores": defaultdict(list),
-        }
-    )
-    for result in results:
-        for capability in result.capabilities or []:
-            item = capability_data[capability]
-            if result.eval_type == "command":
-                item["command_total"] += 1
-                item["command_pass"] += result.status == "pass"
-            elif result.eval_type == "behavior":
-                item["behavior_total"] += 1
-                item["behavior_pass"] += result.status == "pass"
-            if result.judge_result is not None:
-                for dimension in ("accuracy", "completeness", "conciseness"):
-                    item["judge_scores"][dimension].append(
-                        getattr(result.judge_result, dimension)
-                    )
-                if result.judge_result.clarification_score is not None:
-                    item["judge_scores"]["clarification_score"].append(
-                        result.judge_result.clarification_score
-                    )
-
-    lines = ["Eval Summary", "=" * 30]
+    average_turns = turns / len(results) if results else 0
+    average_duration = duration / len(results) if results else 0
+    average_cost = cost / len(results) if results else 0
+    lines = [
+        "Eval Summary",
+        "=" * 30,
+        f"Cases        {len(results)}",
+        f"Passed       {counts['pass']}",
+        f"Failed       {counts['fail']}",
+        f"Scored       {counts['scored']}",
+        f"Errors       {counts['error']}",
+    ]
     if command_total:
         lines.append(
             f"Command: {command_pass}/{command_total} PASS"
@@ -842,7 +864,7 @@ def log_summary(results: list[EvalResult]) -> None:
             result.status == "pass" for result in behavior_results
         )
         lines.append(
-            f"Behavior: {behavior_pass}/{len(behavior_results)} PASS"
+            f"Objective: {behavior_pass}/{len(behavior_results)} PASS"
             f" ({behavior_pass / len(behavior_results) * 100:.1f}%)"
         )
     if judge_results:
@@ -854,49 +876,24 @@ def log_summary(results: list[EvalResult]) -> None:
                 if value is not None
             )
         )
-    lines.append("Capabilities")
-    for capability in sorted(capability_data):
-        item = capability_data[capability]
-        if item["command_total"]:
-            rate = item["command_pass"] / item["command_total"] * 100
-            lines.append(
-                f"  {capability}: "
-                f"{item['command_pass']}/{item['command_total']} "
-                f"({rate:.1f}%)"
+    if failure_categories:
+        lines.append(
+            "Failures     "
+            + ", ".join(
+                f"{category}={count}"
+                for category, count in sorted(failure_categories.items())
             )
-        elif item["behavior_total"]:
-            rate = item["behavior_pass"] / item["behavior_total"] * 100
-            lines.append(
-                f"  {capability}: behavior "
-                f"{item['behavior_pass']}/{item['behavior_total']} "
-                f"({rate:.1f}%)"
-            )
-        else:
-            averages = [
-                _average(item["judge_scores"][dimension])
-                for dimension in ("accuracy", "completeness", "conciseness")
-            ]
-            lines.append(
-                f"  {capability}: judge "
-                + "/".join(
-                    f"{value:.2f}" for value in averages if value is not None
-                )
-            )
+        )
     lines.extend(
         [
-            (
-                "Trajectory: "
-                f"tool_calls={trajectory['tool_call_count']}, "
-                f"subagent_cases={trajectory['subagent_used_cases']}, "
-                f"mcp_cases={trajectory['mcp_used_cases']}, "
-                "verification_cases="
-                f"{trajectory['verification_command_used_cases']}, "
-                "recovered_cases="
-                f"{trajectory['recovered_after_tool_failure_cases']}"
-            ),
-            f"Total: {len(results)} cases, {turns} turns, "
-            f"{duration:.2f}s, ${cost:.6f}",
-            f"Status: {counts}",
+            "Behavior",
+            f"  Tool failures {trajectory['tool_failure_count']}",
+            "  Recovered     "
+            f"{trajectory['recovered_after_tool_failure_cases']}",
+            "Performance",
+            f"  Avg turns     {average_turns:.1f}",
+            f"  Avg duration  {average_duration:.1f}s",
+            f"Cost           ${cost:.6f} (avg ${average_cost:.6f})",
         ]
     )
     logger.info(
@@ -910,21 +907,7 @@ def log_summary(results: list[EvalResult]) -> None:
                 "command_total": command_total,
                 "command_pass_rate": command_rate,
                 "judge_averages": judge_averages,
-                "capabilities": {
-                    name: {
-                        "command_total": item["command_total"],
-                        "command_pass": item["command_pass"],
-                        "behavior_total": item["behavior_total"],
-                        "behavior_pass": item["behavior_pass"],
-                        "judge_averages": {
-                            dimension: _average(
-                                item["judge_scores"][dimension]
-                            )
-                            for dimension in item["judge_scores"]
-                        },
-                    }
-                    for name, item in capability_data.items()
-                },
+                "failure_categories": failure_categories,
                 "turns": turns,
                 "duration_s": duration,
                 "cost_usd": cost,
@@ -959,10 +942,13 @@ def write_report(
         if result.judge_result is not None
     ]
     trajectory = summarize_trajectory(results)
+    buckets = summarize_buckets(results)
+    failure_categories = summarize_failure_categories(results)
+    usage = aggregate_usage(results)
     path = path.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema_version": 2,
+        "schema_version": 3,
         "experiment": experiment,
         "suite": suite,
         "cases": [path.name for path in selected_cases],
@@ -992,9 +978,17 @@ def write_report(
                     "clarification_score",
                 )
             },
+            "buckets": buckets,
+            "failure_categories": failure_categories,
             "turns": sum(result.turns for result in results),
             "duration_s": sum(result.duration_s for result in results),
             "cost_usd": sum(result.cost_usd for result in results),
+            "avg_cost_usd": (
+                sum(result.cost_usd for result in results) / len(results)
+                if results
+                else 0.0
+            ),
+            "usage": usage,
             "trajectory": trajectory,
         },
         "results": [
@@ -1014,7 +1008,10 @@ def write_report(
                 "judge_independent": result.judge_independent,
                 "trajectory": result.trajectory,
                 "assertions": result.assertions,
-                "tool_calls": result.tool_calls,
+                "failure_categories": (
+                    result.failure_categories or classify_failure(result)
+                ),
+                "usage": result.usage,
                 "judge": (
                     result.judge_result.model_dump()
                     if result.judge_result is not None

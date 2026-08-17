@@ -4,7 +4,7 @@
 > 假设业余投入每周 10–15 小时（每天 1.5–2 小时），总周期 **12 周**；全职学习所有周期减半。
 > 本文档既是**学习计划**，也是**进度追踪表**——直接在文中的 checklist 上打勾。
 >
-> W1–W12 是原理与产品化主线；完成后继续执行 [W13–W20 企业级强化路线](AI-Agent-工程师企业强化路线-W13-W20.md)，补齐 LangGraph、企业 RAG、持久化、异步任务、权限与多租户。
+> W1–W12 是原理与产品化主线；完成后继续执行 [W13–W23 企业级强化路线](AI-Agent-工程师企业强化路线-W13-W23.md)，补齐 LangGraph、Planning、Long-horizon、Multi-Agent、企业 RAG、持久化、异步任务、权限与多租户。
 
 ---
 
@@ -760,7 +760,7 @@ evals/
 
 ### 框架预习（W12 末花 2–3 天）
 
-- 速览 **LangGraph** 官方教程，把第 5 周的 workflow 用它重写一个，先建立与手写实现的映射；W13–W20 再进入持久化、human-in-the-loop 和企业项目实战。
+- 速览 **LangGraph** 官方教程，把第 5 周的 workflow 用它重写一个，先建立与手写实现的映射；W13–W23 再进入持久化、human-in-the-loop、高级 Agent 和企业项目实战。
 - 花半天读 **Claude Agent SDK** 文档（顺带扫一眼 OpenAI Agents SDK）——你的 agent-mini 本质就是 Claude Code 的简化版，对照自己的实现讲清「SDK 替你做了什么、你手写时是怎么做的」，这半天在面试里性价比极高。
 - 能一句话讲清 **pgvector** 等生产级向量库与 W7 轻量实验方案的定位差异。
 - **不要**一开始就用框架——先手写才懂原理。
@@ -866,4 +866,4 @@ evals/
 > **现在就开始第 1 周第一个动手任务**：`uv init` 一个项目，发出你的第一次 API 调用，打印 token 和费用。
 > 十二周后，你手里会有一个能公开访问的 agent、一个开源 MCP server、一套 evals 和一篇有数据的博客——这套组合拳，比任何证书都有说服力。
 >
-> W12 验收通过后，从 [W13｜LangChain / LangGraph 框架映射](weeks/W13.md) 开始企业级强化，不再另起一套前端。
+> W12 验收通过后，从 [W13｜LangChain / LangGraph 框架映射](weeks/W13.md) 开始企业级强化，不再另起一套前端；W16–W18 的高级 Agent 实验单独使用 `advanced-coding-agent`。

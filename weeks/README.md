@@ -1,6 +1,6 @@
-# weeks/ —— W1–W20 学习计划·周执行文档索引
+# weeks/ —— W1–W23 学习计划·周执行文档索引
 
-> W1–W12 主计划见 [`../AI-Agent-工程师转型路线-12周.md`](../AI-Agent-工程师转型路线-12周.md)；W13–W20 企业级强化见 [`../AI-Agent-工程师企业强化路线-W13-W20.md`](../AI-Agent-工程师企业强化路线-W13-W20.md)。本目录是每周的细化执行文档：概念讲透、资料给链接、任务拆到 session、验收可打勾。
+> W1–W12 主计划见 [`../AI-Agent-工程师转型路线-12周.md`](../AI-Agent-工程师转型路线-12周.md)；W13–W23 企业级强化见 [`../AI-Agent-工程师企业强化路线-W13-W23.md`](../AI-Agent-工程师企业强化路线-W13-W23.md)。本目录是每周的细化执行文档：概念讲透、资料给链接、任务拆到 session、验收可打勾。
 > 每份文档统一 7 节结构:核心要掌握 / 学习资料 / 落地执行(按 session)/ 自测题 / 验收 checklist / 常见坑速查 / 本周产出物。
 
 ## 文档索引
@@ -21,11 +21,14 @@
 | [W13.md](W13.md) | LangChain / LangGraph 框架映射 | `support-agent` 起步 + 手写与框架对照 |
 | [W14.md](W14.md) | LangGraph 业务编排 | 工单 `StateGraph` + typed state + streaming |
 | [W15.md](W15.md) | 持久化 + Human-in-the-loop | PostgreSQL checkpointer + 审批恢复 + 幂等副作用 |
-| [W16.md](W16.md) | 企业 RAG | pgvector + FTS 混合检索 + 引用 + retrieval eval |
-| [W17.md](W17.md) | 生产后端 | PostgreSQL/Redis/Celery + 任务状态机 + 幂等/取消/恢复 |
-| [W18.md](W18.md) | 鉴权、多租户与安全 | RBAC + tenant scope + MCP 工具权限 + 审计 |
-| [W19.md](W19.md) | React 企业工作台 | 工单/引用/审批/恢复/历史的产品闭环 |
-| [W20.md](W20.md) | E2E 质量闭环 + 求职 | 30 case + Langfuse + 部署 + 简历/口述 |
+| [W16.md](W16.md) | Planning Agent | 显式 Plan + Executor/Verifier + 有限 re-plan |
+| [W17.md](W17.md) | Long-horizon Agent | Goal/Progress/Context/Recovery + 长任务 eval |
+| [W18.md](W18.md) | Multi-Agent System | Manager/Worker + 路由/并行/冲突聚合 |
+| [W19.md](W19.md) | 企业 RAG | pgvector + FTS 混合检索 + 引用 + retrieval eval |
+| [W20.md](W20.md) | 生产后端 | PostgreSQL/Redis/Celery + 任务状态机 + 幂等/取消/恢复 |
+| [W21.md](W21.md) | 鉴权、多租户与安全 | RBAC + tenant scope + MCP 工具权限 + 审计 |
+| [W22.md](W22.md) | React 企业工作台 | 工单/引用/审批/恢复/历史的产品闭环 |
+| [W23.md](W23.md) | E2E 质量闭环 + 求职 | 30 case + Langfuse + 部署 + 简历/口述 |
 
 ## 使用说明
 
@@ -37,5 +40,5 @@
 6. **主线仓库**:W3 起所有代码都在 `agent-mini` 单仓库演进,每周至少 3 次有意义的 commit,W4 起每周至少 1 条 `evals/LOG.md` 实验记录。
 7. **W11-12 是合并文档**:产品化冲刺按两周排期(20–30h、10–12 个 session),中途不做周切换,只在第 11 周末对照文档做一次进度校准(容器隔离必须已完成)。
 8. **资源以周文档链接为准**:每周文档的「学习资料」都精确到 URL 和要读的章节,不要自行发散找教程——主计划的原则是少而精、反复读。
-9. **W13–W20 是递进门槛**:W12 的 P0 未验收不开 W13；W13 起每周只增加一种主复杂度，当周 P0 未通过就顺延，不跳级。
+9. **W13–W23 是递进门槛**:W12 的 P0 未验收不开 W13；W13 起每周只增加一种主复杂度，当周 P0 未通过就顺延，不跳级。
 10. **前端只有一套**:W11 起统一扩展 `frontend/` 的 Vite + React + TypeScript 工程；不新建 Next.js 或第二套 Web 应用。

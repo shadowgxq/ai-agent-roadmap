@@ -1,6 +1,6 @@
-# AI Agent 工程师企业级强化路线（W13–W20）
+# AI Agent 工程师企业级强化路线（W13–W23）
 
-> 从“能手写 Agent 并做出产品”进阶到“能用主流框架交付企业 Agent 系统”。
+> 从“能手写 Agent 并做出产品”进阶到“能设计、评估并交付长任务与多 Agent 企业系统”。
 > 适用于完成 W1–W12 后，以国内互联网 / AI 创业公司的 **Agent 全栈应用工程师**为目标，每周投入 10–15 小时，边学边投。
 
 ---
@@ -14,13 +14,14 @@ W1–W12 已经建立四类底层能力：
 - 用 FastAPI + SSE 暴露 Agent 运行过程。
 - 用现有 `frontend/` 的 Vite + React + TypeScript 页面展示 Agent 事件流。
 
-W13–W20 不再重复这些原理，只补企业落地缺口：
+W13–W23 不再重复这些原理，只补框架、高级 Agent 能力和企业落地缺口：
 
 1. 用 LangChain / LangGraph 表达团队可维护的状态流。
-2. 用 PostgreSQL、Redis、Celery 承载持久任务、失败恢复与并发。
-3. 做可评估的企业 RAG，而不是只做“能问答”的 demo。
-4. 补齐鉴权、多租户、人工审批、工具权限与审计。
-5. 用同一个 React 工程完成企业工作台，不引入 Next.js。
+2. 在持久化基础上掌握 Planning、Long-horizon 和 Multi-Agent。
+3. 用 PostgreSQL、Redis、Celery 承载持久任务、失败恢复与并发。
+4. 做可评估的企业 RAG，而不是只做“能问答”的 demo。
+5. 补齐鉴权、多租户、人工审批、工具权限与审计。
+6. 用同一个 React 工程完成企业工作台，不引入 Next.js。
 
 ## 2. 学习深度：一层验收后再进下一层
 
@@ -30,9 +31,10 @@ W13–W20 不再重复这些原理，只补企业落地缺口：
 | L2 框架映射层 | 框架替代了哪些手写代码 | 能对照实现、说清取舍 | W13 |
 | L3 业务编排层 | 如何设计可控的企业 Agent 流程 | 状态、分支、子图和事件都可追踪 | W14 |
 | L4 长任务层 | 怎么暂停、审批、恢复且不重复产生副作用 | 服务重启后可恢复，工具写入幂等 | W15 |
-| L5 数据与服务层 | 怎么检索、持久化、异步执行与并发 | RAG 和任务系统都有客观验收 | W16–W17 |
-| L6 企业边界层 | 怎么限制用户、租户、数据与工具权限 | 越权、注入和未审批副作用均被拦截 | W18 |
-| L7 交付层 | 怎么让用户真正完成业务闭环 | React 工作台、eval、观测和部署完整 | W19–W20 |
+| L5 高级 Agent 层 | 怎么规划长任务并让多个 Agent 协作 | Plan、进度、恢复、路由和冲突均可评估 | W16–W18 |
+| L6 数据与服务层 | 怎么检索、持久化、异步执行与并发 | RAG 和任务系统都有客观验收 | W19–W20 |
+| L7 企业边界层 | 怎么限制用户、租户、数据与工具权限 | 越权、注入和未审批副作用均被拦截 | W21 |
+| L8 交付层 | 怎么让用户真正完成业务闭环 | React 工作台、eval、观测和部署完整 | W22–W23 |
 
 **升级规则**：当周 P0 验收未通过，不得因为“时间到了”进入下一周。学习周数可以顺延，学习深度不能跳级。
 
@@ -52,10 +54,11 @@ W13–W20 不再重复这些原理，只补企业落地缺口：
 
 ```text
 agent-mini/                 # W1–W12 手写 Agent，保留为原理作品
-support-agent/              # W13–W20 新增的 LangGraph 企业后端
+support-agent/              # W13–W23 新增的 LangGraph 企业后端
+advanced-coding-agent/      # W16–W18 的 Planning/Long-horizon/Multi-Agent 实验
 frontend/                   # 继续使用现有 Vite + React + TypeScript
   src/pages/agent/          # 原 coding agent 演示，保留
-  src/pages/support/        # W19 新增的工单工作台
+  src/pages/support/        # W22 新增的工单工作台
 ```
 
 - 不把 `agent-mini` 重构成 LangGraph；两个项目分别证明“懂原理”和“能企业交付”。
@@ -143,18 +146,37 @@ SSE 保留现有前端熟悉的 envelope：
 - `tool_actions.idempotency_key` 建唯一索引，保证 interrupt 恢复、worker 重试或节点重放不重复更新 CRM。
 - 文档 chunk 保存 `organization_id`、`knowledge_base_id`、`document_id`、页码/标题路径和版本，以支撑租户过滤与引用溯源。
 
-## 5. W13–W20 路线总览
+### 4.6 高级 Agent 实验边界
+
+W16–W18 不把 Manager/Planner 硬塞进工单业务流，而是沿用一个独立的 `advanced-coding-agent/` 递进实验：
+
+```text
+W16  v1  Planning：Plan → Executor → Verifier → Re-plan
+  ↓
+W17  v2  Long-horizon：Goal + Progress + Context + Recovery
+  ↓
+W18  v3  Multi-Agent：Manager + Researcher/Coder/Tester
+```
+
+- `support-agent` 继续证明企业工单、RAG、审批和多租户边界；`advanced-coding-agent` 证明复杂任务的规划、长期执行和角色协作。
+- 每一版都保留上一版 single-agent baseline，使用相同任务比较成功率、成本、延迟、工具调用、context token 和失败率。
+- Multi-Agent 只有在职责隔离、并行收益或权限边界有明确证据时才保留，不以 Agent 数量作为完成标准。
+
+## 5. W13–W23 路线总览
 
 | 周 | 学习深度 | 主要产出 | 细化文档 |
 |---|---|---|---|
 | W13 | 框架映射 | 手写机制 ↔ LangChain / LangGraph 对照，`support-agent` 起步 | [W13](weeks/W13.md) |
 | W14 | 业务编排 | 工单 Agent `StateGraph`、typed state、分支、子图和 streaming | [W14](weeks/W14.md) |
 | W15 | 长任务 | PostgreSQL checkpointer、`interrupt`审批、恢复和副作用幂等 | [W15](weeks/W15.md) |
-| W16 | 企业 RAG | 文档入库、pgvector + FTS 混合检索、引用和检索 eval | [W16](weeks/W16.md) |
-| W17 | 生产后端 | SQLAlchemy/Alembic、Redis + Celery、幂等、取消、重试和并发 | [W17](weeks/W17.md) |
-| W18 | 企业边界 | 鉴权、RBAC、多租户、MCP 工具权限、PII 与审计 | [W18](weeks/W18.md) |
-| W19 | 产品交付 | 在现有 React 中完成工单、引用、审批、恢复和历史 | [W19](weeks/W19.md) |
-| W20 | 质量与求职 | 30 个 E2E eval、Langfuse、并发检查、部署、README 与面试口述 | [W20](weeks/W20.md) |
+| W16 | Planning Agent | 显式 Plan、Executor/Verifier、任务分解和有限 re-plan | [W16](weeks/W16.md) |
+| W17 | Long-horizon Agent | Goal、进度、上下文压缩、失败恢复和长任务 eval | [W17](weeks/W17.md) |
+| W18 | Multi-Agent System | Manager/Worker、路由、依赖并行、冲突聚合和对照评估 | [W18](weeks/W18.md) |
+| W19 | 企业 RAG | 文档入库、pgvector + FTS 混合检索、引用和检索 eval | [W19](weeks/W19.md) |
+| W20 | 生产后端 | SQLAlchemy/Alembic、Redis + Celery、幂等、取消、重试和并发 | [W20](weeks/W20.md) |
+| W21 | 企业边界 | 鉴权、RBAC、多租户、MCP 工具权限、PII 与审计 | [W21](weeks/W21.md) |
+| W22 | 产品交付 | 在现有 React 中完成工单、引用、审批、恢复和历史 | [W22](weeks/W22.md) |
+| W23 | 质量与求职 | 30 个 E2E eval、Langfuse、并发检查、部署、README 与面试口述 | [W23](weeks/W23.md) |
 
 ## 6. 每周固定节奏
 
@@ -168,7 +190,7 @@ SSE 保留现有前端熟悉的 envelope：
 方法规则：
 
 1. **先契约，后代码**：先定 state、API、event 和错误边界。
-2. **一周只增加一种主复杂度**：W14 不同时加数据库，W16 不同时加权限。
+2. **一周只增加一种主复杂度**：W14 不同时加数据库，W16–W18 只推进一种高级 Agent 复杂度，W19 不同时加权限。
 3. **官方文档优先**：框架 API 只从当前官方文档学，不用过期 LangChain 教程。
 4. **评估驱动**：检索、prompt、router 和工具策略的优化必须有数据。
 5. **失败才是学习单元**：每周至少选一个失败 trace，形成“现象 → 原因 → 改动 → 数据”。
@@ -181,6 +203,12 @@ SSE 保留现有前端熟悉的 envelope：
 - [ ] 能用现有 `agent-mini` 对照说清 LangChain harness 和 LangGraph runtime 的责任。
 - [ ] 工单 Agent 的确定性步骤与 LLM 决策步骤边界清晰，state 可序列化。
 - [ ] 服务重启后能从 `waiting_approval` 恢复，重试不会重复执行 CRM 写入。
+
+### 高级 Agent
+
+- [ ] Planning 版本的 Plan 是可序列化 state，Executor/Verifier 职责分离，re-plan 有原因和硬上限。
+- [ ] Long-horizon 实验至少完成 30–50 次工具调用，覆盖 compact、checkpoint 恢复、故障分类和 completion gate。
+- [ ] Multi-Agent 版本有 Manager/Worker 角色、路由、依赖并行和冲突处理，并完成 single-agent 对照评估。
 
 ### RAG 与质量
 
@@ -205,6 +233,6 @@ SSE 保留现有前端熟悉的 envelope：
 
 - 不拆微服务，不学 Kubernetes，先用模块化单体 + worker。
 - 不做模型训练、微调、GPU 推理或深度学习数学。
-- 不支持扫描 PDF / OCR；W16 P0 只处理 Markdown、纯文本和有文本层的 PDF。
+- 不支持扫描 PDF / OCR；W19 P0 只处理 Markdown、纯文本和有文本层的 PDF。
 - 不为了“多 Agent”而多 Agent；子图只在责任、state 或复用边界清晰时使用。
 - 不把前端 SSR、SEO 或 Next.js 当作转型学习项，企业工作台继续使用 React SPA。

@@ -13,6 +13,8 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from src.agent.cost import CostBreakdown
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -33,6 +35,34 @@ def _delta(candidate: float | int | None, baseline: float | int | None) -> float
     if candidate is None or baseline is None:
         return None
     return round(float(candidate) - float(baseline), 4)
+
+
+def _report_cost(report: dict[str, Any]) -> dict[str, float | None]:
+    """读取新 cost 对象，并兼容旧报告的平铺费用字段。"""
+    summary = report.get("summary", {})
+    if not isinstance(summary, dict):
+        summary = {}
+    legacy_total = summary.get(
+        "cost_usd",
+        summary.get("total_cost_usd", report.get("total_cost_usd")),
+    )
+    nested = report.get("cost")
+    if not isinstance(nested, dict):
+        nested = summary.get("cost")
+    cost = CostBreakdown.from_dict(
+        nested if isinstance(nested, dict) else {
+            "router_usd": summary.get("router_cost_usd"),
+        },
+        legacy_total=legacy_total,
+    )
+    return {
+        "total_usd": cost.total_usd,
+        "avg_total_usd": summary.get("avg_cost_usd"),
+        "agent_usd": cost.agent_usd,
+        "compact_usd": cost.compact_usd,
+        "router_usd": cost.router_usd,
+        "judge_usd": cost.judge_usd,
+    }
 
 
 def compare_reports(
@@ -106,6 +136,23 @@ def compare_reports(
             "cache_read_ratio",
         )
     }
+    baseline_cost = _report_cost(baseline)
+    candidate_cost = _report_cost(candidate)
+    cost = {
+        field: {
+            "baseline": baseline_cost[field],
+            "candidate": candidate_cost[field],
+            "delta": _delta(candidate_cost[field], baseline_cost[field]),
+        }
+        for field in (
+            "total_usd",
+            "avg_total_usd",
+            "agent_usd",
+            "compact_usd",
+            "router_usd",
+            "judge_usd",
+        )
+    }
 
     return {
         "baseline": baseline.get("experiment", "baseline"),
@@ -113,6 +160,7 @@ def compare_reports(
         "buckets": buckets,
         "failure_categories": failure_categories,
         "usage": usage,
+        "cost": cost,
         "regressions": regressions,
     }
 
@@ -152,6 +200,12 @@ def render_comparison(comparison: dict[str, Any]) -> str:
     for field, data in comparison["usage"].items():
         lines.append(
             f"  {field}: {data['baseline']} -> {data['candidate']}"
+        )
+    lines.append("Cost")
+    for field, data in comparison["cost"].items():
+        lines.append(
+            f"  {field}: {data['baseline']} -> {data['candidate']} "
+            f"(delta={data['delta']})"
         )
     lines.append("Regressions")
     if comparison["regressions"]:

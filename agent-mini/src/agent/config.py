@@ -70,6 +70,10 @@ class AgentSettings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("JUDGE_MODEL"),
     )
+    pricing_file: Path = Field(
+        default=PROJECT_ROOT / "config" / "model_prices.yaml",
+        validation_alias=AliasChoices("PRICING_FILE"),
+    )
     log_file: Path = PROJECT_ROOT / "logs" / "agent.jsonl"
     max_turns: int = 30
     max_tool_output_chars: int = 10_000
@@ -79,61 +83,6 @@ class AgentSettings(BaseSettings):
         validation_alias=AliasChoices(
             "CONTEXT_WINDOW_TOKENS",
             "CONTEXT_WINDOW",
-        ),
-    )
-    input_price_per_million: float | None = Field(default=None, ge=0)
-    output_price_per_million: float | None = Field(default=None, ge=0)
-    cache_read_price_per_million: float | None = Field(default=None, ge=0)
-    cache_creation_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-    )
-    small_input_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices("SMALL_INPUT_PRICE_PER_MILLION"),
-    )
-    small_output_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices("SMALL_OUTPUT_PRICE_PER_MILLION"),
-    )
-    small_cache_read_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices(
-            "SMALL_CACHE_READ_PRICE_PER_MILLION"
-        ),
-    )
-    small_cache_creation_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices(
-            "SMALL_CACHE_CREATION_PRICE_PER_MILLION"
-        ),
-    )
-    router_input_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices("ROUTER_INPUT_PRICE_PER_MILLION"),
-    )
-    router_output_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices("ROUTER_OUTPUT_PRICE_PER_MILLION"),
-    )
-    router_cache_read_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices(
-            "ROUTER_CACHE_READ_PRICE_PER_MILLION"
-        ),
-    )
-    router_cache_creation_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-        validation_alias=AliasChoices(
-            "ROUTER_CACHE_CREATION_PRICE_PER_MILLION"
         ),
     )
     prompt_cache_enabled: bool = Field(
@@ -146,28 +95,11 @@ class AgentSettings(BaseSettings):
     )
     prompt_cache_key: str = Field(default="agent-mini", min_length=1)
     prompt_cache_retention: str | None = None
-    price_currency: str = "USD"
     compact_enabled: bool = True
     compact_threshold: float = Field(default=0.7, gt=0, lt=1)
     compact_keep_recent: int = Field(default=4, ge=1)
     compact_model: str | None = None
     compact_max_tokens: int = Field(default=1000, ge=1)
-    compact_input_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-    )
-    compact_output_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-    )
-    compact_cache_read_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-    )
-    compact_cache_creation_price_per_million: float | None = Field(
-        default=None,
-        ge=0,
-    )
     embedding_api_key: str | None = None
     embedding_base_url: str | None = None
     embedding_model: str = Field(
@@ -234,6 +166,13 @@ class AgentSettings(BaseSettings):
         if self.mcp_config_file.is_absolute():
             return self.mcp_config_file
         return PROJECT_ROOT / self.mcp_config_file
+
+    @property
+    def resolved_pricing_file(self) -> Path:
+        """把相对价格表路径固定到 agent-mini 项目目录。"""
+        if self.pricing_file.is_absolute():
+            return self.pricing_file
+        return PROJECT_ROOT / self.pricing_file
 
     @property
     def langfuse_configured(self) -> bool:

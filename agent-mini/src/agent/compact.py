@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from collections.abc import Callable
 from contextlib import nullcontext
 from typing import Any
@@ -10,6 +11,7 @@ from langfuse import Langfuse
 from openai import AsyncOpenAI
 
 from .logging_config import get_logger
+from .logging_events import log_event
 
 
 logger = get_logger("agent.compact")
@@ -231,20 +233,20 @@ async def compact(
                     f"compact 连续 {max_attempts} 次失败"
                 ) from exc
 
-            logger.warning(
+            log_event(
+                logger,
+                logging.WARNING,
                 "上下文摘要失败，%.1f 秒后重试 (%s/%s): %s",
                 retry_delay_s,
                 attempt + 1,
                 max_attempts,
                 type(exc).__name__,
-                extra={
-                    "event": "agent.context_compact_retry",
-                    "data": {
-                        "attempt": attempt + 1,
-                        "max_attempts": max_attempts,
-                        "delay_s": retry_delay_s,
-                        "error_type": type(exc).__name__,
-                    },
+                event="agent.context_compact_retry",
+                data={
+                    "attempt": attempt + 1,
+                    "max_attempts": max_attempts,
+                    "delay_s": retry_delay_s,
+                    "error_type": type(exc).__name__,
                 },
             )
             await asyncio.sleep(retry_delay_s)

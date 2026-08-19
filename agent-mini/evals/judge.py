@@ -12,6 +12,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, Field, ValidationError
 
 from src.agent.config import AgentSettings
+from src.agent.cost import CostCalculator
 from src.agent.loop import UsageTokens, extract_usage_tokens
 
 
@@ -31,7 +32,7 @@ class JudgeRun:
 
     result: JudgeResult
     usage: UsageTokens
-    cost_usd: float
+    cost_usd: float | None
 
 
 def build_judge_prompt(
@@ -134,19 +135,6 @@ def _parse_json_output(raw_output: str) -> JudgeResult:
         raise ValueError(f"Judge JSON 字段校验失败: {exc}") from exc
 
 
-def _estimate_cost(usage: UsageTokens, settings: AgentSettings) -> float:
-    """根据当前项目的 USD 价格配置估算 Judge 调用费用。"""
-    if (
-        settings.input_price_per_million is None
-        or settings.output_price_per_million is None
-    ):
-        return 0.0
-    return (
-        usage.input_tokens * settings.input_price_per_million
-        + usage.output_tokens * settings.output_price_per_million
-    ) / 1_000_000
-
-
 def _sum_usage(total: UsageTokens, current: UsageTokens) -> UsageTokens:
     """累加多次 Judge 重试的 token 用量。"""
     return UsageTokens(
@@ -167,6 +155,7 @@ async def judge_output(
     *,
     client: AsyncOpenAI,
     settings: AgentSettings,
+    cost_calculator: CostCalculator | None = None,
     case_name: str,
     task: str,
     reference: str,
@@ -181,6 +170,7 @@ async def judge_output(
         raise ValueError("Judge max_attempts 必须大于 0")
 
     judge_model = settings.judge_model or settings.main_model_name
+    calculator = cost_calculator or CostCalculator.from_settings(settings)
     langfuse_client: Langfuse | None = None
     if settings.langfuse_configured:
         langfuse_client = Langfuse(
@@ -311,7 +301,7 @@ async def judge_output(
         return JudgeRun(
             result=final_result,
             usage=total_usage,
-            cost_usd=_estimate_cost(total_usage, settings),
+            cost_usd=calculator.estimate_usage(total_usage, judge_model),
         )
     finally:
         if langfuse_client is not None:

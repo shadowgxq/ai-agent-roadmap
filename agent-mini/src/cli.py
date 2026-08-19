@@ -2,8 +2,8 @@
 
 import argparse
 import asyncio
+import logging
 from pathlib import Path
-from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -13,9 +13,16 @@ from openai import APIError
 from .agent.checkpoint import load_checkpoint
 from .agent.config import AgentSettings
 from .agent.context import Context
-from .agent.cost import estimate_cost, estimate_router_cost
+from .agent.cost import CostCalculator
 from .agent.git_snapshot import GitSnapshotError, rollback_to_sha
 from .agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
+from .agent.logging_events import (
+    build_cost_event_data,
+    build_cost_data,
+    build_run_started_data,
+    build_run_usage_data,
+    log_event,
+)
 from .agent.runtime import run_coding_agent
 from .agent.logging_config import configure_logging, get_logger
 
@@ -175,26 +182,13 @@ def log_stats(
     trace: dict[str, str] | None = None,
 ) -> None:
     """记录一次 Agent 运行累计的模型用量。"""
-    total_stats = stats.aggregate()
-    main_tokens = stats.total_tokens
-    total_tokens = total_stats.total_tokens
-    subagent_turns = total_stats.turns - stats.turns
-    subagent_input_tokens = total_stats.input_tokens - stats.input_tokens
-    subagent_cache_read_tokens = (
-        total_stats.cache_read_input_tokens
-        - stats.cache_read_input_tokens
-    )
-    subagent_cache_creation_tokens = (
-        total_stats.cache_creation_input_tokens
-        - stats.cache_creation_input_tokens
-    )
-    subagent_output_tokens = total_stats.output_tokens - stats.output_tokens
-    subagent_compact_calls = total_stats.compact_calls - stats.compact_calls
-    subagent_compact_tokens = (
-        total_stats.compact_tokens - stats.compact_tokens
-    )
-    subagent_tokens = total_tokens - main_tokens
-    logger.info(
+    data = build_run_usage_data(stats)
+    main_data = data["main"]
+    subagent_data = data["subagents"]
+    total_data = data["total"]
+    log_event(
+        logger,
+        logging.INFO,
         (
             "运行统计: main_turns=%s, subagent_runs=%s, "
             "subagent_turns=%s, compact_calls=%s, compact_tokens=%s, "
@@ -203,143 +197,46 @@ def log_stats(
         ),
         stats.turns,
         len(stats.subagent_runs),
-        subagent_turns,
-        stats.compact_calls,
-        stats.compact_tokens,
-        main_tokens,
-        subagent_tokens,
-        total_tokens,
-        extra={
-            "event": "run.usage",
-            "trace": trace,
-            "data": {
-                "main": {
-                    "turns": stats.turns,
-                    "input_tokens": stats.input_tokens,
-                    "cache_read_input_tokens": (
-                        stats.cache_read_input_tokens
-                    ),
-                    "cache_creation_input_tokens": (
-                        stats.cache_creation_input_tokens
-                    ),
-                    "output_tokens": stats.output_tokens,
-                    "router_calls": stats.router_calls,
-                    "router_model": stats.router_model,
-                    "route": stats.route,
-                    "router_input_tokens": stats.router_input_tokens,
-                    "router_cache_read_input_tokens": (
-                        stats.router_cache_read_input_tokens
-                    ),
-                    "router_cache_creation_input_tokens": (
-                        stats.router_cache_creation_input_tokens
-                    ),
-                    "router_output_tokens": stats.router_output_tokens,
-                    "router_tokens": stats.router_tokens,
-                    "compact_calls": stats.compact_calls,
-                    "compact_input_tokens": stats.compact_input_tokens,
-                    "compact_cache_read_input_tokens": (
-                        stats.compact_cache_read_input_tokens
-                    ),
-                    "compact_cache_creation_input_tokens": (
-                        stats.compact_cache_creation_input_tokens
-                    ),
-                    "compact_output_tokens": stats.compact_output_tokens,
-                    "compact_tokens": stats.compact_tokens,
-                    "total_tokens": main_tokens,
-                },
-                "subagents": {
-                    "runs": len(stats.subagent_runs),
-                    "turns": subagent_turns,
-                    "input_tokens": subagent_input_tokens,
-                    "cache_read_input_tokens": subagent_cache_read_tokens,
-                    "cache_creation_input_tokens": (
-                        subagent_cache_creation_tokens
-                    ),
-                    "output_tokens": subagent_output_tokens,
-                    "compact_calls": subagent_compact_calls,
-                    "compact_tokens": subagent_compact_tokens,
-                    "total_tokens": subagent_tokens,
-                },
-                "total": {
-                    "turns": total_stats.turns,
-                    "input_tokens": total_stats.input_tokens,
-                    "cache_read_input_tokens": (
-                        total_stats.cache_read_input_tokens
-                    ),
-                    "cache_creation_input_tokens": (
-                        total_stats.cache_creation_input_tokens
-                    ),
-                    "output_tokens": total_stats.output_tokens,
-                    "router_calls": total_stats.router_calls,
-                    "router_model": total_stats.router_model,
-                    "route": total_stats.route,
-                    "router_input_tokens": total_stats.router_input_tokens,
-                    "router_cache_read_input_tokens": (
-                        total_stats.router_cache_read_input_tokens
-                    ),
-                    "router_cache_creation_input_tokens": (
-                        total_stats.router_cache_creation_input_tokens
-                    ),
-                    "router_output_tokens": total_stats.router_output_tokens,
-                    "router_tokens": total_stats.router_tokens,
-                    "compact_calls": total_stats.compact_calls,
-                    "compact_input_tokens": (
-                        total_stats.compact_input_tokens
-                    ),
-                    "compact_cache_read_input_tokens": (
-                        total_stats.compact_cache_read_input_tokens
-                    ),
-                    "compact_cache_creation_input_tokens": (
-                        total_stats.compact_cache_creation_input_tokens
-                    ),
-                    "compact_output_tokens": (
-                        total_stats.compact_output_tokens
-                    ),
-                    "compact_tokens": total_stats.compact_tokens,
-                    "total_tokens": total_tokens,
-                    "trajectory": total_stats.trajectory_metrics(),
-                },
-            },
-        },
+        subagent_data["turns"],
+        main_data["compact_calls"],
+        main_data["compact_tokens"],
+        main_data["total_tokens"],
+        subagent_data["total_tokens"],
+        total_data["total_tokens"],
+        event="run.usage",
+        trace=trace,
+        data=data,
     )
 
 
 def log_cost(
     stats: RunStats,
-    settings: AgentSettings,
+    cost_calculator: CostCalculator,
     *,
     trace: dict[str, str] | None = None,
 ) -> None:
-    """价格配置完整时打印预估费用。"""
-    cost = estimate_cost(stats, settings)
-    if cost is None:
-        logger.info(
+    """输出统一成本明细，同时保留历史平铺字段。"""
+    cost = cost_calculator.breakdown(stats)
+    data = build_cost_data(cost, include_legacy=True)
+    if not cost.available:
+        log_event(
+            logger,
+            logging.INFO,
             "预估费用: 未配置完整的模型单价",
-            extra={"event": "run.cost_unavailable", "trace": trace},
+            event="run.cost_unavailable",
+            trace=trace,
+            data=data,
         )
         return
-
-    router_cost = estimate_router_cost(stats, settings)
-    task_cost = (
-        cost - router_cost
-        if cost is not None and router_cost is not None
-        else None
-    )
-    logger.info(
+    log_event(
+        logger,
+        logging.INFO,
         "预估费用: %s %.6f",
-        settings.price_currency,
-        cost,
-        extra={
-            "event": "run.cost",
-            "trace": trace,
-            "data": {
-                "currency": settings.price_currency,
-                "amount": cost,
-                "total_cost_usd": cost,
-                "router_cost_usd": router_cost,
-                "task_cost_usd": task_cost,
-            },
-        },
+        cost.currency,
+        cost.total_usd or 0.0,
+        event="run.cost",
+        trace=trace,
+        data=build_cost_event_data(cost),
     )
 
 
@@ -361,6 +258,7 @@ async def main() -> None:
         return
 
     settings = AgentSettings()
+    cost_calculator = CostCalculator.from_settings(settings)
 
     if args.resume:
         checkpoint = load_checkpoint(args.resume)
@@ -422,43 +320,43 @@ async def main() -> None:
     checkpoint_enabled = args.checkpoint_enabled or bool(args.resume)
     trace = {"run_id": run_id, "agent_id": "main", "role": "main"}
     log_file = configure_logging(args.log_file or settings.log_file)
-    logger.info(
+    log_event(
+        logger,
+        logging.INFO,
         "[RUN] %s",
         log_file,
-        extra={
-            "event": "run.resumed" if args.resume else "run.started",
-            "trace": trace,
-            "console_message": f"[RUN] {task}",
-            "data": {
-                "task": task,
-                "workdir": str(workdir),
+        event="run.resumed" if args.resume else "run.started",
+        trace=trace,
+        console_message=f"[RUN] {task}",
+        data=build_run_started_data(
+            task=task,
+            workdir=workdir,
+            model=model,
+            main_model=settings.main_model_name,
+            small_model=settings.small_model_name,
+            router_model=(
+                settings.router_model_name if router_enabled else None
+            ),
+            router_enabled=router_enabled,
+            prompt_cache_enabled=prompt_cache_enabled,
+            prompt_cache_key=settings.prompt_cache_key,
+            prompt_cache_retention=settings.prompt_cache_retention,
+            max_turns=max_turns,
+            start_turn=start_turn,
+            additional={
                 "log_file": str(log_file),
-                "model": model,
-                "main_model": settings.main_model_name,
-                "small_model": settings.small_model_name,
-                "router_model": (
-                    settings.router_model_name
-                    if router_enabled
-                    else None
-                ),
-                "max_turns": max_turns,
                 "enable_subagent": enable_subagent,
-                "router_enabled": router_enabled,
-                "prompt_cache_enabled": prompt_cache_enabled,
-                "prompt_cache_key": settings.prompt_cache_key,
-                "prompt_cache_retention": settings.prompt_cache_retention,
                 "checkpoint_enabled": checkpoint_enabled,
-                "start_turn": start_turn,
             },
-        },
+        ),
     )
 
     try:
-        run_started_at = perf_counter()
-        final_response, stats = await run_coding_agent(
+        _, stats = await run_coding_agent(
             task=task,
             workdir=workdir,
             settings=settings,
+            cost_calculator=cost_calculator,
             model=model,
             router_enabled=router_enabled,
             prompt_cache_enabled=prompt_cache_enabled,
@@ -477,15 +375,14 @@ async def main() -> None:
             trace_metadata=trace_metadata or None,
             trace_tags=trace_tags or None,
             log_start=False,
-            log_completion=False,
         )
     except MaxTurnsExceeded as exc:
         log_stats(exc.stats, trace=trace)
-        log_cost(exc.stats, settings, trace=trace)
+        log_cost(exc.stats, cost_calculator, trace=trace)
         return
     except CostLimitExceeded as exc:
         log_stats(exc.stats, trace=trace)
-        log_cost(exc.stats, settings, trace=trace)
+        log_cost(exc.stats, cost_calculator, trace=trace)
         return
     except APIError:
         return
@@ -493,64 +390,26 @@ async def main() -> None:
         raise
 
     log_stats(stats, trace=trace)
-    log_cost(stats, settings, trace=trace)
+    log_cost(stats, cost_calculator, trace=trace)
     if stats.trace_url:
-        logger.info(
+        log_event(
+            logger,
+            logging.INFO,
             "Langfuse Trace URL: %s",
             stats.trace_url,
-            extra={
-                "event": "run.trace_url",
-                "trace": trace,
-                "data": {"url": stats.trace_url},
-            },
+            event="run.trace_url",
+            trace=trace,
+            data={"url": stats.trace_url},
         )
-    total_cost_usd = estimate_cost(stats, settings)
-    router_cost_usd = estimate_router_cost(stats, settings)
-    total_stats = stats.aggregate()
-    task_cost_usd = (
-        total_cost_usd - router_cost_usd
-        if total_cost_usd is not None and router_cost_usd is not None
-        else None
-    )
-    finish_reason = final_response.choices[0].finish_reason
-    logger.info(
-        "运行完成",
-        extra={
-            "event": "run.completed",
-            "trace": trace,
-            "data": {
-                "status": "completed",
-                "finish_reason": finish_reason,
-                "trace_id": stats.trace_id,
-                "trace_url": stats.trace_url,
-                "router_enabled": router_enabled,
-                "prompt_cache_enabled": prompt_cache_enabled,
-                "prompt_cache_key": settings.prompt_cache_key,
-                "prompt_cache_retention": settings.prompt_cache_retention,
-                "route": stats.route,
-                "router_model": stats.router_model,
-                "selected_model": stats.selected_model or model,
-                "router_fallback": stats.router_fallback,
-                "cache_read_input_tokens": (
-                    total_stats.cache_read_input_tokens
-                ),
-                "cache_creation_input_tokens": (
-                    total_stats.cache_creation_input_tokens
-                ),
-                "total_cost_usd": total_cost_usd,
-                "router_cost_usd": router_cost_usd,
-                "task_cost_usd": task_cost_usd,
-                "duration_s": round(perf_counter() - run_started_at, 3),
-            },
-        },
-    )
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.warning(
+        log_event(
+            logger,
+            logging.WARNING,
             "运行已由用户中断。",
-            extra={"event": "run.interrupted"},
+            event="run.interrupted",
         )

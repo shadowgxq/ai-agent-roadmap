@@ -8,7 +8,7 @@ from src.agent.loop import (
     message_text,
 )
 from src.agent.logging_config import configure_logging, get_logger
-from src.agent.cost import estimate_cost
+from src.agent.cost import CostBreakdown, CostCalculator
 from src.agent.config import AgentSettings
 from evals.analysis import (
     aggregate_usage,
@@ -131,7 +131,8 @@ class EvalResult:
     capabilities: list[str] | None = None
     turns: int = 0
     duration_s: float = 0.0
-    cost_usd: float = 0.0
+    cost_usd: float | None = None
+    cost: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     judge_result: JudgeResult | None = None
     trace_id: str | None = None
@@ -374,6 +375,7 @@ async def run_case(
     experiment: str = "baseline",
     router_enabled: bool = False,
     prompt_cache_enabled: bool | None = None,
+    cost_calculator: CostCalculator | None = None,
 ) -> EvalResult:
     """运行一个 case，并按 command/judge/behavior 分派验证器。"""
     case_name = case_dir.name
@@ -384,7 +386,8 @@ async def run_case(
     )
     started_at = perf_counter()
     turns = 0
-    cost_usd = 0.0
+    cost_usd: float | None = None
+    cost_data: dict[str, Any] = {}
     trace_id: str | None = None
     trace_url: str | None = None
     judge_model: str | None = None
@@ -394,16 +397,14 @@ async def run_case(
     tool_calls: list[dict[str, Any]] = []
     usage: dict[str, int | float | None] = {}
     case: EvalCase | None = None
+    calculator = cost_calculator or CostCalculator.from_settings(settings)
+    cost_data = CostBreakdown.unavailable(
+        currency=calculator.price_table.currency,
+        reason="not_calculated",
+    ).to_dict()
 
     try:
         case = load_case(case_dir / "case.yaml")
-        if settings.price_currency.upper() != "USD":
-            raise ValueError("Eval 的费用配置要求价格货币使用 USD")
-        if (
-            settings.input_price_per_million is None
-            or settings.output_price_per_million is None
-        ):
-            raise ValueError("缺少输入或输出单价，无法计算 Eval 费用")
 
         with temporary_workspace(case_dir) as workspace:
             case_settings = build_case_settings(settings, case, workspace)
@@ -413,6 +414,7 @@ async def run_case(
                     task=case.task,
                     workdir=workspace,
                     settings=case_settings,
+                    cost_calculator=calculator,
                     router_enabled=router_enabled,
                     prompt_cache_enabled=effective_prompt_cache_enabled,
                     max_cost_usd=case.max_cost_usd,
@@ -460,10 +462,9 @@ async def run_case(
             tool_calls = aggregate_stats.tool_calls
             usage = usage_metrics(aggregate_stats)
             after_snapshot = snapshot_workspace(workspace)
-            estimated_cost = estimate_cost(stats, case_settings)
-            if estimated_cost is None:
-                raise ValueError("缺少完整的模型价格配置，无法计算 Eval 费用")
-            cost_usd = estimated_cost
+            breakdown = calculator.breakdown(stats)
+            cost_data = breakdown.to_dict()
+            cost_usd = breakdown.total_usd
             agent_answer = message_text(final_response.choices[0].message)
 
             if case.eval_type == "command":
@@ -530,6 +531,7 @@ async def run_case(
                             judge_output(
                                 client=judge_client,
                                 settings=case_settings,
+                                cost_calculator=calculator,
                                 case_name=case_name,
                                 task=case.task,
                                 reference=reference,
@@ -553,6 +555,7 @@ async def run_case(
                             turns=turns,
                             duration_s=perf_counter() - started_at,
                             cost_usd=cost_usd,
+                            cost=cost_data,
                             reason=(
                                 f"Judge 运行超过 {case.agent_timeout_s} 秒"
                             ),
@@ -565,8 +568,14 @@ async def run_case(
                             tool_calls=tool_calls,
                             usage=usage,
                         )
-                cost_usd += judge_run.cost_usd
-                if cost_usd > case.max_cost_usd:
+                breakdown = calculator.breakdown(
+                    stats,
+                    judge_usage=judge_run.usage,
+                    judge_model=judge_model,
+                )
+                cost_data = breakdown.to_dict()
+                cost_usd = breakdown.total_usd
+                if cost_usd is not None and cost_usd > case.max_cost_usd:
                     return EvalResult(
                         case_name=case_name,
                         eval_type=case.eval_type,
@@ -576,6 +585,7 @@ async def run_case(
                         turns=turns,
                         duration_s=perf_counter() - started_at,
                         cost_usd=cost_usd,
+                        cost=cost_data,
                         reason=(
                             f"Agent + Judge 总费用 ${cost_usd:.6f}"
                             f" 超过 case 预算 ${case.max_cost_usd:.6f}"
@@ -598,6 +608,7 @@ async def run_case(
                         capabilities=case.capabilities,
                         duration_s=perf_counter() - started_at,
                         judge_result=judge_run.result,
+                        cost=cost_data,
                     )
                 else:
                     result.judge_result = judge_run.result
@@ -632,6 +643,7 @@ async def run_case(
 
             result.turns = turns
             result.cost_usd = cost_usd
+            result.cost = cost_data
             result.trace_id = trace_id
             result.trace_url = trace_url
             result.judge_model = judge_model
@@ -643,13 +655,15 @@ async def run_case(
             result.usage = usage
             return result
     except CostLimitExceeded as exc:
+        breakdown = calculator.breakdown(exc.stats)
         return EvalResult(
             case_name=case_name,
             eval_type=case.eval_type if case is not None else "command",
             status="fail",
             turns=exc.stats.turns,
             duration_s=perf_counter() - started_at,
-            cost_usd=exc.actual_cost_usd,
+            cost_usd=breakdown.total_usd or exc.actual_cost_usd,
+            cost=breakdown.to_dict(),
             reason=str(exc),
             trace_id=exc.stats.trace_id,
             trace_url=exc.stats.trace_url,
@@ -658,14 +672,15 @@ async def run_case(
             usage=usage_metrics(exc.stats),
         )
     except MaxTurnsExceeded as exc:
-        estimated_cost = estimate_cost(exc.stats, settings)
+        breakdown = calculator.breakdown(exc.stats)
         return EvalResult(
             case_name=case_name,
             eval_type=case.eval_type if case is not None else "command",
             status="error",
             turns=exc.stats.turns,
             duration_s=perf_counter() - started_at,
-            cost_usd=estimated_cost or 0.0,
+            cost_usd=breakdown.total_usd,
+            cost=breakdown.to_dict(),
             reason=str(exc),
             trace_id=exc.stats.trace_id,
             trace_url=exc.stats.trace_url,
@@ -681,6 +696,7 @@ async def run_case(
             turns=turns,
             duration_s=perf_counter() - started_at,
             cost_usd=cost_usd,
+            cost=cost_data,
             reason=f"Agent 运行超过 {case.agent_timeout_s if case else 180} 秒",
             trace_id=trace_id,
             trace_url=trace_url,
@@ -697,6 +713,7 @@ async def run_case(
             turns=turns,
             duration_s=perf_counter() - started_at,
             cost_usd=cost_usd,
+            cost=cost_data,
             reason=f"验证命令超过 {exc.timeout} 秒",
             trace_id=trace_id,
             trace_url=trace_url,
@@ -713,6 +730,7 @@ async def run_case(
             turns=turns,
             duration_s=perf_counter() - started_at,
             cost_usd=cost_usd,
+            cost=cost_data,
             reason=f"{type(exc).__name__}: {exc}",
             trace_id=trace_id,
             trace_url=trace_url,
@@ -727,6 +745,7 @@ def log_result(result: EvalResult) -> None:
     """只在终端显示一个 case 的状态、评分和失败原因。"""
     label = result.status.upper()
     failure_categories = result.failure_categories or classify_failure(result)
+    result_cost = _result_cost(result)
     summary = (
         f"[{label}] {result.case_name} ({result.eval_type}) | "
         f"turns={result.turns} | "
@@ -740,6 +759,8 @@ def log_result(result: EvalResult) -> None:
         "capabilities": result.capabilities,
         "turns": result.turns,
         "duration_s": result.duration_s,
+        "cost_usd": result.cost_usd,
+        **result_cost.output_fields(),
         "reason": result.reason or None,
         "trace_id": result.trace_id,
         "trace_url": result.trace_url,
@@ -809,6 +830,19 @@ def _average(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def _result_cost(result: EvalResult) -> CostBreakdown:
+    """兼容新 cost 对象和历史 cost_usd 字段。"""
+    return CostBreakdown.from_dict(
+        result.cost,
+        legacy_total=result.cost_usd,
+    )
+
+
+def aggregate_cost(results: list[EvalResult]) -> CostBreakdown:
+    """汇总 Eval case 成本；任一 case 不可用则明确保留不可用状态。"""
+    return CostBreakdown.combine(_result_cost(result) for result in results)
+
+
 def summarize_trajectory(results: list[EvalResult]) -> dict[str, Any]:
     """汇总每个 case 的轨迹指标，不把它们误当成结果分数。"""
     return {
@@ -866,7 +900,8 @@ def log_summary(
     }
     turns = sum(result.turns for result in results)
     duration = sum(result.duration_s for result in results)
-    cost = sum(result.cost_usd for result in results)
+    cost_breakdown = aggregate_cost(results)
+    cost = cost_breakdown.total_usd
     trajectory = summarize_trajectory(results)
     failure_categories = summarize_failure_categories(results)
 
@@ -892,7 +927,12 @@ def log_summary(
 
     average_turns = turns / len(results) if results else 0
     average_duration = duration / len(results) if results else 0
-    average_cost = cost / len(results) if results else 0
+    average_cost = cost / len(results) if cost is not None and results else None
+    cost_line = (
+        f"${cost:.6f} (avg ${average_cost:.6f})"
+        if cost is not None and average_cost is not None
+        else "unavailable"
+    )
     lines = [
         "Eval Summary",
         "=" * 30,
@@ -941,7 +981,7 @@ def log_summary(
             "Performance",
             f"  Avg turns     {average_turns:.1f}",
             f"  Avg duration  {average_duration:.1f}s",
-            f"Cost           ${cost:.6f} (avg ${average_cost:.6f})",
+            f"Cost           {cost_line}",
             f"Prompt cache   {prompt_cache_enabled}",
         ]
     )
@@ -960,6 +1000,7 @@ def log_summary(
                 "turns": turns,
                 "duration_s": duration,
                 "cost_usd": cost,
+                **cost_breakdown.output_fields(),
                 "prompt_cache_enabled": prompt_cache_enabled,
                 "trajectory": trajectory,
             },
@@ -997,6 +1038,13 @@ def write_report(
     buckets = summarize_buckets(results)
     failure_categories = summarize_failure_categories(results)
     usage = aggregate_usage(results)
+    cost_breakdown = aggregate_cost(results)
+    cost_usd = cost_breakdown.total_usd
+    average_cost_usd = (
+        cost_usd / len(results)
+        if cost_usd is not None and results
+        else None
+    )
     path = path.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -1005,6 +1053,7 @@ def write_report(
         "suite": suite,
         "router_enabled": router_enabled,
         "prompt_cache_enabled": prompt_cache_enabled,
+        **cost_breakdown.output_fields(),
         "cases": [path.name for path in selected_cases],
         "summary": {
             "total": len(results),
@@ -1036,12 +1085,9 @@ def write_report(
             "failure_categories": failure_categories,
             "turns": sum(result.turns for result in results),
             "duration_s": sum(result.duration_s for result in results),
-            "cost_usd": sum(result.cost_usd for result in results),
-            "avg_cost_usd": (
-                sum(result.cost_usd for result in results) / len(results)
-                if results
-                else 0.0
-            ),
+            "cost_usd": cost_usd,
+            "avg_cost_usd": average_cost_usd,
+            **cost_breakdown.output_fields(),
             "usage": usage,
             "trajectory": trajectory,
         },
@@ -1055,6 +1101,7 @@ def write_report(
                 "turns": result.turns,
                 "duration_s": result.duration_s,
                 "cost_usd": result.cost_usd,
+                **_result_cost(result).output_fields(),
                 "reason": result.reason or None,
                 "trace_id": result.trace_id,
                 "trace_url": result.trace_url,
@@ -1095,6 +1142,7 @@ async def main() -> None:
     """顺序运行选中的 cases，避免并发请求干扰结果和日志。"""
     args = parse_args()
     settings = AgentSettings()
+    cost_calculator = CostCalculator.from_settings(settings)
     prompt_cache_enabled = (
         settings.prompt_cache_enabled
         if args.cache is None
@@ -1170,6 +1218,7 @@ async def main() -> None:
             experiment=args.experiment,
             router_enabled=args.router == "on",
             prompt_cache_enabled=prompt_cache_enabled,
+            cost_calculator=cost_calculator,
         )
         results.append(result)
         log_result(result)

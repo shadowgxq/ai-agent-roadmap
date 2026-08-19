@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import random
 import re
 import time
@@ -19,6 +20,7 @@ from .cache import PromptCacheConfig
 from .compact import compact, hard_truncate
 from .context import Context
 from .logging_config import get_logger
+from .logging_events import log_event
 
 logger = get_logger("agent.loop")
 
@@ -602,33 +604,33 @@ async def run(
                 stats=stats,
             )
 
-    logger.info(
+    log_event(
+        logger,
+        logging.INFO,
         "Agent 开始: %s",
         trace.agent_id,
-        extra={
-            "event": "agent.started",
-            "trace": trace.event_context(),
-            "data": {
-                "model": model,
-                "max_turns": max_turns,
-                "max_tokens": max_tokens,
-                "message_count": len(context.messages),
-                "tools": [tool["name"] for tool in tools],
-            },
+        event="agent.started",
+        trace=trace.event_context(),
+        data={
+            "model": model,
+            "max_turns": max_turns,
+            "max_tokens": max_tokens,
+            "message_count": len(context.messages),
+            "tools": [tool["name"] for tool in tools],
         },
     )
     last_context_tokens: int | None = None
 
     for turn in range(start_turn + 1, max_turns + 1):
-        logger.info(
+        log_event(
+            logger,
+            logging.INFO,
             "===== 第 %s/%s 轮 =====",
             turn,
             max_turns,
-            extra={
-                "event": "agent.turn_started",
-                "trace": trace.event_context(turn),
-                "data": {"max_turns": max_turns},
-            },
+            event="agent.turn_started",
+            trace=trace.event_context(turn),
+            data={"max_turns": max_turns},
         )
         compact_before_tokens: int | None = None
         compact_strategy: Literal["summary", "hard_truncate"] | None = None
@@ -644,28 +646,28 @@ async def run(
             def record_compact_usage(raw_usage: Any) -> dict[str, int]:
                 usage = extract_usage_tokens(raw_usage)
                 stats.add_compact_usage(usage)
-                logger.info(
+                log_event(
+                    logger,
+                    logging.INFO,
                     "compact 模型用量",
-                    extra={
-                        "event": "agent.context_compact_model_usage",
-                        "trace": trace.event_context(turn),
-                        "data": {
-                            "model": compact_model or model,
-                            "input_tokens": usage.input_tokens,
-                            "cache_read_input_tokens": (
-                                usage.cache_read_input_tokens
-                            ),
-                            "cache_creation_input_tokens": (
-                                usage.cache_creation_input_tokens
-                            ),
-                            "output_tokens": usage.output_tokens,
-                            "total_tokens": (
-                                usage.input_tokens
-                                + usage.cache_read_input_tokens
-                                + usage.cache_creation_input_tokens
-                                + usage.output_tokens
-                            ),
-                        },
+                    event="agent.context_compact_model_usage",
+                    trace=trace.event_context(turn),
+                    data={
+                        "model": compact_model or model,
+                        "input_tokens": usage.input_tokens,
+                        "cache_read_input_tokens": (
+                            usage.cache_read_input_tokens
+                        ),
+                        "cache_creation_input_tokens": (
+                            usage.cache_creation_input_tokens
+                        ),
+                        "output_tokens": usage.output_tokens,
+                        "total_tokens": (
+                            usage.input_tokens
+                            + usage.cache_read_input_tokens
+                            + usage.cache_creation_input_tokens
+                            + usage.output_tokens
+                        ),
                     },
                 )
                 return {
@@ -695,16 +697,16 @@ async def run(
                 compact_strategy = "summary"
             except Exception as exc:
                 compact_error = exc
-                logger.warning(
+                log_event(
+                    logger,
+                    logging.WARNING,
                     "上下文摘要最终失败，改用完整轮次硬裁剪: %s",
                     type(exc).__name__,
-                    extra={
-                        "event": "agent.context_compact_failed",
-                        "trace": trace.event_context(turn),
-                        "data": {
-                            "error_type": type(exc).__name__,
-                            "error": str(exc),
-                        },
+                    event="agent.context_compact_failed",
+                    trace=trace.event_context(turn),
+                    data={
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
                     },
                 )
                 try:
@@ -717,16 +719,16 @@ async def run(
                 except Exception as fallback_exc:
                     validated_messages = context.messages
                     compact_strategy = None
-                    logger.error(
+                    log_event(
+                        logger,
+                        logging.ERROR,
                         "上下文硬裁剪失败，保留原上下文继续执行: %s",
                         type(fallback_exc).__name__,
-                        extra={
-                            "event": "agent.context_compact_fallback_failed",
-                            "trace": trace.event_context(turn),
-                            "data": {
-                                "error_type": type(fallback_exc).__name__,
-                                "error": str(fallback_exc),
-                            },
+                        event="agent.context_compact_fallback_failed",
+                        trace=trace.event_context(turn),
+                        data={
+                            "error_type": type(fallback_exc).__name__,
+                            "error": str(fallback_exc),
                         },
                     )
 
@@ -737,26 +739,26 @@ async def run(
                 compact_before_tokens = last_context_tokens
                 before_message_count = len(context.messages)
                 context.messages = validated_messages
-                logger.info(
+                log_event(
+                    logger,
+                    logging.INFO,
                     "上下文压缩完成，等待下一次请求确认 token 用量",
-                    extra={
-                        "event": "agent.context_compacted",
-                        "trace": trace.event_context(turn),
-                        "console_message": (
-                            f"[compact] before={compact_before_tokens} tokens, "
-                            "after=pending"
+                    event="agent.context_compacted",
+                    trace=trace.event_context(turn),
+                    console_message=(
+                        f"[compact] before={compact_before_tokens} tokens, "
+                        "after=pending"
+                    ),
+                    data={
+                        "before_tokens": compact_before_tokens,
+                        "before_message_count": before_message_count,
+                        "after_message_count": len(context.messages),
+                        "strategy": compact_strategy,
+                        "fallback_error": (
+                            str(compact_error)
+                            if compact_error is not None
+                            else None
                         ),
-                        "data": {
-                            "before_tokens": compact_before_tokens,
-                            "before_message_count": before_message_count,
-                            "after_message_count": len(context.messages),
-                            "strategy": compact_strategy,
-                            "fallback_error": (
-                                str(compact_error)
-                                if compact_error is not None
-                                else None
-                            ),
-                        },
                     },
                 )
 
@@ -794,16 +796,16 @@ async def run(
             )
         else:
             console_message = f"Turn {turn} → final answer"
-        logger.info(
+        log_event(
+            logger,
+            logging.INFO,
             "LLM 完成: turn=%s tools=%s",
             turn,
             len(tool_call_names),
-            extra={
-                "event": "llm.completed",
-                "trace": trace.event_context(turn),
-                "console_message": console_message,
-                "data": llm_data,
-            },
+            event="llm.completed",
+            trace=trace.event_context(turn),
+            console_message=console_message,
+            data=llm_data,
         )
         if text:
             await emit_event(
@@ -821,18 +823,18 @@ async def run(
                 "after_tokens": after_tokens,
                 "strategy": compact_strategy,
             }
-            logger.info(
+            log_event(
+                logger,
+                logging.INFO,
                 "上下文压缩用量",
-                extra={
-                    "event": "agent.compact_usage",
-                    "trace": trace.event_context(turn),
-                    "console_message": (
-                        f"[compact] before={compact_before_tokens} tokens, "
-                        f"after={after_tokens if after_tokens is not None else 'unknown'} "
-                        "tokens"
-                    ),
-                    "data": compact_data,
-                },
+                event="agent.compact_usage",
+                trace=trace.event_context(turn),
+                console_message=(
+                    f"[compact] before={compact_before_tokens} tokens, "
+                    f"after={after_tokens if after_tokens is not None else 'unknown'} "
+                    "tokens"
+                ),
+                data=compact_data,
             )
             await emit_event(event_callback, "compact_usage", compact_data)
 
@@ -851,26 +853,6 @@ async def run(
             "context_usage_percent": context_usage_percent,
             "available": context_tokens is not None,
         }
-        if context_tokens is None:
-            context_message = (
-                # f"上下文用量: turn={turn} context_tokens=unknown "
-                f"window={context_window_tokens} usage=unknown%"
-            )
-        else:
-            context_message = (
-                # f"上下文用量: turn={turn} context_tokens={context_tokens} "
-                f"window={context_window_tokens} "
-                f"usage={context_usage_percent:.2f}%"
-            )
-        # logger.info(
-        #     "上下文用量",
-        #     extra={
-        #         "event": "agent.context_usage",
-        #         "trace": trace.event_context(turn),
-        #         "console_message": context_message,
-        #         "data": context_usage_data,
-        #     },
-        # )
         await emit_event(event_callback, "context_usage", context_usage_data)
 
         stats.turns += 1
@@ -888,30 +870,30 @@ async def run(
         if not message.tool_calls:
             if checkpoint_callback is not None:
                 checkpoint_callback(context, stats, turn, "completed")
-            logger.info(
+            log_event(
+                logger,
+                logging.INFO,
                 "Agent 最终回答",
-                extra={
-                    "event": "agent.final_answer",
-                    "trace": trace.event_context(turn),
-                    "console_message": f"Final answer: {text}",
-                    "data": {
-                        "turn": turn,
-                        "text": text,
-                        "finish_reason": response.choices[0].finish_reason,
-                    },
+                event="agent.final_answer",
+                trace=trace.event_context(turn),
+                console_message=f"Final answer: {text}",
+                data={
+                    "turn": turn,
+                    "text": text,
+                    "finish_reason": response.choices[0].finish_reason,
                 },
             )
-            logger.info(
+            log_event(
+                logger,
+                logging.INFO,
                 "Agent 完成: %s",
                 trace.agent_id,
-                extra={
-                    "event": "agent.completed",
-                    "trace": trace.event_context(turn),
-                    "console_message": f"Agent completed: {stats.turns} turns",
-                    "data": {
-                        "turns": stats.turns,
-                        "finish_reason": response.choices[0].finish_reason,
-                    },
+                event="agent.completed",
+                trace=trace.event_context(turn),
+                console_message=f"Agent completed: {stats.turns} turns",
+                data={
+                    "turns": stats.turns,
+                    "finish_reason": response.choices[0].finish_reason,
                 },
             )
             await emit_event(
@@ -968,14 +950,14 @@ async def run(
         if checkpoint_callback is not None:
             checkpoint_callback(context, stats, turn, "running")
 
-    logger.error(
+    log_event(
+        logger,
+        logging.ERROR,
         "Agent 达到最大轮数: %s",
         max_turns,
-        extra={
-            "event": "agent.max_turns_exceeded",
-            "trace": trace.event_context(max_turns),
-            "data": {"max_turns": max_turns},
-        },
+        event="agent.max_turns_exceeded",
+        trace=trace.event_context(max_turns),
+        data={"max_turns": max_turns},
     )
     raise MaxTurnsExceeded(max_turns, stats)
 
@@ -1118,24 +1100,23 @@ async def call_llm(
                 raise
 
             delay = base_delay * 2**attempt + random.uniform(0, 0.5)
-            logger.warning(
+            log_event(
+                logger,
+                logging.WARNING,
                 "模型请求失败，%.2f 秒后重试 (%s/%s): %s",
                 delay,
                 attempt + 2,
                 max_attempts,
                 type(exc).__name__,
-                extra={
-                    "event": "agent.model_retry",
-                    "trace": (
-                        trace.event_context(
-                            turn) if trace is not None else None
-                    ),
-                    "data": {
-                        "delay_s": delay,
-                        "attempt": attempt + 2,
-                        "max_attempts": max_attempts,
-                        "error_type": type(exc).__name__,
-                    },
+                event="agent.model_retry",
+                trace=(
+                    trace.event_context(turn) if trace is not None else None
+                ),
+                data={
+                    "delay_s": delay,
+                    "attempt": attempt + 2,
+                    "max_attempts": max_attempts,
+                    "error_type": type(exc).__name__,
                 },
             )
             await asyncio.sleep(delay)
@@ -1213,21 +1194,21 @@ async def execute_tools(
                     content,
                     tool_call_id=tool_call.id,
                 )
-            logger.error(
+            log_event(
+                logger,
+                logging.ERROR,
                 content,
-                extra={
-                    "event": "tool.completed",
-                    "trace": trace_context,
-                    "console_message": f"→ {name} ✗ invalid arguments",
-                    "data": {
-                        "tool": name,
-                        "status": "invalid_arguments",
-                        "duration_ms": round(
-                            (time.perf_counter() - tool_started_at) * 1000
-                        ),
-                        "result_size": len(content),
-                        "error": local_text_preview(content),
-                    },
+                event="tool.completed",
+                trace=trace_context,
+                console_message=f"→ {name} ✗ invalid arguments",
+                data={
+                    "tool": name,
+                    "status": "invalid_arguments",
+                    "duration_ms": round(
+                        (time.perf_counter() - tool_started_at) * 1000
+                    ),
+                    "result_size": len(content),
+                    "error": local_text_preview(content),
                 },
             )
             tool_results.append(
@@ -1285,29 +1266,24 @@ async def execute_tools(
             )
             preview = local_text_preview(content)
             console_status = "✓" if status == "ok" else "✗"
-            log_method = logger.info if status == "ok" else logger.warning
-            log_method(
+            log_event(
+                logger,
+                logging.INFO if status == "ok" else logging.WARNING,
                 "工具完成: %s (%s)",
                 name,
                 status,
-                extra={
-                    "event": "tool.completed",
-                    "trace": trace_context,
-                    "console_message": (
-                        f"→ {name} {console_status} ({duration_ms}ms)"
-                    ),
-                    "data": {
-                        "tool": name,
-                        "status": status,
-                        "duration_ms": duration_ms,
-                        "result_size": len(content),
-                        "preview": preview,
-                        **(
-                            {"error": preview}
-                            if status != "ok"
-                            else {}
-                        ),
-                    },
+                event="tool.completed",
+                trace=trace_context,
+                console_message=(
+                    f"→ {name} {console_status} ({duration_ms}ms)"
+                ),
+                data={
+                    "tool": name,
+                    "status": status,
+                    "duration_ms": duration_ms,
+                    "result_size": len(content),
+                    "preview": preview,
+                    **({"error": preview} if status != "ok" else {}),
                 },
             )
 

@@ -14,7 +14,7 @@ from uuid import uuid4
 import yaml
 
 from src.agent.config import AgentSettings, PROJECT_ROOT
-from src.agent.cost import estimate_cost
+from src.agent.cost import CostCalculator
 from src.agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
 from src.agent.runtime import ToolMode, run_coding_agent
 from src.rag.indexer import load_index
@@ -213,6 +213,7 @@ async def run_case(
     max_tokens: int,
     max_cost_usd: float | None,
     prompt_cache_enabled: bool,
+    cost_calculator: CostCalculator | None = None,
 ) -> CaseResult:
     """运行一个问题并提取统一指标。"""
     started_at = perf_counter()
@@ -220,6 +221,7 @@ async def run_case(
     stats = RunStats()
     answer = ""
     error = ""
+    calculator = cost_calculator or CostCalculator.from_settings(settings)
 
     async def collect_event(event: str, data: dict[str, Any]) -> None:
         if event != "tool_call":
@@ -233,6 +235,7 @@ async def run_case(
             task=build_task(case, mode),
             workdir=workdir,
             settings=settings,
+            cost_calculator=calculator,
             prompt_cache_enabled=prompt_cache_enabled,
             max_turns=max_turns,
             max_tokens=max_tokens,
@@ -273,7 +276,7 @@ async def run_case(
         output_tokens=stats.output_tokens,
         total_tokens=stats.total_tokens,
         duration_s=perf_counter() - started_at,
-        cost_usd=estimate_cost(stats, settings),
+        cost_usd=calculator.breakdown(stats).total_usd,
         tool_calls=tool_calls,
         matched_groups=matched,
         expected_groups=len(case.expected_groups),
@@ -356,6 +359,7 @@ async def run_experiment(args: argparse.Namespace) -> list[CaseResult]:
         load_index(index_path)
 
     settings = AgentSettings()
+    cost_calculator = CostCalculator.from_settings(settings)
 
     results: list[CaseResult] = []
     for mode in modes:
@@ -369,6 +373,7 @@ async def run_experiment(args: argparse.Namespace) -> list[CaseResult]:
                 max_tokens=args.max_tokens,
                 max_cost_usd=args.max_cost_usd,
                 prompt_cache_enabled=args.cache == "on",
+                cost_calculator=cost_calculator,
             )
             results.append(result)
             print_result(result)

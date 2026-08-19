@@ -1,6 +1,7 @@
 """组装并运行一次 Coding Agent。"""
 
 import asyncio
+import logging
 from contextlib import AsyncExitStack
 from dataclasses import replace
 from pathlib import Path
@@ -33,7 +34,7 @@ from .checkpoint import (
 )
 from .config import AgentSettings, ConfirmCallback
 from .context import Context
-from .cost import estimate_cost, estimate_router_cost
+from .cost import CostCalculator
 from .git_snapshot import ensure_start_snapshot, get_head_sha
 from .loop import (
     AgentTrace,
@@ -44,6 +45,12 @@ from .loop import (
     run,
 )
 from .logging_config import get_logger
+from .logging_events import (
+    build_cost_data,
+    build_run_completed_data,
+    build_run_started_data,
+    log_event,
+)
 from .prompts import build_system_prompt, build_task_message
 from ..workflows.router import ComplexityDecision, RouterResult, classify_task
 
@@ -57,6 +64,7 @@ async def run_coding_agent(
     workdir: Path,
     settings: AgentSettings,
     *,
+    cost_calculator: CostCalculator | None = None,
     model: str | None = None,
     router_enabled: bool | None = None,
     prompt_cache_enabled: bool | None = None,
@@ -130,6 +138,7 @@ async def run_coding_agent(
             else main_model
         )
     main_stats.selected_model = selected_model
+    cost_calculator = cost_calculator or CostCalculator.from_settings(settings)
     run_started_at = perf_counter()
 
     registry = ToolRegistry()
@@ -159,7 +168,7 @@ async def run_coding_agent(
         status: CheckpointStatus,
     ) -> None:
         """在完整轮次边界保存可恢复状态。"""
-        total_cost = estimate_cost(current_stats, settings)
+        cost = cost_calculator.breakdown(current_stats)
         save_checkpoint(
             Checkpoint(
                 run_id=selected_run_id,
@@ -167,7 +176,8 @@ async def run_coding_agent(
                 messages=current_context.messages,
                 turn=turn,
                 stats=RunStatsSnapshot.from_stats(current_stats),
-                total_cost_usd=total_cost,
+                total_cost_usd=cost.total_usd,
+                cost=cost.to_dict(),
                 workdir=str(workdir),
                 model=selected_model,
                 max_turns=selected_max_turns,
@@ -196,29 +206,29 @@ async def run_coding_agent(
         persist_checkpoint(context, main_stats, main_stats.turns, status)
 
     if log_start:
-        logger.info(
+        log_event(
+            logger,
+            logging.INFO,
             "Agent 开始: %s",
             trace.agent_id,
-            extra={
-                "event": "run.resumed" if start_turn else "run.started",
-                "trace": trace.event_context(),
-                "data": {
-                    "task": task,
-                    "workdir": str(workdir),
-                    "model": selected_model,
-                    "main_model": main_model,
-                    "small_model": settings.small_model_name,
-                    "router_model": (
-                        settings.router_model_name if use_router else None
-                    ),
-                    "router_enabled": use_router,
-                    "prompt_cache_enabled": prompt_cache.enabled,
-                    "prompt_cache_key": prompt_cache.key,
-                    "prompt_cache_retention": prompt_cache.retention,
-                    "max_turns": selected_max_turns,
-                    "start_turn": start_turn,
-                },
-            },
+            event="run.resumed" if start_turn else "run.started",
+            trace=trace.event_context(),
+            data=build_run_started_data(
+                task=task,
+                workdir=workdir,
+                model=selected_model,
+                main_model=main_model,
+                small_model=settings.small_model_name,
+                router_model=(
+                    settings.router_model_name if use_router else None
+                ),
+                router_enabled=use_router,
+                prompt_cache_enabled=prompt_cache.enabled,
+                prompt_cache_key=prompt_cache.key,
+                prompt_cache_retention=prompt_cache.retention,
+                max_turns=selected_max_turns,
+                start_turn=start_turn,
+            ),
         )
 
     try:
@@ -274,17 +284,17 @@ async def run_coding_agent(
                 router_result: RouterResult | None = None
                 if use_router and main_stats.router_calls == 0:
                     router_model = settings.router_model_name
-                    logger.info(
+                    log_event(
+                        logger,
+                        logging.INFO,
                         "任务路由开始: router_model=%s",
                         router_model,
-                        extra={
-                            "event": "agent.router_started",
-                            "trace": trace.event_context(),
-                            "data": {
-                                "router_enabled": True,
-                                "router_model": router_model,
-                                "prompt_cache_enabled": prompt_cache.enabled,
-                            },
+                        event="agent.router_started",
+                        trace=trace.event_context(),
+                        data={
+                            "router_enabled": True,
+                            "router_model": router_model,
+                            "prompt_cache_enabled": prompt_cache.enabled,
                         },
                     )
                     try:
@@ -295,17 +305,17 @@ async def run_coding_agent(
                             prompt_cache=prompt_cache,
                         )
                     except Exception as exc:
-                        logger.warning(
+                        log_event(
+                            logger,
+                            logging.WARNING,
                             "Router 调用失败，保守降级为 complex: %s",
                             exc,
-                            extra={
-                                "event": "agent.router_failed",
-                                "trace": trace.event_context(),
-                                "data": {
-                                    "router_model": router_model,
-                                    "error_type": type(exc).__name__,
-                                    "error": str(exc),
-                                },
+                            event="agent.router_failed",
+                            trace=trace.event_context(),
+                            data={
+                                "router_model": router_model,
+                                "error_type": type(exc).__name__,
+                                "error": str(exc),
                             },
                         )
                         router_result = RouterResult(
@@ -325,28 +335,28 @@ async def run_coding_agent(
                         else main_model
                     )
                     main_stats.selected_model = selected_model
-                    logger.info(
+                    log_event(
+                        logger,
+                        logging.INFO,
                         "任务路由完成: route=%s model=%s fallback=%s",
                         router_result.decision.route,
                         selected_model,
                         router_result.fallback,
-                        extra={
-                            "event": "agent.routed",
-                            "trace": trace.event_context(),
-                            "data": {
-                                "router_enabled": True,
-                                "route": router_result.decision.route,
-                                "router_model": router_model,
-                                "selected_model": selected_model,
-                                "prompt_cache_enabled": prompt_cache.enabled,
-                                "fallback": router_result.fallback,
-                                "router_tokens": (
-                                    router_result.usage.input_tokens
-                                    + router_result.usage.output_tokens
-                                    + router_result.usage.cache_read_input_tokens
-                                    + router_result.usage.cache_creation_input_tokens
-                                ),
-                            },
+                        event="agent.routed",
+                        trace=trace.event_context(),
+                        data={
+                            "router_enabled": True,
+                            "route": router_result.decision.route,
+                            "router_model": router_model,
+                            "selected_model": selected_model,
+                            "prompt_cache_enabled": prompt_cache.enabled,
+                            "fallback": router_result.fallback,
+                            "router_tokens": (
+                                router_result.usage.input_tokens
+                                + router_result.usage.output_tokens
+                                + router_result.usage.cache_read_input_tokens
+                                + router_result.usage.cache_creation_input_tokens
+                            ),
                         },
                     )
                 if root_observation is not None:
@@ -419,8 +429,7 @@ async def run_coding_agent(
                     max_turns=selected_max_turns,
                     max_tokens=max_tokens,
                     context_window_tokens=selected_context_window_tokens,
-                    cost_estimator=lambda stats: estimate_cost(
-                        stats, settings),
+                    cost_estimator=cost_calculator.estimate,
                     max_cost_usd=max_cost_usd,
                     prompt_cache=prompt_cache,
                     stats=main_stats,
@@ -437,20 +446,10 @@ async def run_coding_agent(
                     event_callback=event_callback,
                     langfuse_client=langfuse_client,
                 )
+                final_response, final_stats = result
+                cost = cost_calculator.breakdown(final_stats)
                 if root_observation is not None:
-                    final_response, final_stats = result
                     total_stats = final_stats.aggregate()
-                    local_cost_usd = estimate_cost(final_stats, settings)
-                    router_cost_usd = estimate_router_cost(
-                        final_stats,
-                        settings,
-                    )
-                    task_cost_usd = (
-                        local_cost_usd - router_cost_usd
-                        if local_cost_usd is not None
-                        and router_cost_usd is not None
-                        else None
-                    )
                     main_stats.trace_id = (
                         langfuse_client.get_current_trace_id()
                     )
@@ -468,13 +467,11 @@ async def run_coding_agent(
                             "cache_creation_input_tokens": (
                                 total_stats.cache_creation_input_tokens
                             ),
-                            "local_cost_usd": local_cost_usd,
-                            "total_cost_usd": local_cost_usd,
-                            "router_cost_usd": router_cost_usd,
-                            "task_cost_usd": task_cost_usd,
-                            "total_cost": local_cost_usd,
-                            "router_cost": router_cost_usd,
-                            "task_cost": task_cost_usd,
+                            **build_cost_data(cost, include_legacy=True),
+                            "local_cost_usd": cost.total_usd,
+                            "total_cost": cost.total_usd,
+                            "router_cost": cost.router_usd,
+                            "task_cost": cost.task_usd,
                             "router_enabled": use_router,
                             "prompt_cache_enabled": prompt_cache.enabled,
                             "prompt_cache_key": prompt_cache.key,
@@ -496,59 +493,23 @@ async def run_coding_agent(
                         metadata=final_metadata,
                     )
                 if log_completion:
-                    final_response, final_stats = result
-                    completion_stats = final_stats.aggregate()
-                    total_cost_usd = estimate_cost(final_stats, settings)
-                    router_cost_usd = estimate_router_cost(
-                        final_stats,
-                        settings,
-                    )
-                    task_cost_usd = (
-                        total_cost_usd - router_cost_usd
-                        if total_cost_usd is not None
-                        and router_cost_usd is not None
-                        else None
-                    )
-                    logger.info(
+                    log_event(
+                        logger,
+                        logging.INFO,
                         "运行完成",
-                        extra={
-                            "event": "run.completed",
-                            "trace": trace.event_context(final_stats.turns),
-                            "data": {
-                                "status": "completed",
-                                "finish_reason": (
-                                    final_response.choices[0].finish_reason
-                                ),
-                                "trace_id": final_stats.trace_id,
-                                "trace_url": final_stats.trace_url,
-                                "router_enabled": use_router,
-                                "prompt_cache_enabled": prompt_cache.enabled,
-                                "prompt_cache_key": prompt_cache.key,
-                                "prompt_cache_retention": prompt_cache.retention,
-                                "route": final_stats.route,
-                                "router_model": final_stats.router_model,
-                                "selected_model": (
-                                    final_stats.selected_model
-                                    or selected_model
-                                ),
-                                "router_fallback": (
-                                    final_stats.router_fallback
-                                ),
-                                "cache_read_input_tokens": (
-                                    completion_stats.cache_read_input_tokens
-                                ),
-                                "cache_creation_input_tokens": (
-                                    completion_stats.cache_creation_input_tokens
-                                ),
-                                "total_cost_usd": total_cost_usd,
-                                "router_cost_usd": router_cost_usd,
-                                "task_cost_usd": task_cost_usd,
-                                "duration_s": round(
-                                    perf_counter() - run_started_at,
-                                    3,
-                                ),
-                            },
-                        },
+                        event="run.completed",
+                        trace=trace.event_context(final_stats.turns),
+                        data=build_run_completed_data(
+                            response=final_response,
+                            stats=final_stats,
+                            selected_model=selected_model,
+                            router_enabled=use_router,
+                            prompt_cache_enabled=prompt_cache.enabled,
+                            prompt_cache_key=prompt_cache.key,
+                            prompt_cache_retention=prompt_cache.retention,
+                            cost=cost,
+                            duration_s=perf_counter() - run_started_at,
+                        ),
                     )
                 return result
     except (asyncio.CancelledError, KeyboardInterrupt):
@@ -556,19 +517,20 @@ async def run_coding_agent(
             persist_failure_checkpoint("interrupted")
         raise
     except Exception as exc:
-        logger.exception(
+        log_event(
+            logger,
+            logging.ERROR,
             "Agent 运行失败: %s",
             exc,
-            extra={
-                "event": "run.error",
-                "trace": trace.event_context(),
-                "data": {
-                    "error_type": type(exc).__name__,
-                    "error": str(exc),
-                    "run_id": selected_run_id,
-                    "rollback_run_id": selected_run_id,
-                },
+            event="run.error",
+            trace=trace.event_context(),
+            data={
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+                "run_id": selected_run_id,
+                "rollback_run_id": selected_run_id,
             },
+            exc_info=True,
         )
         if checkpoint_enabled:
             persist_failure_checkpoint("failed")

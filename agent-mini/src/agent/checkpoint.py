@@ -137,6 +137,7 @@ class Checkpoint(BaseModel):
     turn: int = Field(default=0, ge=0)
     stats: RunStatsSnapshot = Field(default_factory=RunStatsSnapshot)
     total_cost_usd: float | None = Field(default=None, ge=0)
+    cost: dict[str, Any] = Field(default_factory=dict)
     workdir: str = Field(min_length=1)
     model: str = Field(min_length=1)
     max_turns: int = Field(gt=0)

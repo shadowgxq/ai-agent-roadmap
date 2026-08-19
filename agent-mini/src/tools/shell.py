@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 import sys
 
-from .registry import ToolRegistry
+from .policy import Policy, PolicyAction
+from .registry import ToolExecutionResult, ToolRegistry
 
 
 def _truncate_output(output: str, max_chars: int) -> str:
@@ -29,6 +30,7 @@ def register_shell_tools(
     *,
     timeout: float = 30.0,
     max_output_chars: int = 10_000,
+    policy: Policy | None = None,
 ) -> None:
     """注册绑定到指定工作目录的 Shell 工具。"""
     if timeout <= 0:
@@ -37,6 +39,7 @@ def register_shell_tools(
         raise ValueError("max_output_chars 必须大于 0")
 
     root = workdir.resolve()
+    shell_policy = policy if policy is not None else Policy()
     environment = os.environ.copy()
     if os.name != "nt":
         path_entries = [
@@ -51,7 +54,7 @@ def register_shell_tools(
             environment[temp_variable] = "/tmp"
 
     @registry.tool
-    async def run_shell(command: str) -> str:
+    async def run_shell(command: str) -> str | ToolExecutionResult:
         """在项目工作目录中执行 Shell 命令。
 
         Args:
@@ -59,6 +62,21 @@ def register_shell_tools(
         """
         if not command.strip():
             raise ValueError("command 不能为空")
+
+        decision = shell_policy.evaluate(command)
+        if decision.action is not PolicyAction.ALLOW:
+            action_text = (
+                "拒绝"
+                if decision.action is PolicyAction.DENY
+                else "需要确认"
+            )
+            return ToolExecutionResult(
+                content=(
+                    f"命令{action_text}，未执行: {command}\n"
+                    f"原因: {decision.reason}"
+                ),
+                is_error=True,
+            )
 
         process = await asyncio.create_subprocess_shell(
             command,

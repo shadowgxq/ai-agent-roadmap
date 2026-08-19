@@ -8,6 +8,7 @@ from .fs import (
     resolve_path,
 )
 from .mcp_client import MCPClientManager
+from .policy import Policy, PolicyAction, PolicyDecision
 from .registry import (
     RegisteredTool,
     ToolExecutionResult,
@@ -26,6 +27,9 @@ __all__ = [
     "RegisteredTool",
     "ToolExecutionResult",
     "ToolRegistry",
+    "Policy",
+    "PolicyAction",
+    "PolicyDecision",
     "MCPClientManager",
     "get_weather",
     "registry",

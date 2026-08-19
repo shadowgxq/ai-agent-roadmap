@@ -11,6 +11,7 @@ REPORT_FILE ?=
 BASELINE ?=
 CANDIDATE ?=
 ROUTER ?= off
+CACHE ?= on
 
 CASE_ARGS := $(foreach case_name,$(CASE),--case "$(case_name)")
 EVAL_SELECTOR := $(if $(strip $(CASE)),$(CASE_ARGS),--suite "$(SUITE)")
@@ -32,14 +33,14 @@ help:
 	@echo "  make eval-compare BASELINE=... CANDIDATE=...  对比两份报告（不调用模型）"
 	@echo "  make eval-full 或 make eval-all   运行全量（32 个）"
 	@echo ""
-	@echo "可选变量：SUITE=core CASE=name EXPERIMENT=name REPORT_FILE=path ROUTER=off|on UV=uv"
+	@echo "可选变量：SUITE=core CASE=name EXPERIMENT=name REPORT_FILE=path ROUTER=off|on CACHE=off|on UV=uv"
 
 eval:
-	$(EVAL_RUNNER) $(EVAL_SELECTOR) --experiment "$(EXPERIMENT)" --router "$(ROUTER)" $(REPORT_ARGS)
+	$(EVAL_RUNNER) $(EVAL_SELECTOR) --experiment "$(EXPERIMENT)" --router "$(ROUTER)" --cache "$(CACHE)" $(REPORT_ARGS)
 
 eval-case:
 	@test -n "$(strip $(CASE))" || (echo "用法: make eval-case CASE=code_review_report"; exit 2)
-	$(MAKE) eval CASE="$(CASE)" EXPERIMENT="$(EXPERIMENT)" REPORT_FILE="$(REPORT_FILE)"
+	$(MAKE) eval CASE="$(CASE)" EXPERIMENT="$(EXPERIMENT)" REPORT_FILE="$(REPORT_FILE)" CACHE="$(CACHE)"
 
 eval-core:
 	$(MAKE) eval SUITE=core

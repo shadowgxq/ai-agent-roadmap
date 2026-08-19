@@ -145,6 +145,7 @@ class Checkpoint(BaseModel):
     max_cost_usd: float | None = Field(default=None, gt=0)
     enable_subagent: bool = True
     router_enabled: bool = False
+    prompt_cache_enabled: bool = True
     status: CheckpointStatus = "running"
     start_sha: str | None = None
 

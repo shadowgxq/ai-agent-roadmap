@@ -2,6 +2,7 @@
 
 import asyncio
 from contextlib import AsyncExitStack
+from dataclasses import replace
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Literal
@@ -58,6 +59,7 @@ async def run_coding_agent(
     *,
     model: str | None = None,
     router_enabled: bool | None = None,
+    prompt_cache_enabled: bool | None = None,
     max_turns: int | None = None,
     max_tokens: int = 3000,
     context_window_tokens: int | None = None,
@@ -90,6 +92,12 @@ async def run_coding_agent(
         if router_enabled is None
         else router_enabled
     )
+    prompt_cache = settings.prompt_cache_config
+    if prompt_cache_enabled is not None:
+        prompt_cache = replace(
+            prompt_cache,
+            enabled=prompt_cache_enabled,
+        )
     selected_model = main_model
     selected_max_turns = (
         max_turns if max_turns is not None else settings.max_turns
@@ -168,6 +176,7 @@ async def run_coding_agent(
                 max_cost_usd=max_cost_usd,
                 enable_subagent=enable_subagent,
                 router_enabled=use_router,
+                prompt_cache_enabled=prompt_cache.enabled,
                 status=status,
                 start_sha=selected_start_sha,
             ),
@@ -203,6 +212,9 @@ async def run_coding_agent(
                         settings.router_model_name if use_router else None
                     ),
                     "router_enabled": use_router,
+                    "prompt_cache_enabled": prompt_cache.enabled,
+                    "prompt_cache_key": prompt_cache.key,
+                    "prompt_cache_retention": prompt_cache.retention,
                     "max_turns": selected_max_turns,
                     "start_turn": start_turn,
                 },
@@ -237,6 +249,9 @@ async def run_coding_agent(
                                 if use_router
                                 else None
                             ),
+                            "prompt_cache_enabled": prompt_cache.enabled,
+                            "prompt_cache_key": prompt_cache.key,
+                            "prompt_cache_retention": prompt_cache.retention,
                             "max_turns": selected_max_turns,
                         }
                     )
@@ -268,6 +283,7 @@ async def run_coding_agent(
                             "data": {
                                 "router_enabled": True,
                                 "router_model": router_model,
+                                "prompt_cache_enabled": prompt_cache.enabled,
                             },
                         },
                     )
@@ -276,6 +292,7 @@ async def run_coding_agent(
                             client,
                             task,
                             model=router_model,
+                            prompt_cache=prompt_cache,
                         )
                     except Exception as exc:
                         logger.warning(
@@ -321,6 +338,7 @@ async def run_coding_agent(
                                 "route": router_result.decision.route,
                                 "router_model": router_model,
                                 "selected_model": selected_model,
+                                "prompt_cache_enabled": prompt_cache.enabled,
                                 "fallback": router_result.fallback,
                                 "router_tokens": (
                                     router_result.usage.input_tokens
@@ -388,7 +406,7 @@ async def run_coding_agent(
                         model=selected_model,
                         parent_trace=trace,
                         parent_stats=main_stats,
-                        prompt_cache=settings.prompt_cache_config,
+                        prompt_cache=prompt_cache,
                         context_window_tokens=selected_context_window_tokens,
                         langfuse_client=langfuse_client,
                     )
@@ -404,7 +422,7 @@ async def run_coding_agent(
                     cost_estimator=lambda stats: estimate_cost(
                         stats, settings),
                     max_cost_usd=max_cost_usd,
-                    prompt_cache=settings.prompt_cache_config,
+                    prompt_cache=prompt_cache,
                     stats=main_stats,
                     trace=trace,
                     start_turn=start_turn,
@@ -458,6 +476,9 @@ async def run_coding_agent(
                             "router_cost": router_cost_usd,
                             "task_cost": task_cost_usd,
                             "router_enabled": use_router,
+                            "prompt_cache_enabled": prompt_cache.enabled,
+                            "prompt_cache_key": prompt_cache.key,
+                            "prompt_cache_retention": prompt_cache.retention,
                             "route": total_stats.route,
                             "router_model": total_stats.router_model,
                             "selected_model": selected_model,
@@ -476,6 +497,7 @@ async def run_coding_agent(
                     )
                 if log_completion:
                     final_response, final_stats = result
+                    completion_stats = final_stats.aggregate()
                     total_cost_usd = estimate_cost(final_stats, settings)
                     router_cost_usd = estimate_router_cost(
                         final_stats,
@@ -500,6 +522,9 @@ async def run_coding_agent(
                                 "trace_id": final_stats.trace_id,
                                 "trace_url": final_stats.trace_url,
                                 "router_enabled": use_router,
+                                "prompt_cache_enabled": prompt_cache.enabled,
+                                "prompt_cache_key": prompt_cache.key,
+                                "prompt_cache_retention": prompt_cache.retention,
                                 "route": final_stats.route,
                                 "router_model": final_stats.router_model,
                                 "selected_model": (
@@ -508,6 +533,12 @@ async def run_coding_agent(
                                 ),
                                 "router_fallback": (
                                     final_stats.router_fallback
+                                ),
+                                "cache_read_input_tokens": (
+                                    completion_stats.cache_read_input_tokens
+                                ),
+                                "cache_creation_input_tokens": (
+                                    completion_stats.cache_creation_input_tokens
                                 ),
                                 "total_cost_usd": total_cost_usd,
                                 "router_cost_usd": router_cost_usd,

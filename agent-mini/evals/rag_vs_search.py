@@ -96,6 +96,12 @@ def parse_args() -> argparse.Namespace:
         help="单个问题的费用上限；不传则使用配置价格统计。",
     )
     parser.add_argument(
+        "--cache",
+        choices=("on", "off"),
+        default="off",
+        help="Prompt Cache 开关；默认关闭，避免顺序实验互相命中。",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -206,6 +212,7 @@ async def run_case(
     max_turns: int,
     max_tokens: int,
     max_cost_usd: float | None,
+    prompt_cache_enabled: bool,
 ) -> CaseResult:
     """运行一个问题并提取统一指标。"""
     started_at = perf_counter()
@@ -226,6 +233,7 @@ async def run_case(
             task=build_task(case, mode),
             workdir=workdir,
             settings=settings,
+            prompt_cache_enabled=prompt_cache_enabled,
             max_turns=max_turns,
             max_tokens=max_tokens,
             max_cost_usd=max_cost_usd,
@@ -348,9 +356,6 @@ async def run_experiment(args: argparse.Namespace) -> list[CaseResult]:
         load_index(index_path)
 
     settings = AgentSettings()
-    # 两组顺序执行时关闭 prompt cache，避免后运行的组因缓存命中而获得
-    # 不公平的 token 和费用优势。
-    settings.prompt_cache_enabled = False
 
     results: list[CaseResult] = []
     for mode in modes:
@@ -363,6 +368,7 @@ async def run_experiment(args: argparse.Namespace) -> list[CaseResult]:
                 max_turns=args.max_turns,
                 max_tokens=args.max_tokens,
                 max_cost_usd=args.max_cost_usd,
+                prompt_cache_enabled=args.cache == "on",
             )
             results.append(result)
             print_result(result)

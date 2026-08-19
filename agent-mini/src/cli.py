@@ -66,6 +66,12 @@ def parse_args() -> argparse.Namespace:
         help="覆盖任务分流开关；on 先用 Router 判断 simple/complex。",
     )
     parser.add_argument(
+        "--cache",
+        choices=("on", "off"),
+        default=None,
+        help="覆盖 Prompt Cache 开关；不传则使用环境配置。",
+    )
+    parser.add_argument(
         "--max-turns",
         type=int,
         default=None,
@@ -127,6 +133,7 @@ def parse_args() -> argparse.Namespace:
     if args.resume and (
         args.model is not None
         or args.router is not None
+        or args.cache is not None
         or args.max_turns is not None
         or args.workdir != Path.cwd()
         or not args.enable_subagent
@@ -142,6 +149,7 @@ def parse_args() -> argparse.Namespace:
     if args.rollback and (
         args.model is not None
         or args.router is not None
+        or args.cache is not None
         or args.max_turns is not None
         or args.workdir != Path.cwd()
         or not args.enable_subagent
@@ -368,6 +376,7 @@ async def main() -> None:
         max_cost_usd = checkpoint.max_cost_usd
         enable_subagent = checkpoint.enable_subagent
         router_enabled = checkpoint.router_enabled
+        prompt_cache_enabled = checkpoint.prompt_cache_enabled
         trace_metadata = None
         trace_tags = None
         context = Context(checkpoint.messages)
@@ -390,6 +399,11 @@ async def main() -> None:
             settings.router_enabled
             if args.router is None
             else args.router == "on"
+        )
+        prompt_cache_enabled = (
+            settings.prompt_cache_enabled
+            if args.cache is None
+            else args.cache == "on"
         )
         trace_metadata = {
             key: value
@@ -430,6 +444,9 @@ async def main() -> None:
                 "max_turns": max_turns,
                 "enable_subagent": enable_subagent,
                 "router_enabled": router_enabled,
+                "prompt_cache_enabled": prompt_cache_enabled,
+                "prompt_cache_key": settings.prompt_cache_key,
+                "prompt_cache_retention": settings.prompt_cache_retention,
                 "checkpoint_enabled": checkpoint_enabled,
                 "start_turn": start_turn,
             },
@@ -444,6 +461,7 @@ async def main() -> None:
             settings=settings,
             model=model,
             router_enabled=router_enabled,
+            prompt_cache_enabled=prompt_cache_enabled,
             max_turns=max_turns,
             max_tokens=max_tokens,
             context_window_tokens=context_window_tokens,
@@ -488,6 +506,7 @@ async def main() -> None:
         )
     total_cost_usd = estimate_cost(stats, settings)
     router_cost_usd = estimate_router_cost(stats, settings)
+    total_stats = stats.aggregate()
     task_cost_usd = (
         total_cost_usd - router_cost_usd
         if total_cost_usd is not None and router_cost_usd is not None
@@ -505,10 +524,19 @@ async def main() -> None:
                 "trace_id": stats.trace_id,
                 "trace_url": stats.trace_url,
                 "router_enabled": router_enabled,
+                "prompt_cache_enabled": prompt_cache_enabled,
+                "prompt_cache_key": settings.prompt_cache_key,
+                "prompt_cache_retention": settings.prompt_cache_retention,
                 "route": stats.route,
                 "router_model": stats.router_model,
                 "selected_model": stats.selected_model or model,
                 "router_fallback": stats.router_fallback,
+                "cache_read_input_tokens": (
+                    total_stats.cache_read_input_tokens
+                ),
+                "cache_creation_input_tokens": (
+                    total_stats.cache_creation_input_tokens
+                ),
                 "total_cost_usd": total_cost_usd,
                 "router_cost_usd": router_cost_usd,
                 "task_cost_usd": task_cost_usd,

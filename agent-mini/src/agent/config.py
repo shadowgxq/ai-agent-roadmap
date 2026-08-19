@@ -136,7 +136,14 @@ class AgentSettings(BaseSettings):
             "ROUTER_CACHE_CREATION_PRICE_PER_MILLION"
         ),
     )
-    prompt_cache_enabled: bool = True
+    prompt_cache_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "PROMPT_CACHE_ENABLED",
+            "ENABLE_PROMPT_CACHE",
+            "ENABLE_CACHE",
+        ),
+    )
     prompt_cache_key: str = Field(default="agent-mini", min_length=1)
     prompt_cache_retention: str | None = None
     price_currency: str = "USD"

@@ -6,6 +6,7 @@ from typing import Literal
 from openai import AsyncOpenAI
 from pydantic import BaseModel, ValidationError
 
+from ..agent.cache import PromptCacheConfig
 from ..agent.loop import UsageTokens, extract_usage_tokens
 
 
@@ -47,6 +48,7 @@ async def classify_task(
     *,
     model: str,
     max_tokens: int = 80,
+    prompt_cache: PromptCacheConfig | None = None,
 ) -> RouterResult:
     """用一次短模型调用完成分流；格式异常时保守降级为 complex。"""
     response = await client.chat.completions.create(
@@ -56,6 +58,11 @@ async def classify_task(
             {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
             {"role": "user", "content": task},
         ],
+        **(
+            prompt_cache.request_kwargs()
+            if prompt_cache is not None
+            else {}
+        ),
     )
     usage = extract_usage_tokens(response.usage)
     raw_output = (response.choices[0].message.content or "").strip()

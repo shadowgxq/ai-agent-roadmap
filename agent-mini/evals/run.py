@@ -100,6 +100,12 @@ def parse_args() -> argparse.Namespace:
         help="是否在 Agent 主 Loop 前启用 simple/complex Router。",
     )
     parser.add_argument(
+        "--cache",
+        choices=("on", "off"),
+        default=None,
+        help="Prompt Cache 开关；不传则使用环境配置。",
+    )
+    parser.add_argument(
         "--log-file",
         type=Path,
         default=None,
@@ -367,9 +373,15 @@ async def run_case(
     *,
     experiment: str = "baseline",
     router_enabled: bool = False,
+    prompt_cache_enabled: bool | None = None,
 ) -> EvalResult:
     """运行一个 case，并按 command/judge/behavior 分派验证器。"""
     case_name = case_dir.name
+    effective_prompt_cache_enabled = (
+        settings.prompt_cache_enabled
+        if prompt_cache_enabled is None
+        else prompt_cache_enabled
+    )
     started_at = perf_counter()
     turns = 0
     cost_usd = 0.0
@@ -402,6 +414,7 @@ async def run_case(
                     workdir=workspace,
                     settings=case_settings,
                     router_enabled=router_enabled,
+                    prompt_cache_enabled=effective_prompt_cache_enabled,
                     max_cost_usd=case.max_cost_usd,
                     tool_mode=case.tool_mode,
                     trace_metadata={
@@ -413,6 +426,9 @@ async def run_case(
                         "suite": case.suite,
                         **case.trace_metadata,
                         "router_enabled": router_enabled,
+                        "prompt_cache_enabled": (
+                            effective_prompt_cache_enabled
+                        ),
                     },
                     trace_tags=[
                         "eval",
@@ -438,6 +454,7 @@ async def run_case(
                     "router_fallback": aggregate_stats.router_fallback,
                     "router_tokens": aggregate_stats.router_tokens,
                     "selected_model": aggregate_stats.selected_model,
+                    "prompt_cache_enabled": effective_prompt_cache_enabled,
                 }
             )
             tool_calls = aggregate_stats.tool_calls
@@ -731,6 +748,9 @@ def log_result(result: EvalResult) -> None:
         "trajectory": result.trajectory,
         "assertions": result.assertions,
         "failure_categories": failure_categories,
+        "prompt_cache_enabled": result.trajectory.get(
+            "prompt_cache_enabled"
+        ),
     }
     if result.judge_result is not None:
         data["judge"] = result.judge_result.model_dump()
@@ -823,7 +843,11 @@ def summarize_trajectory(results: list[EvalResult]) -> dict[str, Any]:
     }
 
 
-def log_summary(results: list[EvalResult]) -> None:
+def log_summary(
+    results: list[EvalResult],
+    *,
+    prompt_cache_enabled: bool | None = None,
+) -> None:
     """只输出评测结果、行为指标和性能摘要。"""
     command_results = [
         result for result in results if result.eval_type == "command"
@@ -918,6 +942,7 @@ def log_summary(results: list[EvalResult]) -> None:
             f"  Avg turns     {average_turns:.1f}",
             f"  Avg duration  {average_duration:.1f}s",
             f"Cost           ${cost:.6f} (avg ${average_cost:.6f})",
+            f"Prompt cache   {prompt_cache_enabled}",
         ]
     )
     logger.info(
@@ -935,6 +960,7 @@ def log_summary(results: list[EvalResult]) -> None:
                 "turns": turns,
                 "duration_s": duration,
                 "cost_usd": cost,
+                "prompt_cache_enabled": prompt_cache_enabled,
                 "trajectory": trajectory,
             },
         },
@@ -949,6 +975,7 @@ def write_report(
     selected_cases: list[Path],
     results: list[EvalResult],
     router_enabled: bool = False,
+    prompt_cache_enabled: bool | None = None,
 ) -> Path:
     """持久化一次实验的完整结果，避免下一次运行覆盖历史证据。"""
     counts = {
@@ -977,6 +1004,7 @@ def write_report(
         "experiment": experiment,
         "suite": suite,
         "router_enabled": router_enabled,
+        "prompt_cache_enabled": prompt_cache_enabled,
         "cases": [path.name for path in selected_cases],
         "summary": {
             "total": len(results),
@@ -1067,6 +1095,11 @@ async def main() -> None:
     """顺序运行选中的 cases，避免并发请求干扰结果和日志。"""
     args = parse_args()
     settings = AgentSettings()
+    prompt_cache_enabled = (
+        settings.prompt_cache_enabled
+        if args.cache is None
+        else args.cache == "on"
+    )
     log_file = configure_logging(args.log_file or settings.log_file)
     logger.info(
         "详细日志: %s",
@@ -1079,6 +1112,7 @@ async def main() -> None:
                 "case_names": args.case_names,
                 "experiment": args.experiment,
                 "router_enabled": args.router == "on",
+                "prompt_cache_enabled": prompt_cache_enabled,
             },
         },
     )
@@ -1124,7 +1158,10 @@ async def main() -> None:
             case_dir.name,
             extra={
                 "event": "eval.case_started",
-                "data": {"case": case_dir.name},
+                "data": {
+                    "case": case_dir.name,
+                    "prompt_cache_enabled": prompt_cache_enabled,
+                },
             },
         )
         result = await run_case(
@@ -1132,11 +1169,15 @@ async def main() -> None:
             settings,
             experiment=args.experiment,
             router_enabled=args.router == "on",
+            prompt_cache_enabled=prompt_cache_enabled,
         )
         results.append(result)
         log_result(result)
 
-    log_summary(results)
+    log_summary(
+        results,
+        prompt_cache_enabled=prompt_cache_enabled,
+    )
     safe_experiment = re.sub(r"[^A-Za-z0-9_.-]+", "-", args.experiment)
     safe_experiment = safe_experiment.strip("-") or "baseline"
     report_file = args.report_file or (
@@ -1149,6 +1190,7 @@ async def main() -> None:
         selected_cases=selected_cases,
         results=results,
         router_enabled=args.router == "on",
+        prompt_cache_enabled=prompt_cache_enabled,
     )
 
 

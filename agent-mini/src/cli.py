@@ -13,7 +13,7 @@ from openai import APIError
 from .agent.checkpoint import load_checkpoint
 from .agent.config import AgentSettings
 from .agent.context import Context
-from .agent.cost import estimate_cost
+from .agent.cost import estimate_cost, estimate_router_cost
 from .agent.git_snapshot import GitSnapshotError, rollback_to_sha
 from .agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
 from .agent.runtime import run_coding_agent
@@ -58,6 +58,12 @@ def parse_args() -> argparse.Namespace:
         "--model",
         default=None,
         help="覆盖环境配置中的模型名称。",
+    )
+    parser.add_argument(
+        "--router",
+        choices=("on", "off"),
+        default=None,
+        help="覆盖任务分流开关；on 先用 Router 判断 simple/complex。",
     )
     parser.add_argument(
         "--max-turns",
@@ -120,6 +126,7 @@ def parse_args() -> argparse.Namespace:
         parser.error("必须提供 task，或使用 --resume RUN_ID")
     if args.resume and (
         args.model is not None
+        or args.router is not None
         or args.max_turns is not None
         or args.workdir != Path.cwd()
         or not args.enable_subagent
@@ -134,6 +141,7 @@ def parse_args() -> argparse.Namespace:
         )
     if args.rollback and (
         args.model is not None
+        or args.router is not None
         or args.max_turns is not None
         or args.workdir != Path.cwd()
         or not args.enable_subagent
@@ -207,6 +215,18 @@ def log_stats(
                         stats.cache_creation_input_tokens
                     ),
                     "output_tokens": stats.output_tokens,
+                    "router_calls": stats.router_calls,
+                    "router_model": stats.router_model,
+                    "route": stats.route,
+                    "router_input_tokens": stats.router_input_tokens,
+                    "router_cache_read_input_tokens": (
+                        stats.router_cache_read_input_tokens
+                    ),
+                    "router_cache_creation_input_tokens": (
+                        stats.router_cache_creation_input_tokens
+                    ),
+                    "router_output_tokens": stats.router_output_tokens,
+                    "router_tokens": stats.router_tokens,
                     "compact_calls": stats.compact_calls,
                     "compact_input_tokens": stats.compact_input_tokens,
                     "compact_cache_read_input_tokens": (
@@ -242,6 +262,18 @@ def log_stats(
                         total_stats.cache_creation_input_tokens
                     ),
                     "output_tokens": total_stats.output_tokens,
+                    "router_calls": total_stats.router_calls,
+                    "router_model": total_stats.router_model,
+                    "route": total_stats.route,
+                    "router_input_tokens": total_stats.router_input_tokens,
+                    "router_cache_read_input_tokens": (
+                        total_stats.router_cache_read_input_tokens
+                    ),
+                    "router_cache_creation_input_tokens": (
+                        total_stats.router_cache_creation_input_tokens
+                    ),
+                    "router_output_tokens": total_stats.router_output_tokens,
+                    "router_tokens": total_stats.router_tokens,
                     "compact_calls": total_stats.compact_calls,
                     "compact_input_tokens": (
                         total_stats.compact_input_tokens
@@ -279,6 +311,12 @@ def log_cost(
         )
         return
 
+    router_cost = estimate_router_cost(stats, settings)
+    task_cost = (
+        cost - router_cost
+        if cost is not None and router_cost is not None
+        else None
+    )
     logger.info(
         "预估费用: %s %.6f",
         settings.price_currency,
@@ -286,7 +324,13 @@ def log_cost(
         extra={
             "event": "run.cost",
             "trace": trace,
-            "data": {"currency": settings.price_currency, "amount": cost},
+            "data": {
+                "currency": settings.price_currency,
+                "amount": cost,
+                "total_cost_usd": cost,
+                "router_cost_usd": router_cost,
+                "task_cost_usd": task_cost,
+            },
         },
     )
 
@@ -323,6 +367,7 @@ async def main() -> None:
         context_window_tokens = checkpoint.context_window_tokens
         max_cost_usd = checkpoint.max_cost_usd
         enable_subagent = checkpoint.enable_subagent
+        router_enabled = checkpoint.router_enabled
         trace_metadata = None
         trace_tags = None
         context = Context(checkpoint.messages)
@@ -335,12 +380,17 @@ async def main() -> None:
             raise RuntimeError("CLI 参数校验未提供 task")
         workdir = args.workdir.resolve()
         run_id = uuid4().hex
-        model = args.model or settings.model
+        model = args.model or settings.main_model_name
         max_turns = args.max_turns or settings.max_turns
         max_tokens = 3000
         context_window_tokens = settings.context_window_tokens
         max_cost_usd = None
         enable_subagent = args.enable_subagent
+        router_enabled = (
+            settings.router_enabled
+            if args.router is None
+            else args.router == "on"
+        )
         trace_metadata = {
             key: value
             for key, value in {
@@ -370,8 +420,16 @@ async def main() -> None:
                 "workdir": str(workdir),
                 "log_file": str(log_file),
                 "model": model,
+                "main_model": settings.main_model_name,
+                "small_model": settings.small_model_name,
+                "router_model": (
+                    settings.router_model_name
+                    if router_enabled
+                    else None
+                ),
                 "max_turns": max_turns,
                 "enable_subagent": enable_subagent,
+                "router_enabled": router_enabled,
                 "checkpoint_enabled": checkpoint_enabled,
                 "start_turn": start_turn,
             },
@@ -385,6 +443,7 @@ async def main() -> None:
             workdir=workdir,
             settings=settings,
             model=model,
+            router_enabled=router_enabled,
             max_turns=max_turns,
             max_tokens=max_tokens,
             context_window_tokens=context_window_tokens,
@@ -427,6 +486,13 @@ async def main() -> None:
                 "data": {"url": stats.trace_url},
             },
         )
+    total_cost_usd = estimate_cost(stats, settings)
+    router_cost_usd = estimate_router_cost(stats, settings)
+    task_cost_usd = (
+        total_cost_usd - router_cost_usd
+        if total_cost_usd is not None and router_cost_usd is not None
+        else None
+    )
     finish_reason = final_response.choices[0].finish_reason
     logger.info(
         "运行完成",
@@ -438,6 +504,14 @@ async def main() -> None:
                 "finish_reason": finish_reason,
                 "trace_id": stats.trace_id,
                 "trace_url": stats.trace_url,
+                "router_enabled": router_enabled,
+                "route": stats.route,
+                "router_model": stats.router_model,
+                "selected_model": stats.selected_model or model,
+                "router_fallback": stats.router_fallback,
+                "total_cost_usd": total_cost_usd,
+                "router_cost_usd": router_cost_usd,
+                "task_cost_usd": task_cost_usd,
                 "duration_s": round(perf_counter() - run_started_at, 3),
             },
         },

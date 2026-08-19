@@ -94,6 +94,12 @@ def parse_args() -> argparse.Namespace:
         help="写入 Langfuse metadata 的实验名称。",
     )
     parser.add_argument(
+        "--router",
+        choices=("on", "off"),
+        default="off",
+        help="是否在 Agent 主 Loop 前启用 simple/complex Router。",
+    )
+    parser.add_argument(
         "--log-file",
         type=Path,
         default=None,
@@ -360,6 +366,7 @@ async def run_case(
     settings: AgentSettings,
     *,
     experiment: str = "baseline",
+    router_enabled: bool = False,
 ) -> EvalResult:
     """运行一个 case，并按 command/judge/behavior 分派验证器。"""
     case_name = case_dir.name
@@ -394,6 +401,7 @@ async def run_case(
                     task=case.task,
                     workdir=workspace,
                     settings=case_settings,
+                    router_enabled=router_enabled,
                     max_cost_usd=case.max_cost_usd,
                     tool_mode=case.tool_mode,
                     trace_metadata={
@@ -404,6 +412,7 @@ async def run_case(
                         "capabilities": case.capabilities,
                         "suite": case.suite,
                         **case.trace_metadata,
+                        "router_enabled": router_enabled,
                     },
                     trace_tags=[
                         "eval",
@@ -420,6 +429,17 @@ async def run_case(
             trace_url = stats.trace_url
             aggregate_stats = stats.aggregate()
             trajectory = aggregate_stats.trajectory_metrics()
+            trajectory.update(
+                {
+                    "router_enabled": router_enabled,
+                    "router_calls": aggregate_stats.router_calls,
+                    "router_model": aggregate_stats.router_model,
+                    "route": aggregate_stats.route,
+                    "router_fallback": aggregate_stats.router_fallback,
+                    "router_tokens": aggregate_stats.router_tokens,
+                    "selected_model": aggregate_stats.selected_model,
+                }
+            )
             tool_calls = aggregate_stats.tool_calls
             usage = usage_metrics(aggregate_stats)
             after_snapshot = snapshot_workspace(workspace)
@@ -473,10 +493,14 @@ async def run_case(
                 )
             if case.eval_type == "judge" or case.judge_reference_file:
                 reference = read_judge_reference(case_dir, case)
-                judge_model = case_settings.judge_model or case_settings.model
+                judge_model = (
+                    case_settings.judge_model
+                    or case_settings.main_model_name
+                )
                 judge_independent = (
                     case_settings.judge_model is not None
-                    and case_settings.judge_model != case_settings.model
+                    and case_settings.judge_model
+                    != case_settings.main_model_name
                 )
                 async with AsyncOpenAI(
                     api_key=case_settings.api_key,
@@ -924,6 +948,7 @@ def write_report(
     suite: str,
     selected_cases: list[Path],
     results: list[EvalResult],
+    router_enabled: bool = False,
 ) -> Path:
     """持久化一次实验的完整结果，避免下一次运行覆盖历史证据。"""
     counts = {
@@ -951,6 +976,7 @@ def write_report(
         "schema_version": 3,
         "experiment": experiment,
         "suite": suite,
+        "router_enabled": router_enabled,
         "cases": [path.name for path in selected_cases],
         "summary": {
             "total": len(results),
@@ -1052,6 +1078,7 @@ async def main() -> None:
                 "suite": args.suite,
                 "case_names": args.case_names,
                 "experiment": args.experiment,
+                "router_enabled": args.router == "on",
             },
         },
     )
@@ -1104,6 +1131,7 @@ async def main() -> None:
             case_dir,
             settings,
             experiment=args.experiment,
+            router_enabled=args.router == "on",
         )
         results.append(result)
         log_result(result)
@@ -1120,6 +1148,7 @@ async def main() -> None:
         suite=args.suite,
         selected_cases=selected_cases,
         results=results,
+        router_enabled=args.router == "on",
     )
 
 

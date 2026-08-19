@@ -83,23 +83,35 @@ def _judge_value(result: Any, name: str) -> Any:
 
 
 def usage_metrics(stats: Any) -> dict[str, int | float | None]:
-    """提取 Agent 与 compact 的总 token/cache 指标。"""
+    """提取 Router、Agent 与 compact 的总 token/cache 指标。"""
     aggregate = stats.aggregate() if hasattr(stats, "aggregate") else stats
+    router_input = int(getattr(aggregate, "router_input_tokens", 0))
+    router_output = int(getattr(aggregate, "router_output_tokens", 0))
+    router_cache_read = int(
+        getattr(aggregate, "router_cache_read_input_tokens", 0)
+    )
+    router_cache_creation = int(
+        getattr(aggregate, "router_cache_creation_input_tokens", 0)
+    )
     input_tokens = int(
         getattr(aggregate, "input_tokens", 0)
         + getattr(aggregate, "compact_input_tokens", 0)
+        + router_input
     )
     output_tokens = int(
         getattr(aggregate, "output_tokens", 0)
         + getattr(aggregate, "compact_output_tokens", 0)
+        + router_output
     )
     cache_read = int(
         getattr(aggregate, "cache_read_input_tokens", 0)
         + getattr(aggregate, "compact_cache_read_input_tokens", 0)
+        + router_cache_read
     )
     cache_creation = int(
         getattr(aggregate, "cache_creation_input_tokens", 0)
         + getattr(aggregate, "compact_cache_creation_input_tokens", 0)
+        + router_cache_creation
     )
     prompt_context_tokens = input_tokens + cache_read + cache_creation
     cache_read_ratio = (

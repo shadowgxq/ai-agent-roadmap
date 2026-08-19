@@ -98,6 +98,15 @@ class RunStats:
     output_tokens: int = 0
     cache_read_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
+    router_calls: int = 0
+    router_input_tokens: int = 0
+    router_output_tokens: int = 0
+    router_cache_read_input_tokens: int = 0
+    router_cache_creation_input_tokens: int = 0
+    router_model: str | None = None
+    route: str | None = None
+    router_fallback: bool = False
+    selected_model: str | None = None
     compact_calls: int = 0
     compact_input_tokens: int = 0
     compact_output_tokens: int = 0
@@ -135,9 +144,19 @@ class RunStats:
         )
 
     @property
+    def router_tokens(self) -> int:
+        """Router 调用的 token 总量。"""
+        return (
+            self.router_input_tokens
+            + self.router_output_tokens
+            + self.router_cache_read_input_tokens
+            + self.router_cache_creation_input_tokens
+        )
+
+    @property
     def total_tokens(self) -> int:
-        """当前 Agent 的决策调用与 compact 调用 token 总量。"""
-        return self.model_tokens + self.compact_tokens
+        """当前 Agent 的 Router、决策调用与 compact 调用总量。"""
+        return self.router_tokens + self.model_tokens + self.compact_tokens
 
     @property
     def subagent_used(self) -> bool:
@@ -153,6 +172,26 @@ class RunStats:
     def verification_command_used(self) -> bool:
         """本次运行是否实际执行过测试或验证命令。"""
         return self.verification_command_count > 0
+
+    def record_router(
+        self,
+        model: str,
+        route: str,
+        usage: "UsageTokens",
+        *,
+        fallback: bool = False,
+    ) -> None:
+        """记录一次任务分流及其用量。"""
+        self.router_calls += 1
+        self.router_input_tokens += usage.input_tokens
+        self.router_output_tokens += usage.output_tokens
+        self.router_cache_read_input_tokens += usage.cache_read_input_tokens
+        self.router_cache_creation_input_tokens += (
+            usage.cache_creation_input_tokens
+        )
+        self.router_model = model
+        self.route = route
+        self.router_fallback = fallback
 
     def record_tool_call(
         self,
@@ -236,6 +275,17 @@ class RunStats:
             output_tokens=self.output_tokens,
             cache_read_input_tokens=self.cache_read_input_tokens,
             cache_creation_input_tokens=self.cache_creation_input_tokens,
+            router_calls=self.router_calls,
+            router_input_tokens=self.router_input_tokens,
+            router_output_tokens=self.router_output_tokens,
+            router_cache_read_input_tokens=self.router_cache_read_input_tokens,
+            router_cache_creation_input_tokens=(
+                self.router_cache_creation_input_tokens
+            ),
+            router_model=self.router_model,
+            route=self.route,
+            router_fallback=self.router_fallback,
+            selected_model=self.selected_model,
             compact_calls=self.compact_calls,
             compact_input_tokens=self.compact_input_tokens,
             compact_output_tokens=self.compact_output_tokens,
@@ -267,6 +317,18 @@ class RunStats:
             )
             total.cache_creation_input_tokens += (
                 child_total.cache_creation_input_tokens
+            )
+            total.router_calls += child_total.router_calls
+            total.router_input_tokens += child_total.router_input_tokens
+            total.router_output_tokens += child_total.router_output_tokens
+            total.router_cache_read_input_tokens += (
+                child_total.router_cache_read_input_tokens
+            )
+            total.router_cache_creation_input_tokens += (
+                child_total.router_cache_creation_input_tokens
+            )
+            total.router_fallback = (
+                total.router_fallback or child_total.router_fallback
             )
             total.compact_calls += child_total.compact_calls
             total.compact_input_tokens += child_total.compact_input_tokens

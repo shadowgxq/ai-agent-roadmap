@@ -22,6 +22,7 @@ class AgentSettings(BaseSettings):
         env_file=(PROJECT_ROOT.parent / ".env", PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     api_key: str = Field(
@@ -49,6 +50,22 @@ class AgentSettings(BaseSettings):
             "DEEPSEEK_MODEL",
         ),
     )
+    main_model: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MAIN_MODEL", "CODEX_MAIN_MODEL"),
+    )
+    small_model: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SMALL_MODEL"),
+    )
+    enable_router: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "ROUTER_ENABLED",
+            "ENABLE_ROUTER",
+            "router_enabled",
+        ),
+    )
     judge_model: str | None = Field(
         default=None,
         validation_alias=AliasChoices("JUDGE_MODEL"),
@@ -70,6 +87,54 @@ class AgentSettings(BaseSettings):
     cache_creation_price_per_million: float | None = Field(
         default=None,
         ge=0,
+    )
+    small_input_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices("SMALL_INPUT_PRICE_PER_MILLION"),
+    )
+    small_output_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices("SMALL_OUTPUT_PRICE_PER_MILLION"),
+    )
+    small_cache_read_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices(
+            "SMALL_CACHE_READ_PRICE_PER_MILLION"
+        ),
+    )
+    small_cache_creation_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices(
+            "SMALL_CACHE_CREATION_PRICE_PER_MILLION"
+        ),
+    )
+    router_input_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices("ROUTER_INPUT_PRICE_PER_MILLION"),
+    )
+    router_output_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices("ROUTER_OUTPUT_PRICE_PER_MILLION"),
+    )
+    router_cache_read_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices(
+            "ROUTER_CACHE_READ_PRICE_PER_MILLION"
+        ),
+    )
+    router_cache_creation_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices(
+            "ROUTER_CACHE_CREATION_PRICE_PER_MILLION"
+        ),
     )
     prompt_cache_enabled: bool = True
     prompt_cache_key: str = Field(default="agent-mini", min_length=1)
@@ -135,6 +200,26 @@ class AgentSettings(BaseSettings):
             key=self.prompt_cache_key,
             retention=self.prompt_cache_retention,
         )
+
+    @property
+    def main_model_name(self) -> str:
+        """返回任务主模型；兼容已有的 model 配置。"""
+        return self.main_model or self.model
+
+    @property
+    def router_enabled(self) -> bool:
+        """兼容代码中使用的 Router 开关命名。"""
+        return self.enable_router
+
+    @property
+    def small_model_name(self) -> str:
+        """返回 simple 任务使用的模型，缺省回退到主模型。"""
+        return self.small_model or self.main_model_name
+
+    @property
+    def router_model_name(self) -> str:
+        """Router 与 simple 任务共用 small 模型，不再单独配置。"""
+        return self.small_model_name
 
     @property
     def resolved_mcp_config_file(self) -> Path:

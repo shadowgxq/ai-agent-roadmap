@@ -22,6 +22,15 @@ class RunStatsSnapshot(BaseModel):
     output_tokens: int = Field(default=0, ge=0)
     cache_read_input_tokens: int = Field(default=0, ge=0)
     cache_creation_input_tokens: int = Field(default=0, ge=0)
+    router_calls: int = Field(default=0, ge=0)
+    router_input_tokens: int = Field(default=0, ge=0)
+    router_output_tokens: int = Field(default=0, ge=0)
+    router_cache_read_input_tokens: int = Field(default=0, ge=0)
+    router_cache_creation_input_tokens: int = Field(default=0, ge=0)
+    router_model: str | None = None
+    route: str | None = None
+    router_fallback: bool = False
+    selected_model: str | None = None
     compact_calls: int = Field(default=0, ge=0)
     compact_input_tokens: int = Field(default=0, ge=0)
     compact_output_tokens: int = Field(default=0, ge=0)
@@ -45,6 +54,17 @@ class RunStatsSnapshot(BaseModel):
             output_tokens=stats.output_tokens,
             cache_read_input_tokens=stats.cache_read_input_tokens,
             cache_creation_input_tokens=stats.cache_creation_input_tokens,
+            router_calls=stats.router_calls,
+            router_input_tokens=stats.router_input_tokens,
+            router_output_tokens=stats.router_output_tokens,
+            router_cache_read_input_tokens=stats.router_cache_read_input_tokens,
+            router_cache_creation_input_tokens=(
+                stats.router_cache_creation_input_tokens
+            ),
+            router_model=stats.router_model,
+            route=stats.route,
+            router_fallback=stats.router_fallback,
+            selected_model=stats.selected_model,
             compact_calls=stats.compact_calls,
             compact_input_tokens=stats.compact_input_tokens,
             compact_output_tokens=stats.compact_output_tokens,
@@ -75,6 +95,17 @@ class RunStatsSnapshot(BaseModel):
             output_tokens=self.output_tokens,
             cache_read_input_tokens=self.cache_read_input_tokens,
             cache_creation_input_tokens=self.cache_creation_input_tokens,
+            router_calls=self.router_calls,
+            router_input_tokens=self.router_input_tokens,
+            router_output_tokens=self.router_output_tokens,
+            router_cache_read_input_tokens=self.router_cache_read_input_tokens,
+            router_cache_creation_input_tokens=(
+                self.router_cache_creation_input_tokens
+            ),
+            router_model=self.router_model,
+            route=self.route,
+            router_fallback=self.router_fallback,
+            selected_model=self.selected_model,
             compact_calls=self.compact_calls,
             compact_input_tokens=self.compact_input_tokens,
             compact_output_tokens=self.compact_output_tokens,
@@ -113,6 +144,7 @@ class Checkpoint(BaseModel):
     context_window_tokens: int = Field(default=128_000, ge=1)
     max_cost_usd: float | None = Field(default=None, gt=0)
     enable_subagent: bool = True
+    router_enabled: bool = False
     status: CheckpointStatus = "running"
     start_sha: str | None = None
 

@@ -180,7 +180,7 @@ async def judge_output(
     if max_attempts <= 0:
         raise ValueError("Judge max_attempts 必须大于 0")
 
-    judge_model = settings.judge_model or settings.model
+    judge_model = settings.judge_model or settings.main_model_name
     langfuse_client: Langfuse | None = None
     if settings.langfuse_configured:
         langfuse_client = Langfuse(

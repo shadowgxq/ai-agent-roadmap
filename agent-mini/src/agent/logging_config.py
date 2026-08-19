@@ -21,6 +21,9 @@ LOCAL_EVENT_NAMES = frozenset(
         "run.interrupted",
         "llm.completed",
         "tool.completed",
+        "agent.router_started",
+        "agent.routed",
+        "agent.router_failed",
         "agent.final_answer",
         "agent.completed",
     }

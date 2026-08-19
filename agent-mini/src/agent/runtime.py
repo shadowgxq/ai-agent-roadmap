@@ -32,11 +32,19 @@ from .checkpoint import (
 )
 from .config import AgentSettings, ConfirmCallback
 from .context import Context
-from .cost import estimate_cost
+from .cost import estimate_cost, estimate_router_cost
 from .git_snapshot import ensure_start_snapshot, get_head_sha
-from .loop import AgentTrace, EventCallback, RunStats, message_text, run
+from .loop import (
+    AgentTrace,
+    EventCallback,
+    RunStats,
+    UsageTokens,
+    message_text,
+    run,
+)
 from .logging_config import get_logger
 from .prompts import build_system_prompt, build_task_message
+from ..workflows.router import ComplexityDecision, RouterResult, classify_task
 
 
 ToolMode = Literal["all", "rag", "search"]
@@ -49,6 +57,7 @@ async def run_coding_agent(
     settings: AgentSettings,
     *,
     model: str | None = None,
+    router_enabled: bool | None = None,
     max_turns: int | None = None,
     max_tokens: int = 3000,
     context_window_tokens: int | None = None,
@@ -75,7 +84,13 @@ async def run_coding_agent(
         raise NotADirectoryError(f"工作目录不存在或不是目录: {workdir}")
     if tool_mode not in {"all", "rag", "search"}:
         raise ValueError(f"不支持的 tool_mode: {tool_mode}")
-    selected_model = model if model is not None else settings.model
+    main_model = model if model is not None else settings.main_model_name
+    use_router = (
+        settings.router_enabled
+        if router_enabled is None
+        else router_enabled
+    )
+    selected_model = main_model
     selected_max_turns = (
         max_turns if max_turns is not None else settings.max_turns
     )
@@ -100,6 +115,13 @@ async def run_coding_agent(
         role="main",
     )
     main_stats = stats if stats is not None else RunStats()
+    if use_router and main_stats.route is not None:
+        selected_model = main_stats.selected_model or (
+            settings.small_model_name
+            if main_stats.route == "simple"
+            else main_model
+        )
+    main_stats.selected_model = selected_model
     run_started_at = perf_counter()
 
     registry = ToolRegistry()
@@ -145,6 +167,7 @@ async def run_coding_agent(
                 context_window_tokens=selected_context_window_tokens,
                 max_cost_usd=max_cost_usd,
                 enable_subagent=enable_subagent,
+                router_enabled=use_router,
                 status=status,
                 start_sha=selected_start_sha,
             ),
@@ -174,6 +197,12 @@ async def run_coding_agent(
                     "task": task,
                     "workdir": str(workdir),
                     "model": selected_model,
+                    "main_model": main_model,
+                    "small_model": settings.small_model_name,
+                    "router_model": (
+                        settings.router_model_name if use_router else None
+                    ),
+                    "router_enabled": use_router,
                     "max_turns": selected_max_turns,
                     "start_turn": start_turn,
                 },
@@ -202,6 +231,12 @@ async def run_coding_agent(
                             "run_id": selected_run_id,
                             "workdir": str(workdir),
                             "model": selected_model,
+                            "router_enabled": use_router,
+                            "router_model": (
+                                settings.router_model_name
+                                if use_router
+                                else None
+                            ),
                             "max_turns": selected_max_turns,
                         }
                     )
@@ -219,6 +254,92 @@ async def run_coding_agent(
                             input={"task": task},
                             metadata=root_metadata,
                         )
+                    )
+
+                router_result: RouterResult | None = None
+                if use_router and main_stats.router_calls == 0:
+                    router_model = settings.router_model_name
+                    logger.info(
+                        "任务路由开始: router_model=%s",
+                        router_model,
+                        extra={
+                            "event": "agent.router_started",
+                            "trace": trace.event_context(),
+                            "data": {
+                                "router_enabled": True,
+                                "router_model": router_model,
+                            },
+                        },
+                    )
+                    try:
+                        router_result = await classify_task(
+                            client,
+                            task,
+                            model=router_model,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Router 调用失败，保守降级为 complex: %s",
+                            exc,
+                            extra={
+                                "event": "agent.router_failed",
+                                "trace": trace.event_context(),
+                                "data": {
+                                    "router_model": router_model,
+                                    "error_type": type(exc).__name__,
+                                    "error": str(exc),
+                                },
+                            },
+                        )
+                        router_result = RouterResult(
+                            decision=ComplexityDecision(route="complex"),
+                            usage=UsageTokens(),
+                            fallback=True,
+                        )
+                    main_stats.record_router(
+                        router_model,
+                        router_result.decision.route,
+                        router_result.usage,
+                        fallback=router_result.fallback,
+                    )
+                    selected_model = (
+                        settings.small_model_name
+                        if router_result.decision.route == "simple"
+                        else main_model
+                    )
+                    main_stats.selected_model = selected_model
+                    logger.info(
+                        "任务路由完成: route=%s model=%s fallback=%s",
+                        router_result.decision.route,
+                        selected_model,
+                        router_result.fallback,
+                        extra={
+                            "event": "agent.routed",
+                            "trace": trace.event_context(),
+                            "data": {
+                                "router_enabled": True,
+                                "route": router_result.decision.route,
+                                "router_model": router_model,
+                                "selected_model": selected_model,
+                                "fallback": router_result.fallback,
+                                "router_tokens": (
+                                    router_result.usage.input_tokens
+                                    + router_result.usage.output_tokens
+                                    + router_result.usage.cache_read_input_tokens
+                                    + router_result.usage.cache_creation_input_tokens
+                                ),
+                            },
+                        },
+                    )
+                if root_observation is not None:
+                    root_metadata.update(
+                        {
+                            "router_enabled": use_router,
+                            "route": main_stats.route,
+                            "router_model": main_stats.router_model,
+                            "selected_model": selected_model,
+                            "router_fallback": main_stats.router_fallback,
+                        }
                     )
 
                 resource_context = ""
@@ -302,6 +423,16 @@ async def run_coding_agent(
                     final_response, final_stats = result
                     total_stats = final_stats.aggregate()
                     local_cost_usd = estimate_cost(final_stats, settings)
+                    router_cost_usd = estimate_router_cost(
+                        final_stats,
+                        settings,
+                    )
+                    task_cost_usd = (
+                        local_cost_usd - router_cost_usd
+                        if local_cost_usd is not None
+                        and router_cost_usd is not None
+                        else None
+                    )
                     main_stats.trace_id = (
                         langfuse_client.get_current_trace_id()
                     )
@@ -320,6 +451,16 @@ async def run_coding_agent(
                                 total_stats.cache_creation_input_tokens
                             ),
                             "local_cost_usd": local_cost_usd,
+                            "total_cost_usd": local_cost_usd,
+                            "router_cost_usd": router_cost_usd,
+                            "task_cost_usd": task_cost_usd,
+                            "total_cost": local_cost_usd,
+                            "router_cost": router_cost_usd,
+                            "task_cost": task_cost_usd,
+                            "router_enabled": use_router,
+                            "route": total_stats.route,
+                            "router_model": total_stats.router_model,
+                            "selected_model": selected_model,
                             "trajectory": total_stats.trajectory_metrics(),
                         }
                     )
@@ -335,6 +476,17 @@ async def run_coding_agent(
                     )
                 if log_completion:
                     final_response, final_stats = result
+                    total_cost_usd = estimate_cost(final_stats, settings)
+                    router_cost_usd = estimate_router_cost(
+                        final_stats,
+                        settings,
+                    )
+                    task_cost_usd = (
+                        total_cost_usd - router_cost_usd
+                        if total_cost_usd is not None
+                        and router_cost_usd is not None
+                        else None
+                    )
                     logger.info(
                         "运行完成",
                         extra={
@@ -347,6 +499,19 @@ async def run_coding_agent(
                                 ),
                                 "trace_id": final_stats.trace_id,
                                 "trace_url": final_stats.trace_url,
+                                "router_enabled": use_router,
+                                "route": final_stats.route,
+                                "router_model": final_stats.router_model,
+                                "selected_model": (
+                                    final_stats.selected_model
+                                    or selected_model
+                                ),
+                                "router_fallback": (
+                                    final_stats.router_fallback
+                                ),
+                                "total_cost_usd": total_cost_usd,
+                                "router_cost_usd": router_cost_usd,
+                                "task_cost_usd": task_cost_usd,
                                 "duration_s": round(
                                     perf_counter() - run_started_at,
                                     3,

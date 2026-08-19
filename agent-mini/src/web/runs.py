@@ -4,13 +4,13 @@ import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from uuid import uuid4
 
 from ..agent.config import AgentSettings
-from ..agent.loop import EventCallback
+from ..agent.loop import AgentEventName
 from ..agent.runtime import run_coding_agent
-from .events import AgentEvent, EventType
+from .events import AgentEvent, EventType, is_public_event
 
 
 @dataclass
@@ -93,8 +93,15 @@ class RunManager:
         await state.queue.put(item)
 
     async def _execute(self, state: RunState) -> None:
-        async def publish(event: str, data: dict[str, Any]) -> None:
-            await self._publish(state, cast(EventType, event), data)
+        async def publish(
+            event: AgentEventName,
+            data: dict[str, Any],
+        ) -> None:
+            # Agent Loop 还可以产生内部观测事件；Web 只发布冻结范围内
+            # 的公共事件，不能用 cast 把任意事件强行伪装成 SSE 协议。
+            if not is_public_event(event):
+                return
+            await self._publish(state, event, data)
 
         try:
             await run_coding_agent(

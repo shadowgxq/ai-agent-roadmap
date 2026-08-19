@@ -1,6 +1,6 @@
 """Stable event schema shared by the Agent backend and future frontends."""
 
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,21 @@ EventType = Literal[
     "context_usage",
     "done",
 ]
+
+PUBLIC_EVENT_TYPES = frozenset(
+    {
+        "text",
+        "tool_call",
+        "tool_result",
+        "context_usage",
+        "done",
+    }
+)
+
+
+def is_public_event(event: str) -> TypeGuard[EventType]:
+    """判断事件是否允许穿过 Web Adapter 进入 SSE。"""
+    return event in PUBLIC_EVENT_TYPES
 
 
 class AgentEvent(BaseModel):

@@ -15,7 +15,12 @@ from .agent.config import AgentSettings
 from .agent.context import Context
 from .agent.cost import CostCalculator
 from .agent.git_snapshot import GitSnapshotError, rollback_to_sha
-from .agent.loop import CostLimitExceeded, MaxTurnsExceeded, RunStats
+from .agent.loop import (
+    AgentEventName,
+    CostLimitExceeded,
+    MaxTurnsExceeded,
+    RunStats,
+)
 from .agent.logging_events import (
     build_cost_event_data,
     build_cost_data,
@@ -24,10 +29,63 @@ from .agent.logging_events import (
     log_event,
 )
 from .agent.runtime import run_coding_agent
-from .agent.logging_config import configure_logging, get_logger
+from .agent.logging_config import (
+    CONSOLE_EVENT_NAMES,
+    configure_logging,
+    get_logger,
+)
 
 
 logger = get_logger("cli")
+
+
+def _preview_event(value: Any, limit: int = 500) -> str:
+    """把事件内容压缩成适合终端阅读的一段文本。"""
+    text = value if isinstance(value, str) else str(value)
+    text = text.replace("\x00", "")
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"...[truncated, total={len(text)} chars]"
+
+
+def render_agent_event(event: AgentEventName, data: dict[str, Any]) -> None:
+    """CLI Adapter：把 Agent Event 转成终端输出，不让 Loop 直接 print。"""
+    if event == "text":
+        text = data.get("text")
+        if isinstance(text, str) and text:
+            print(text)
+        return
+
+    if event == "tool_call":
+        calls = data.get("calls")
+        if isinstance(calls, list):
+            for call in calls:
+                if isinstance(call, dict):
+                    print(
+                        f"[tool] {call.get('name', '<unknown>')} "
+                        f"args={_preview_event(call.get('arguments', '{}'))}"
+                    )
+        return
+
+    if event == "tool_result":
+        results = data.get("results")
+        if isinstance(results, list):
+            for result in results:
+                if isinstance(result, dict):
+                    print(
+                        f"[tool-result] {result.get('tool_call_id', '<unknown>')}: "
+                        f"{_preview_event(result.get('content', ''))}"
+                    )
+        return
+
+    if event == "context_usage":
+        context_tokens = data.get("context_tokens", "unknown")
+        context_window = data.get("context_window_tokens", "unknown")
+        print(f"[context] {context_tokens}/{context_window} tokens")
+        return
+
+    if event == "done":
+        print(f"[agent] {data.get('status', 'completed')}")
 
 
 def confirm_command(command: str, reason: str) -> bool:
@@ -319,7 +377,18 @@ async def main() -> None:
 
     checkpoint_enabled = args.checkpoint_enabled or bool(args.resume)
     trace = {"run_id": run_id, "agent_id": "main", "role": "main"}
-    log_file = configure_logging(args.log_file or settings.log_file)
+    # 这些运行日志仍然会写入 JSONL；终端展示交给下面的 Agent Event
+    # Renderer，避免同一份回答/工具结果同时由两条通道重复输出。
+    cli_log_events = CONSOLE_EVENT_NAMES - {
+        "llm.completed",
+        "tool.completed",
+        "agent.final_answer",
+        "agent.completed",
+    }
+    log_file = configure_logging(
+        args.log_file or settings.log_file,
+        console_event_names=cli_log_events,
+    )
     log_event(
         logger,
         logging.INFO,
@@ -371,6 +440,7 @@ async def main() -> None:
             start_turn=start_turn,
             start_sha=start_sha,
             checkpoint_enabled=checkpoint_enabled,
+            event_callback=render_agent_event,
             on_confirm=confirm_command,
             trace_metadata=trace_metadata or None,
             trace_tags=trace_tags or None,

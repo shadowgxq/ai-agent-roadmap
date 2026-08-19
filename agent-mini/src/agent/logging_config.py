@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from collections.abc import Collection
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
@@ -103,8 +104,14 @@ class ConsoleFormatter(logging.Formatter):
 class ConsoleEventFilter(logging.Filter):
     """只让面向人的关键进度事件进入终端。"""
 
+    def __init__(self, event_names: Collection[str] | None = None) -> None:
+        super().__init__()
+        self.event_names = frozenset(
+            CONSOLE_EVENT_NAMES if event_names is None else event_names
+        )
+
     def filter(self, record: logging.LogRecord) -> bool:
-        return getattr(record, "event", "log") in CONSOLE_EVENT_NAMES
+        return getattr(record, "event", "log") in self.event_names
 
 
 class JsonEventFormatter(logging.Formatter):
@@ -129,7 +136,8 @@ class JsonEventFormatter(logging.Formatter):
         if event != "agent.final_answer":
             payload["message"] = _preview(record.getMessage())
         if record.exc_info:
-            payload["exception"] = _preview(self.formatException(record.exc_info))
+            payload["exception"] = _preview(
+                self.formatException(record.exc_info))
         return payload
 
 
@@ -166,7 +174,11 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(f"{LOGGER_NAME}.{name}")
 
 
-def configure_logging(log_file: Path) -> Path:
+def configure_logging(
+    log_file: Path,
+    *,
+    console_event_names: Collection[str] | None = None,
+) -> Path:
     """配置本次进程的 console，并向 JSONL 文件追加关键运行事件。"""
     path = log_file.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -180,7 +192,7 @@ def configure_logging(log_file: Path) -> Path:
         logger.removeHandler(handler)
 
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.addFilter(ConsoleEventFilter())
+    console_handler.addFilter(ConsoleEventFilter(console_event_names))
     console_handler.setFormatter(ConsoleFormatter())
     logger.addHandler(console_handler)
 

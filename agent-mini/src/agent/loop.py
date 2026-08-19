@@ -26,18 +26,31 @@ logger = get_logger("agent.loop")
 
 DEFAULT_CONTEXT_WINDOW_TOKENS = 128_000
 
+AgentEventName = Literal[
+    "text",
+    "tool_call",
+    "tool_result",
+    "context_usage",
+    "compact_usage",
+    "done",
+]
+
 EventCallback = Callable[
-    [str, dict[str, Any]],
+    [AgentEventName, dict[str, Any]],
     Awaitable[None] | None,
 ]
 
 
 async def emit_event(
     callback: EventCallback | None,
-    event: str,
+    event: AgentEventName,
     data: dict[str, Any],
 ) -> None:
-    """通知可选观察者；观察者异常不应中断 Agent 主循环。"""
+    """通知外部 Adapter；事件观察者异常不应中断 Agent 主循环。
+
+    这里不关心事件最终由 CLI、Web 还是其他渲染器消费；结构化日志仍
+    通过 ``log_event`` 单独发送，避免把日志格式当成 UI 协议。
+    """
     if callback is None:
         return
     try:

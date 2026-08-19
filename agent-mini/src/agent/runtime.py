@@ -88,7 +88,11 @@ async def run_coding_agent(
     log_start: bool = True,
     log_completion: bool = True,
 ) -> tuple[ChatCompletion, RunStats]:
-    """组装依赖并在指定目录运行一次 Coding Agent。"""
+    """组装依赖并在指定目录运行一次 Coding Agent。
+
+    ``event_callback`` 是 CLI/Web Adapter 的可选观察出口。Runtime 只负责
+    将它传给唯一的 Agent Loop，不在这里加入任何展示或传输逻辑。
+    """
     workdir = workdir.resolve()
     if not workdir.is_dir():
         raise NotADirectoryError(f"工作目录不存在或不是目录: {workdir}")

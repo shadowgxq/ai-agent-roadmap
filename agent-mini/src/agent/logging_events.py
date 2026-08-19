@@ -1,4 +1,4 @@
-"""Helpers for building and emitting structured agent events."""
+"""Helpers for the structured logging channel, separate from UI events."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def log_event(
     console_message: str | None = None,
     **logging_kwargs: Any,
 ) -> None:
-    """Emit one event with the project's common structured-log envelope."""
+    """Emit one structured log record; this does not publish a UI event."""
     extra: dict[str, Any] = {
         "event": event,
         "trace": dict(trace) if trace is not None else None,

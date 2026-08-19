@@ -23,6 +23,19 @@ from .agent.logging_config import configure_logging, get_logger
 logger = get_logger("cli")
 
 
+def confirm_command(command: str, reason: str) -> bool:
+    """在 CLI 中对需要确认的 Shell 命令阻塞等待用户决定。"""
+    try:
+        answer = input(
+            f"\n命令需要确认：{command}\n"
+            f"原因：{reason}\n"
+            "继续执行？[y/N] "
+        )
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return answer.strip().lower() in {"y", "yes"}
+
+
 def parse_args() -> argparse.Namespace:
     """解析 Coding Agent 的命令行参数。"""
     parser = argparse.ArgumentParser(
@@ -383,6 +396,7 @@ async def main() -> None:
             start_turn=start_turn,
             start_sha=start_sha,
             checkpoint_enabled=checkpoint_enabled,
+            on_confirm=confirm_command,
             trace_metadata=trace_metadata or None,
             trace_tags=trace_tags or None,
             log_start=False,

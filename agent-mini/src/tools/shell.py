@@ -1,10 +1,12 @@
 """在指定工作目录内执行 Shell 命令。"""
 
 import asyncio
+import inspect
 import os
 from pathlib import Path
 import sys
 
+from ..agent.config import ConfirmCallback
 from .policy import Policy, PolicyAction
 from .registry import ToolExecutionResult, ToolRegistry
 
@@ -31,6 +33,7 @@ def register_shell_tools(
     timeout: float = 30.0,
     max_output_chars: int = 10_000,
     policy: Policy | None = None,
+    on_confirm: ConfirmCallback | None = None,
 ) -> None:
     """注册绑定到指定工作目录的 Shell 工具。"""
     if timeout <= 0:
@@ -64,19 +67,36 @@ def register_shell_tools(
             raise ValueError("command 不能为空")
 
         decision = shell_policy.evaluate(command)
-        if decision.action is not PolicyAction.ALLOW:
-            action_text = (
-                "拒绝"
-                if decision.action is PolicyAction.DENY
-                else "需要确认"
-            )
+        if decision.action is PolicyAction.DENY:
             return ToolExecutionResult(
                 content=(
-                    f"命令{action_text}，未执行: {command}\n"
+                    f"命令拒绝，未执行: {command}\n"
                     f"原因: {decision.reason}"
                 ),
                 is_error=True,
             )
+
+        if decision.action is PolicyAction.CONFIRM:
+            if on_confirm is None:
+                return ToolExecutionResult(
+                    content=(
+                        f"命令需要确认，但当前未配置确认回调，未执行: {command}\n"
+                        f"原因: {decision.reason}"
+                    ),
+                    is_error=True,
+                )
+
+            approved = on_confirm(command, decision.reason)
+            if inspect.isawaitable(approved):
+                approved = await approved
+            if not approved:
+                return ToolExecutionResult(
+                    content=(
+                        f"用户拒绝了命令，未执行: {command}\n"
+                        f"原因: {decision.reason}"
+                    ),
+                    is_error=True,
+                )
 
         process = await asyncio.create_subprocess_shell(
             command,

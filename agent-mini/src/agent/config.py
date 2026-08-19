@@ -1,5 +1,6 @@
 """加载 agent-mini 的模型与运行配置。"""
 
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from pydantic import AliasChoices, Field, field_validator
@@ -9,6 +10,8 @@ from .cache import PromptCacheConfig
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+ConfirmCallback = Callable[[str, str], bool | Awaitable[bool]]
 
 
 class AgentSettings(BaseSettings):

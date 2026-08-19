@@ -30,7 +30,7 @@ from .checkpoint import (
     RunStatsSnapshot,
     save_checkpoint,
 )
-from .config import AgentSettings
+from .config import AgentSettings, ConfirmCallback
 from .context import Context
 from .cost import estimate_cost
 from .git_snapshot import ensure_start_snapshot, get_head_sha
@@ -63,6 +63,7 @@ async def run_coding_agent(
     runs_dir: Path = DEFAULT_RUNS_DIR,
     start_sha: str | None = None,
     event_callback: EventCallback | None = None,
+    on_confirm: ConfirmCallback | None = None,
     trace_metadata: dict[str, Any] | None = None,
     trace_tags: list[str] | None = None,
     log_start: bool = True,
@@ -109,6 +110,7 @@ async def run_coding_agent(
             registry,
             workdir,
             max_output_chars=settings.max_tool_output_chars,
+            on_confirm=on_confirm,
         )
     elif tool_mode == "search":
         register_read_file_tool(registry, workdir)

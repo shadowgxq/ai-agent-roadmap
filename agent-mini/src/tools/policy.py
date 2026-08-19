@@ -49,7 +49,6 @@ class Policy(BaseModel):
     )
     denied_commands: set[str] = Field(
         default_factory=lambda: {
-            "rm",
             "sudo",
             "curl",
             "wget",
@@ -63,6 +62,7 @@ class Policy(BaseModel):
             "git reset --hard",
             "pip install",
             "npm install",
+            "rm",
         }
     )
 

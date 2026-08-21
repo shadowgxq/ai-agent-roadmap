@@ -118,6 +118,46 @@ def test_session_run_and_sse_stream(tmp_path) -> None:
         assert detail["runs"][0]["status"] == "completed"
 
 
+def test_active_run_endpoint_reports_structured_conflict(tmp_path) -> None:
+    async def delayed_runner(**kwargs: Any) -> None:
+        callback = kwargs["event_callback"]
+        await callback("text", {"turn": 1, "text": "运行中"})
+        await asyncio.sleep(0.2)
+        await callback("done", {"status": "completed", "turn": 1})
+
+    app = create_app(
+        workdir=tmp_path,
+        settings=make_test_settings(),
+        runner=delayed_runner,
+    )
+
+    with TestClient(app) as client:
+        session_id = client.post("/sessions").json()["session_id"]
+        first_run = client.post(
+            f"/sessions/{session_id}/runs",
+            json={"task": "保持运行"},
+        ).json()
+
+        active_response = client.get("/runs/active")
+        assert active_response.status_code == 200
+        active_run = active_response.json()
+        assert active_run["run_id"] == first_run["run_id"]
+        assert active_run["status"] in {"queued", "running"}
+
+        conflict_response = client.post(
+            f"/sessions/{session_id}/runs",
+            json={"task": "重复提交"},
+        )
+        assert conflict_response.status_code == 409
+        assert conflict_response.json()["detail"] == {
+            "code": "active_run",
+            "message": "当前运行器一次只允许一个运行中的任务",
+            "active_run_id": first_run["run_id"],
+            "session_id": session_id,
+            "status": active_run["status"],
+        }
+
+
 def test_runner_failure_becomes_failed_done_event(tmp_path) -> None:
     async def failing_runner(**kwargs: Any) -> None:
         raise RuntimeError("fake runner failed")

@@ -173,6 +173,13 @@ class RunManager:
         except KeyError as exc:
             raise KeyError(f"run 不存在: {run_id}") from exc
 
+    def get_active_run(self) -> Run | None:
+        """返回当前唯一未结束的 Run，供刷新页面或冲突恢复使用。"""
+        for state in reversed(list(self._runs.values())):
+            if not state.finished:
+                return state.to_model()
+        return None
+
     async def stream(self, run_id: str) -> AsyncIterator[str]:
         """先回放已保存事件，再等待队列中的新事件。"""
         state = self.get(run_id)

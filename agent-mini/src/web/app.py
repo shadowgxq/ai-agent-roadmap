@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..agent.config import AgentSettings
-from .models import Session, SessionDetail
+from .models import Run, Session, SessionDetail
 from .runs import AgentRunner, RunManager
 
 
@@ -68,6 +68,32 @@ def create_app(
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    @app.get("/runs/active", response_model=Run | None)
+    async def get_active_run() -> Run | None:
+        """返回当前活动 Run，让 Web 刷新后可以重新订阅 SSE。"""
+        return manager.get_active_run()
+
+    def active_run_conflict() -> HTTPException:
+        active_run = manager.get_active_run()
+        if active_run is None:
+            return HTTPException(
+                status_code=409,
+                detail={
+                    "code": "active_run",
+                    "message": "当前运行器一次只允许一个运行中的任务",
+                },
+            )
+        return HTTPException(
+            status_code=409,
+            detail={
+                "code": "active_run",
+                "message": "当前运行器一次只允许一个运行中的任务",
+                "active_run_id": active_run.run_id,
+                "session_id": active_run.session_id,
+                "status": active_run.status,
+            },
+        )
+
     @app.post(
         "/sessions/{session_id}/runs",
         response_model=RunCreated,
@@ -82,7 +108,7 @@ def create_app(
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except RuntimeError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
+            raise active_run_conflict() from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return RunCreated(
@@ -98,7 +124,7 @@ def create_app(
         try:
             state = await manager.start(request.task)
         except RuntimeError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
+            raise active_run_conflict() from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return RunCreated(

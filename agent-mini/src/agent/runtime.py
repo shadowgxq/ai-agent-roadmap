@@ -73,6 +73,8 @@ async def run_coding_agent(
     context_window_tokens: int | None = None,
     max_cost_usd: float | None = None,
     run_id: str | None = None,
+    session_id: str | None = None,
+    message_id: str | None = None,
     enable_subagent: bool = True,
     tool_mode: ToolMode = "all",
     context: Context | None = None,
@@ -176,6 +178,8 @@ async def run_coding_agent(
         save_checkpoint(
             Checkpoint(
                 run_id=selected_run_id,
+                session_id=session_id,
+                message_id=message_id,
                 task=task,
                 messages=current_context.messages,
                 turn=turn,

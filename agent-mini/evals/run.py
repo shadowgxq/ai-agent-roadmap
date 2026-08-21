@@ -927,7 +927,8 @@ def log_summary(
 
     average_turns = turns / len(results) if results else 0
     average_duration = duration / len(results) if results else 0
-    average_cost = cost / len(results) if cost is not None and results else None
+    average_cost = cost / \
+        len(results) if cost is not None and results else None
     cost_line = (
         f"${cost:.6f} (avg ${average_cost:.6f})"
         if cost is not None and average_cost is not None

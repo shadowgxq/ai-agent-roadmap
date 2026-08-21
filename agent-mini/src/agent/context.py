@@ -4,7 +4,7 @@ from typing import Any
 
 
 class Context:
-    """保存 user、assistant 和 tool 消息，并校验工具调用配对。"""
+    """保存发送给模型的消息，不等同于 Web Session 的展示历史。"""
 
     def __init__(self, messages: list[dict[str, Any]] | None = None) -> None:
         self.messages: list[dict[str, Any]] = (

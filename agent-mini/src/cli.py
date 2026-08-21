@@ -73,7 +73,7 @@ def render_agent_event(event: AgentEventName, data: dict[str, Any]) -> None:
             for result in results:
                 if isinstance(result, dict):
                     print(
-                        f"[tool-result] {result.get('tool_call_id', '<unknown>')}: "
+                        f"[tool-result] {result.get('tool_use_id', '<unknown>')}: "
                         f"{_preview_event(result.get('content', ''))}"
                     )
         return
@@ -330,6 +330,8 @@ async def main() -> None:
         max_tokens = checkpoint.max_tokens
         context_window_tokens = checkpoint.context_window_tokens
         max_cost_usd = checkpoint.max_cost_usd
+        session_id = checkpoint.session_id
+        message_id = checkpoint.message_id
         enable_subagent = checkpoint.enable_subagent
         router_enabled = checkpoint.router_enabled
         prompt_cache_enabled = checkpoint.prompt_cache_enabled
@@ -350,6 +352,8 @@ async def main() -> None:
         max_tokens = 3000
         context_window_tokens = settings.context_window_tokens
         max_cost_usd = None
+        session_id = None
+        message_id = None
         enable_subagent = args.enable_subagent
         router_enabled = (
             settings.router_enabled
@@ -434,6 +438,8 @@ async def main() -> None:
             context_window_tokens=context_window_tokens,
             max_cost_usd=max_cost_usd,
             run_id=run_id,
+            session_id=session_id,
+            message_id=message_id,
             enable_subagent=enable_subagent,
             context=context,
             stats=stats,

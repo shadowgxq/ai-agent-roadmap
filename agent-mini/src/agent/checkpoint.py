@@ -132,6 +132,8 @@ class Checkpoint(BaseModel):
     """一次 Coding Agent 运行恢复所需的完整状态。"""
 
     run_id: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+    message_id: str | None = Field(default=None, min_length=1)
     task: str = Field(min_length=1)
     messages: list[dict[str, Any]]
     turn: int = Field(default=0, ge=0)

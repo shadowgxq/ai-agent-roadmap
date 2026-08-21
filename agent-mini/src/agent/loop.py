@@ -927,7 +927,7 @@ async def run(
                 "turn": turn,
                 "calls": [
                     {
-                        "id": tool_call.id,
+                        "tool_use_id": tool_call.id,
                         "name": tool_call.function.name,
                         "arguments": tool_call.function.arguments,
                     }
@@ -953,7 +953,7 @@ async def run(
                 "turn": turn,
                 "results": [
                     {
-                        "tool_call_id": result["tool_call_id"],
+                        "tool_use_id": result["tool_call_id"],
                         "content": result["content"],
                     }
                     for result in tool_results

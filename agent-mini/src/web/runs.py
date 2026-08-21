@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +23,9 @@ from .models import (
     SessionDetail,
     utc_now,
 )
+
+
+AgentRunner = Callable[..., Awaitable[Any]]
 
 
 @dataclass
@@ -62,9 +65,12 @@ class RunManager:
         *,
         workdir: Path,
         settings: AgentSettings | None = None,
+        runner: AgentRunner | None = None,
     ) -> None:
         self.workdir = workdir.resolve()
         self.settings = settings
+        # 生产环境使用真实 Runtime；测试可注入 fake runner，隔离 LLM、工具和外部服务。
+        self.runner = runner if runner is not None else run_coding_agent
         # Session/Message 保存可查询历史；RunState 另外保存 SSE 回放和队列所需的可变运行态。
         self._sessions: dict[str, Session] = {}
         self._messages: dict[str, Message] = {}
@@ -363,7 +369,7 @@ class RunManager:
             await self._publish(state, event_type, data)
 
         try:
-            await run_coding_agent(
+            await self.runner(
                 task=state.task,
                 workdir=self.workdir,
                 settings=self.settings or AgentSettings(),

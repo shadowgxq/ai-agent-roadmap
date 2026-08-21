@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from ..agent.config import AgentSettings
 from .models import Session, SessionDetail
-from .runs import RunManager
+from .runs import AgentRunner, RunManager
 
 
 # 两条创建 Run 的路由共享同一份输入约束，避免空任务进入异步执行层。
@@ -30,13 +30,18 @@ def create_app(
     *,
     workdir: Path | None = None,
     settings: AgentSettings | None = None,
+    runner: AgentRunner | None = None,
 ) -> FastAPI:
     """Build an app with an explicit workdir and optional injected settings."""
     # 显式参数优先；未注入时才读取环境变量，便于测试或宿主按实例隔离工作目录。
     configured_workdir = workdir or Path(
         os.environ.get("AGENT_WORKDIR", Path.cwd())
     )
-    manager = RunManager(workdir=configured_workdir, settings=settings)
+    manager = RunManager(
+        workdir=configured_workdir,
+        settings=settings,
+        runner=runner,
+    )
     app = FastAPI(title="agent-mini viewer")
     # 将 Manager 放入 app.state，既供路由闭包使用，也保留给宿主/调试工具查看运行态的入口。
     app.state.run_manager = manager

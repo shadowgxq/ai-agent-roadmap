@@ -64,6 +64,7 @@ Agent 请求执行一个或多个工具。`tool_use_id` 是一次工具调用的
 ## tool_result
 
 工具执行结果。每个结果必须使用对应 `tool_call` 的同一个 `tool_use_id`。
+`is_error=true` 表示参数错误、超时、策略阻止或工具自身异常等失败结果。
 重复的 `tool_use_id` 或没有待处理调用与之对应的结果属于协议错误。
 
 ```json
@@ -76,7 +77,8 @@ Agent 请求执行一个或多个工具。`tool_use_id` 是一次工具调用的
     "results": [
       {
         "tool_use_id": "call_abc",
-        "content": "# agent-mini"
+        "content": "# agent-mini",
+        "is_error": false
       }
     ]
   }

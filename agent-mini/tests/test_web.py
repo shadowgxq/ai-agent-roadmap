@@ -42,6 +42,7 @@ async def emit_conversation(**kwargs: Any) -> None:
                 {
                     "tool_use_id": "call-1",
                     "content": "README 内容",
+                    "is_error": False,
                 }
             ],
         },

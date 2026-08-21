@@ -53,10 +53,11 @@ class ToolCallEventData(BaseModel):
     calls: list[ToolCallItem] = Field(min_length=1)
 
 
-# 工具结果只保留公开展示所需的内容，配对完整性由 RunManager 在事件流层继续校验。
+# 工具结果保留公开展示所需的错误标记，配对完整性由 RunManager 在事件流层继续校验。
 class ToolResultItem(BaseModel):
     tool_use_id: str = Field(min_length=1)
     content: str
+    is_error: bool
 
 
 class ToolResultEventData(BaseModel):

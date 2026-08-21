@@ -944,7 +944,17 @@ async def run(
             turn=turn,
             langfuse_client=langfuse_client,
         )
-        context.append_tool_results(tool_results)
+        # Web 事件可以携带 is_error，但模型 Context 只接收 Chat Completions 的标准 tool message 字段。
+        context.append_tool_results(
+            [
+                {
+                    "role": result["role"],
+                    "tool_call_id": result["tool_call_id"],
+                    "content": result["content"],
+                }
+                for result in tool_results
+            ]
+        )
         context.assert_paired()
         await emit_event(
             event_callback,
@@ -955,6 +965,7 @@ async def run(
                     {
                         "tool_use_id": result["tool_call_id"],
                         "content": result["content"],
+                        "is_error": result["is_error"],
                     }
                     for result in tool_results
                 ],
@@ -1229,6 +1240,7 @@ async def execute_tools(
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "content": content,
+                    "is_error": True,
                 }
             )
             continue
@@ -1321,6 +1333,7 @@ async def execute_tools(
                 "role": "tool",
                 "tool_call_id": tool_call.id,
                 "content": content,
+                "is_error": status != "ok",
             }
         )
     return tool_results

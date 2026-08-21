@@ -25,6 +25,8 @@
     "run": {
       "label": "Agent run",
       "eyebrow": "Execution",
+      "sessionId": "Session ID",
+      "sessionNotStarted": "No session created",
       "id": "Run ID",
       "notStarted": "No run started",
       "live": "Live"

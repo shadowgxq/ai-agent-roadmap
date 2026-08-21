@@ -25,6 +25,8 @@
     "run": {
       "label": "Agent 运行",
       "eyebrow": "执行过程",
+      "sessionId": "会话 ID",
+      "sessionNotStarted": "尚未创建会话",
       "id": "运行 ID",
       "notStarted": "尚未开始运行",
       "live": "实时"

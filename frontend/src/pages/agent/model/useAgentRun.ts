@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { createAgentEventsUrl, createAgentRun } from './agent.api';
+import { createAgentEventsUrl, createAgentRun, createAgentSession } from './agent.api';
 import {
   AGENT_EVENT_TYPES,
   parseAgentEvent,
@@ -28,10 +28,13 @@ function insertEventInSequence(currentEvents: AgentEvent[], event: AgentEvent) {
 export function useAgentRun() {
   const { t } = useTranslation();
   const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [status, setStatus] = useState<RunStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const isStartingRef = useRef(false);
   const hasFinishedRef = useRef(false);
   const seenSequencesRef = useRef<Set<number>>(new Set());
 
@@ -44,6 +47,9 @@ export function useAgentRun() {
 
   const startRun = useCallback(
     async (task: string) => {
+      if (isStartingRef.current) return;
+
+      isStartingRef.current = true;
       closeSource();
       hasFinishedRef.current = false;
       seenSequencesRef.current = new Set();
@@ -53,7 +59,17 @@ export function useAgentRun() {
       setStatus('starting');
 
       try {
-        const createdRun = await createAgentRun(task);
+        let activeSessionId = sessionIdRef.current;
+        if (!activeSessionId) {
+          const createdSession = await createAgentSession();
+          activeSessionId = createdSession.sessionId;
+          sessionIdRef.current = activeSessionId;
+          setSessionId(activeSessionId);
+        }
+
+        const createdRun = await createAgentRun(activeSessionId, task);
+        sessionIdRef.current = createdRun.sessionId;
+        setSessionId(createdRun.sessionId);
         setRunId(createdRun.runId);
         setStatus('running');
 
@@ -77,11 +93,13 @@ export function useAgentRun() {
             if (event.type === 'done') {
               const nextStatus = toRunStatus(event.data.status);
               hasFinishedRef.current = true;
+              isStartingRef.current = false;
               setStatus(nextStatus);
               source.close();
               sourceRef.current = null;
             }
           } catch {
+            isStartingRef.current = false;
             setError(t('agent.errors.event'));
             setStatus('failed');
             source.close();
@@ -95,12 +113,14 @@ export function useAgentRun() {
 
         source.onerror = () => {
           if (hasFinishedRef.current) return;
+          isStartingRef.current = false;
           setError(t('agent.errors.stream'));
           setStatus('failed');
           source.close();
           sourceRef.current = null;
         };
       } catch (startError) {
+        isStartingRef.current = false;
         setError(getErrorMessage(startError, t('agent.errors.start')));
         setStatus('failed');
       }
@@ -110,9 +130,12 @@ export function useAgentRun() {
 
   const resetRun = useCallback(() => {
     closeSource();
+    isStartingRef.current = false;
+    sessionIdRef.current = null;
     hasFinishedRef.current = false;
     seenSequencesRef.current = new Set();
     setEvents([]);
+    setSessionId(null);
     setRunId(null);
     setError(null);
     setStatus('idle');
@@ -124,6 +147,7 @@ export function useAgentRun() {
     isPending: status === 'starting' || status === 'running',
     resetRun,
     runId,
+    sessionId,
     startRun,
     status,
   };

@@ -19,7 +19,7 @@ const statusKeys: Record<RunStatus, string> = {
 export function AgentPage() {
   const { t } = useTranslation();
   const [task, setTask] = useState('');
-  const { error, events, isPending, resetRun, runId, startRun, status } = useAgentRun();
+  const { error, events, isPending, resetRun, runId, sessionId, startRun, status } = useAgentRun();
 
   function handleSubmit() {
     void startRun(task);
@@ -58,6 +58,11 @@ export function AgentPage() {
             <div className={styles.runMeta}>
               <div>
                 <p className={styles.eyebrow}>{t('agent.run.eyebrow')}</p>
+                <p className={styles.sessionId}>
+                  {sessionId
+                    ? `${t('agent.run.sessionId')}: ${sessionId}`
+                    : t('agent.run.sessionNotStarted')}
+                </p>
                 <p className={styles.runId}>
                   {runId ? `${t('agent.run.id')}: ${runId}` : t('agent.run.notStarted')}
                 </p>

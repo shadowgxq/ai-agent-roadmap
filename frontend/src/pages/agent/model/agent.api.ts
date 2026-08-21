@@ -1,17 +1,29 @@
 import { runtimeConfig } from '../../../shared/config';
 import { request } from '../../../shared/api';
-import type { RunCreatedDto, RunRequestDto } from './agent.types';
+import type { RunCreatedDto, RunRequestDto, SessionDto } from './agent.types';
 
-export async function createAgentRun(task: string) {
+export async function createAgentSession() {
+  const response = await request<SessionDto>({
+    method: 'POST',
+    url: '/sessions',
+  });
+
+  return {
+    sessionId: response.session_id,
+  };
+}
+
+export async function createAgentRun(sessionId: string, task: string) {
   const payload: RunRequestDto = { task };
   const response = await request<RunCreatedDto, RunRequestDto>({
     method: 'POST',
-    url: '/runs',
+    url: `/sessions/${encodeURIComponent(sessionId)}/runs`,
     data: payload,
   });
 
   return {
     runId: response.run_id,
+    sessionId: response.session_id,
     status: response.status,
   };
 }

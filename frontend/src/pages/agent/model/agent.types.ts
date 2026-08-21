@@ -27,6 +27,13 @@ export type RunRequestDto = {
   task: string;
 };
 
+export type SessionDto = {
+  session_id: string;
+  status: 'active' | 'archived';
+  created_at: string;
+  updated_at: string;
+};
+
 export type RunCreatedDto = {
   run_id: string;
   session_id: string;

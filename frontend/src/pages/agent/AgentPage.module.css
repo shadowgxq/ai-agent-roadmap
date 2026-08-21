@@ -109,13 +109,21 @@
   gap: var(--space-3);
 }
 
+.sessionId,
 .runId {
   max-width: 100%;
-  margin: var(--space-2) 0 0;
   overflow-wrap: anywhere;
   color: var(--color-muted);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
+}
+
+.sessionId {
+  margin: var(--space-2) 0 0;
+}
+
+.runId {
+  margin: 2px 0 0;
 }
 
 .liveMark {

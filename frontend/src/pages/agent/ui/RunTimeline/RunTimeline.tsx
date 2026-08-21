@@ -8,21 +8,6 @@ type RunTimelineProps = {
   events: AgentEvent[];
 };
 
-type EventRecord = Record<string, unknown>;
-
-function asRecord(value: unknown): EventRecord | null {
-  return typeof value === 'object' && value !== null ? (value as EventRecord) : null;
-}
-
-function asRecordList(value: unknown): EventRecord[] {
-  if (!Array.isArray(value)) return [];
-  return value.map(asRecord).filter((item): item is EventRecord => item !== null);
-}
-
-function asText(value: unknown, fallback = '') {
-  return typeof value === 'string' ? value : fallback;
-}
-
 function eventTitle(type: AgentEvent['type'], t: (key: string) => string) {
   const labels = {
     text: t('agent.timeline.text'),
@@ -43,19 +28,17 @@ function EventIcon({ type }: { type: AgentEvent['type'] }) {
 }
 
 function EventBody({ event }: { event: AgentEvent }) {
-  const text = asText(event.data.text);
   if (event.type === 'text') {
-    return <p className={styles.text}>{text}</p>;
+    return <p className={styles.text}>{event.data.text}</p>;
   }
 
   if (event.type === 'tool_call') {
-    const calls = asRecordList(event.data.calls);
     return (
       <div className={styles.detailList}>
-        {calls.map((call, index) => (
-          <div className={styles.detailRow} key={asText(call.id, String(index))}>
-            <strong>{asText(call.name)}</strong>
-            <code>{asText(call.arguments, '{}')}</code>
+        {event.data.calls.map((call) => (
+          <div className={styles.detailRow} key={call.tool_use_id}>
+            <strong>{call.name}</strong>
+            <code>{call.arguments}</code>
           </div>
         ))}
       </div>
@@ -63,12 +46,11 @@ function EventBody({ event }: { event: AgentEvent }) {
   }
 
   if (event.type === 'tool_result') {
-    const results = asRecordList(event.data.results);
     return (
       <div className={styles.detailList}>
-        {results.map((result, index) => (
-          <pre className={styles.result} key={asText(result.tool_call_id, String(index))}>
-            {asText(result.content)}
+        {event.data.results.map((result) => (
+          <pre className={styles.result} key={result.tool_use_id}>
+            {result.content}
           </pre>
         ))}
       </div>
@@ -77,15 +59,12 @@ function EventBody({ event }: { event: AgentEvent }) {
 
   if (event.type === 'context_usage') {
     const contextTokens =
-      typeof event.data.context_tokens === 'number'
+      event.data.context_tokens !== null
         ? event.data.context_tokens.toLocaleString()
         : 'unknown';
-    const contextWindow =
-      typeof event.data.context_window_tokens === 'number'
-        ? event.data.context_window_tokens.toLocaleString()
-        : 'unknown';
+    const contextWindow = event.data.context_window_tokens.toLocaleString();
     const usage =
-      typeof event.data.context_usage_percent === 'number'
+      event.data.context_usage_percent !== null
         ? `${event.data.context_usage_percent.toFixed(2)}%`
         : 'unknown';
     return (
@@ -95,8 +74,7 @@ function EventBody({ event }: { event: AgentEvent }) {
     );
   }
 
-  const status = asText(event.data.status, 'completed');
-  const error = asText(event.data.error);
+  const { error, status } = event.data;
   return (
     <div className={status === 'completed' ? styles.success : styles.failure}>
       {status === 'completed' ? (
@@ -104,7 +82,7 @@ function EventBody({ event }: { event: AgentEvent }) {
       ) : (
         <AlertCircle size={17} aria-hidden="true" />
       )}
-      <span>{error || status}</span>
+      <span>{error ?? status}</span>
     </div>
   );
 }

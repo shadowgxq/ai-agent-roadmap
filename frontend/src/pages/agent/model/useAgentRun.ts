@@ -4,15 +4,25 @@ import { useTranslation } from 'react-i18next';
 import { createAgentEventsUrl, createAgentRun } from './agent.api';
 import {
   AGENT_EVENT_TYPES,
-  toAgentEvent,
+  parseAgentEvent,
   toRunStatus,
   type AgentEvent,
-  type AgentEventDto,
   type RunStatus,
 } from './agent.types';
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function insertEventInSequence(currentEvents: AgentEvent[], event: AgentEvent) {
+  const lastEvent = currentEvents[currentEvents.length - 1];
+  if (!lastEvent || lastEvent.sequence < event.sequence) {
+    return [...currentEvents, event];
+  }
+
+  const nextEvents = [...currentEvents, event];
+  nextEvents.sort((left, right) => left.sequence - right.sequence);
+  return nextEvents;
 }
 
 export function useAgentRun() {
@@ -23,6 +33,7 @@ export function useAgentRun() {
   const [error, setError] = useState<string | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
   const hasFinishedRef = useRef(false);
+  const seenSequencesRef = useRef<Set<number>>(new Set());
 
   const closeSource = useCallback(() => {
     sourceRef.current?.close();
@@ -35,6 +46,7 @@ export function useAgentRun() {
     async (task: string) => {
       closeSource();
       hasFinishedRef.current = false;
+      seenSequencesRef.current = new Set();
       setEvents([]);
       setRunId(null);
       setError(null);
@@ -49,15 +61,21 @@ export function useAgentRun() {
         sourceRef.current = source;
 
         const handleEvent = (rawEvent: Event) => {
+          if (sourceRef.current !== source) return;
           const messageEvent = rawEvent as MessageEvent<string>;
 
           try {
-            const eventDto = JSON.parse(messageEvent.data) as AgentEventDto;
-            const event = toAgentEvent(eventDto);
-            setEvents((currentEvents) => [...currentEvents, event]);
+            const event = parseAgentEvent(JSON.parse(messageEvent.data) as unknown);
+            if (event.runId !== createdRun.runId || messageEvent.type !== event.type) {
+              throw new Error('SSE event envelope does not match the active run');
+            }
+
+            if (seenSequencesRef.current.has(event.sequence)) return;
+            seenSequencesRef.current.add(event.sequence);
+            setEvents((currentEvents) => insertEventInSequence(currentEvents, event));
 
             if (event.type === 'done') {
-              const nextStatus = toRunStatus(String(event.data.status ?? 'completed'));
+              const nextStatus = toRunStatus(event.data.status);
               hasFinishedRef.current = true;
               setStatus(nextStatus);
               source.close();
@@ -93,6 +111,7 @@ export function useAgentRun() {
   const resetRun = useCallback(() => {
     closeSource();
     hasFinishedRef.current = false;
+    seenSequencesRef.current = new Set();
     setEvents([]);
     setRunId(null);
     setError(null);

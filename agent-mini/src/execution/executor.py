@@ -69,6 +69,83 @@ def truncate_output(output: str, max_chars: int) -> str:
     return f"{output[:head_chars]}{marker}{output[-tail_chars:]}"
 
 
+async def _preflight_command(
+    command: str,
+    *,
+    policy: "Policy",
+    on_confirm: ConfirmCallback | None,
+    started_at: float,
+) -> tuple[str, ExecutionResult | None]:
+    """共享本地与 Docker 执行器的策略闸门。"""
+    raw_command = command.strip()
+    if not raw_command:
+        return "", ExecutionResult(
+            command=command,
+            content="命令不能为空",
+            status="denied",
+            is_error=True,
+        )
+
+    decision = policy.evaluate(raw_command)
+    from ..tools.policy import PolicyAction
+
+    if decision.action is PolicyAction.DENY:
+        return raw_command, _policy_result(
+            raw_command,
+            status="denied",
+            reason=decision.reason,
+            started_at=started_at,
+        )
+
+    if decision.action is PolicyAction.CONFIRM:
+        if on_confirm is None:
+            return raw_command, _policy_result(
+                raw_command,
+                status="waiting_confirmation",
+                reason=decision.reason,
+                started_at=started_at,
+            )
+
+        approved = on_confirm(raw_command, decision.reason)
+        if inspect.isawaitable(approved):
+            approved = await approved
+        if not approved:
+            return raw_command, _policy_result(
+                raw_command,
+                status="denied",
+                reason="用户拒绝执行命令",
+                started_at=started_at,
+            )
+
+    return raw_command, None
+
+
+def _duration_ms(started_at: float) -> int:
+    return round((perf_counter() - started_at) * 1000)
+
+
+def _policy_result(
+    command: str,
+    *,
+    status: Literal["denied", "waiting_confirmation"],
+    reason: str,
+    started_at: float,
+) -> ExecutionResult:
+    label = (
+        "命令拒绝，未执行"
+        if status == "denied"
+        else "命令需要确认，暂未执行"
+    )
+    return ExecutionResult(
+        command=command,
+        content=f"{label}: {command}\n原因: {reason}",
+        status=status,
+        is_error=True,
+        duration_ms=_duration_ms(started_at),
+        reason=reason,
+    )
+
+
 class LocalExecutor(Executor):
     """在 Workspace 根目录中执行命令的本地实现。"""
 
@@ -115,45 +192,14 @@ class LocalExecutor(Executor):
     async def execute(self, command: str) -> ExecutionResult:
         """先过策略，再在 Workspace 根目录启动本地 Shell。"""
         started_at = perf_counter()
-        raw_command = command.strip()
-        if not raw_command:
-            return ExecutionResult(
-                command=command,
-                content="命令不能为空",
-                status="denied",
-                is_error=True,
-            )
-
-        decision = self.policy.evaluate(raw_command)
-        from ..tools.policy import PolicyAction
-
-        if decision.action is PolicyAction.DENY:
-            return self._policy_result(
-                raw_command,
-                status="denied",
-                reason=decision.reason,
-                started_at=started_at,
-            )
-
-        if decision.action is PolicyAction.CONFIRM:
-            if self.on_confirm is None:
-                return self._policy_result(
-                    raw_command,
-                    status="waiting_confirmation",
-                    reason=decision.reason,
-                    started_at=started_at,
-                )
-
-            approved = self.on_confirm(raw_command, decision.reason)
-            if inspect.isawaitable(approved):
-                approved = await approved
-            if not approved:
-                return self._policy_result(
-                    raw_command,
-                    status="denied",
-                    reason="用户拒绝执行命令",
-                    started_at=started_at,
-                )
+        raw_command, preflight_result = await _preflight_command(
+            command,
+            policy=self.policy,
+            on_confirm=self.on_confirm,
+            started_at=started_at,
+        )
+        if preflight_result is not None:
+            return preflight_result
 
         try:
             process = await asyncio.create_subprocess_shell(
@@ -169,7 +215,7 @@ class LocalExecutor(Executor):
                 content=f"命令启动失败: {type(exc).__name__}: {exc}",
                 status="failed",
                 is_error=True,
-                duration_ms=self._duration_ms(started_at),
+                duration_ms=_duration_ms(started_at),
             )
 
         try:
@@ -185,7 +231,7 @@ class LocalExecutor(Executor):
                 content=f"命令执行超时（超过 {self.timeout:g} 秒）",
                 status="timeout",
                 is_error=True,
-                duration_ms=self._duration_ms(started_at),
+                duration_ms=_duration_ms(started_at),
             )
         except asyncio.CancelledError:
             if process.returncode is None:
@@ -207,39 +253,164 @@ class LocalExecutor(Executor):
             status="completed" if exit_code == 0 else "failed",
             is_error=exit_code != 0,
             exit_code=exit_code,
-            duration_ms=self._duration_ms(started_at),
+            duration_ms=_duration_ms(started_at),
         )
 
-    @staticmethod
-    def _duration_ms(started_at: float) -> int:
-        return round((perf_counter() - started_at) * 1000)
 
-    def _policy_result(
+class DockerExecutor(Executor):
+    """通过 Docker 运行受限命令的 Sandbox 实现。"""
+
+    def __init__(
         self,
-        command: str,
+        workspace: Workspace,
         *,
-        status: Literal["denied", "waiting_confirmation"],
-        reason: str,
-        started_at: float,
-    ) -> ExecutionResult:
-        label = (
-            "命令拒绝，未执行"
-            if status == "denied"
-            else "命令需要确认，暂未执行"
+        image: str = "agent-mini-sandbox:local",
+        docker_binary: str = "docker",
+        timeout: float = 30.0,
+        max_output_chars: int = 10_000,
+        cpu_limit: float = 1.0,
+        memory_limit: str = "512m",
+        pids_limit: int = 128,
+        container_user: str = "10001:10001",
+        policy: "Policy | None" = None,
+        on_confirm: ConfirmCallback | None = None,
+    ) -> None:
+        if not image.strip():
+            raise ValueError("Docker image 不能为空")
+        if not docker_binary.strip():
+            raise ValueError("docker_binary 不能为空")
+        if timeout <= 0:
+            raise ValueError("timeout 必须大于 0")
+        if max_output_chars <= 0:
+            raise ValueError("max_output_chars 必须大于 0")
+        if cpu_limit <= 0:
+            raise ValueError("cpu_limit 必须大于 0")
+        if not memory_limit.strip():
+            raise ValueError("memory_limit 不能为空")
+        if pids_limit <= 0:
+            raise ValueError("pids_limit 必须大于 0")
+        if not container_user.strip():
+            raise ValueError("container_user 不能为空")
+
+        if policy is None:
+            from ..tools.policy import Policy
+
+            policy = Policy()
+        self.workspace = workspace
+        self.image = image
+        self.docker_binary = docker_binary
+        self.timeout = timeout
+        self.max_output_chars = max_output_chars
+        self.cpu_limit = cpu_limit
+        self.memory_limit = memory_limit
+        self.pids_limit = pids_limit
+        self.container_user = container_user
+        self.policy = policy
+        self.on_confirm = on_confirm
+
+    def build_command(self, command: str) -> list[str]:
+        """构造无宿主 Shell 解析的 Docker CLI 参数。"""
+        workspace_root = str(self.workspace.root)
+        return [
+            self.docker_binary,
+            "run",
+            "--rm",
+            "--init",
+            "--network",
+            "none",
+            "--cpus",
+            str(self.cpu_limit),
+            "--memory",
+            self.memory_limit,
+            "--pids-limit",
+            str(self.pids_limit),
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=64m",
+            "--mount",
+            f"type=bind,source={workspace_root},target=/workspace,rw",
+            "--workdir",
+            "/workspace",
+            "--user",
+            self.container_user,
+            self.image,
+            "/bin/sh",
+            "-lc",
+            command,
+        ]
+
+    async def execute(self, command: str) -> ExecutionResult:
+        """执行受策略约束的 Docker Sandbox 命令。"""
+        started_at = perf_counter()
+        raw_command, preflight_result = await _preflight_command(
+            command,
+            policy=self.policy,
+            on_confirm=self.on_confirm,
+            started_at=started_at,
+        )
+        if preflight_result is not None:
+            return preflight_result
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *self.build_command(raw_command),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as exc:
+            return ExecutionResult(
+                command=raw_command,
+                content=(
+                    f"Docker Sandbox 启动失败: {type(exc).__name__}: {exc}"
+                ),
+                status="failed",
+                is_error=True,
+                duration_ms=_duration_ms(started_at),
+            )
+
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                process.communicate(),
+                timeout=self.timeout,
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.communicate()
+            return ExecutionResult(
+                command=raw_command,
+                content=f"Sandbox 命令执行超时（超过 {self.timeout:g} 秒）",
+                status="timeout",
+                is_error=True,
+                duration_ms=_duration_ms(started_at),
+            )
+        except asyncio.CancelledError:
+            if process.returncode is None:
+                process.kill()
+                await process.communicate()
+            raise
+
+        stdout = stdout_bytes.decode(errors="replace")
+        stderr = stderr_bytes.decode(errors="replace")
+        exit_code = process.returncode
+        output = (
+            f"exit_code: {exit_code}\n"
+            f"stdout:\n{stdout or '(无输出)'}\n"
+            f"stderr:\n{stderr or '(无输出)'}"
         )
         return ExecutionResult(
-            command=command,
-            content=f"{label}: {command}\n原因: {reason}",
-            status=status,
-            is_error=True,
-            duration_ms=self._duration_ms(started_at),
-            reason=reason,
+            command=raw_command,
+            content=truncate_output(output, self.max_output_chars),
+            status="completed" if exit_code == 0 else "failed",
+            is_error=exit_code != 0,
+            exit_code=exit_code,
+            duration_ms=_duration_ms(started_at),
         )
 
 
 __all__ = [
     "ExecutionResult",
     "ExecutionStatus",
+    "DockerExecutor",
     "Executor",
     "LocalExecutor",
     "truncate_output",

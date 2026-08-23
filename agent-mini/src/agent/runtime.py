@@ -13,7 +13,7 @@ from langfuse import Langfuse, propagate_attributes
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
-from ..execution.executor import Executor, LocalExecutor
+from ..execution.executor import DockerExecutor, Executor, LocalExecutor
 from ..execution.workspace import LocalWorkspace
 from ..rag import OpenAIEmbedder
 from ..tools import (
@@ -150,11 +150,27 @@ async def run_coding_agent(
     run_started_at = perf_counter()
 
     registry = ToolRegistry()
-    selected_executor = executor or LocalExecutor(
-        workspace,
-        max_output_chars=settings.max_tool_output_chars,
-        on_confirm=on_confirm,
-    )
+    if executor is not None:
+        selected_executor = executor
+    elif settings.executor_backend == "docker":
+        selected_executor = DockerExecutor(
+            workspace,
+            image=settings.docker_image,
+            docker_binary=settings.docker_binary,
+            timeout=settings.docker_timeout,
+            max_output_chars=settings.max_tool_output_chars,
+            cpu_limit=settings.docker_cpu_limit,
+            memory_limit=settings.docker_memory_limit,
+            pids_limit=settings.docker_pids_limit,
+            container_user=settings.docker_container_user,
+            on_confirm=on_confirm,
+        )
+    else:
+        selected_executor = LocalExecutor(
+            workspace,
+            max_output_chars=settings.max_tool_output_chars,
+            on_confirm=on_confirm,
+        )
     if tool_mode == "all":
         register_fs_tools(registry, workspace)
         register_search_tools(registry, workspace)

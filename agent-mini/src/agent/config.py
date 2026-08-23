@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Literal
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -77,6 +78,58 @@ class AgentSettings(BaseSettings):
     log_file: Path = PROJECT_ROOT / "logs" / "agent.jsonl"
     max_turns: int = 30
     max_tool_output_chars: int = 10_000
+    executor_backend: Literal["local", "docker"] = Field(
+        default="local",
+        validation_alias=AliasChoices(
+            "EXECUTOR_BACKEND",
+            "AGENT_EXECUTOR_BACKEND",
+        ),
+    )
+    docker_image: str = Field(
+        default="agent-mini-sandbox:local",
+        validation_alias=AliasChoices("DOCKER_IMAGE", "AGENT_DOCKER_IMAGE"),
+    )
+    docker_binary: str = Field(
+        default="docker",
+        validation_alias=AliasChoices("DOCKER_BINARY", "AGENT_DOCKER_BINARY"),
+    )
+    docker_timeout: float = Field(
+        default=30.0,
+        gt=0,
+        validation_alias=AliasChoices("DOCKER_TIMEOUT", "AGENT_DOCKER_TIMEOUT"),
+    )
+    docker_cpu_limit: float = Field(
+        default=1.0,
+        gt=0,
+        validation_alias=AliasChoices(
+            "DOCKER_CPU_LIMIT",
+            "AGENT_DOCKER_CPU_LIMIT",
+        ),
+    )
+    docker_memory_limit: str = Field(
+        default="512m",
+        min_length=1,
+        validation_alias=AliasChoices(
+            "DOCKER_MEMORY_LIMIT",
+            "AGENT_DOCKER_MEMORY_LIMIT",
+        ),
+    )
+    docker_pids_limit: int = Field(
+        default=128,
+        gt=0,
+        validation_alias=AliasChoices(
+            "DOCKER_PIDS_LIMIT",
+            "AGENT_DOCKER_PIDS_LIMIT",
+        ),
+    )
+    docker_container_user: str = Field(
+        default="10001:10001",
+        min_length=1,
+        validation_alias=AliasChoices(
+            "DOCKER_CONTAINER_USER",
+            "AGENT_DOCKER_CONTAINER_USER",
+        ),
+    )
     context_window_tokens: int = Field(
         default=128_000,
         ge=1,

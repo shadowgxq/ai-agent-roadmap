@@ -1,7 +1,15 @@
-import { Activity, AlertCircle, CheckCircle2, Circle, Wrench } from 'lucide-react';
+import {
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  Circle,
+  GitCompareArrows,
+  Wrench,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AgentEvent } from '../../model';
+import { DiffView } from '../DiffView';
 import { ToolCallCard } from '../ToolCallCard';
 import type { NonToolAgentEvent, RunTimelineItem } from './toolCallState.utils';
 import { buildTimelineItems } from './toolCallState.utils';
@@ -17,6 +25,7 @@ function eventTitle(type: NonToolAgentEvent['type'], t: Translate) {
   const labels: Record<NonToolAgentEvent['type'], string> = {
     text: t('agent.timeline.text'),
     context_usage: t('agent.timeline.contextUsage'),
+    diff: t('agent.timeline.diff'),
     done: t('agent.timeline.done'),
   };
   return labels[type];
@@ -25,6 +34,7 @@ function eventTitle(type: NonToolAgentEvent['type'], t: Translate) {
 function EventIcon({ type }: { type: NonToolAgentEvent['type'] }) {
   if (type === 'text') return <Circle size={16} aria-hidden="true" />;
   if (type === 'context_usage') return <Activity size={16} aria-hidden="true" />;
+  if (type === 'diff') return <GitCompareArrows size={16} aria-hidden="true" />;
   return <CheckCircle2 size={16} aria-hidden="true" />;
 }
 
@@ -48,6 +58,10 @@ function EventBody({ event }: { event: NonToolAgentEvent }) {
         {contextTokens} / {contextWindow} tokens ({usage})
       </p>
     );
+  }
+
+  if (event.type === 'diff') {
+    return <DiffView files={event.data.files} />;
   }
 
   const { error, status } = event.data;

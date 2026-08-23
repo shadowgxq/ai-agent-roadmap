@@ -56,6 +56,35 @@ describe('parseAgentEvent', () => {
       }),
     ).toThrow('max_turns terminal status requires data.max_turns');
   });
+
+  it('parses a structured diff event without guessing from patch text', () => {
+    expect(
+      parseAgentEvent({
+        sequence: 3,
+        run_id: 'run-1',
+        event: 'diff',
+        data: {
+          turn: 1,
+          files: [
+            {
+              path: 'src/main.py',
+              status: 'modified',
+              patch: '-old\n+new',
+              additions: 1,
+              deletions: 1,
+              binary: false,
+              truncated: false,
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      type: 'diff',
+      data: {
+        files: [{ path: 'src/main.py', status: 'modified' }],
+      },
+    });
+  });
 });
 
 describe('toRunStatus', () => {

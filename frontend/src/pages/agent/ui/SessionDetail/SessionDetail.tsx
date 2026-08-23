@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 
 import type {
   AgentMessage,
+  DiffFileItem,
   AgentSessionDetail,
   StoredRunStatus,
 } from '../../model';
+import { DiffView } from '../DiffView';
 import styles from './SessionDetail.module.css';
 
 export type SessionDetailProps = {
@@ -36,9 +38,43 @@ function formatDate(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function isDiffFileItem(value: unknown): value is DiffFileItem {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const file = value as Record<string, unknown>;
+  return (
+    typeof file.path === 'string' &&
+    (file.status === 'added' ||
+      file.status === 'modified' ||
+      file.status === 'deleted' ||
+      file.status === 'binary') &&
+    typeof file.patch === 'string' &&
+    typeof file.additions === 'number' &&
+    typeof file.deletions === 'number' &&
+    typeof file.binary === 'boolean' &&
+    typeof file.truncated === 'boolean'
+  );
+}
+
+function parseStoredDiff(content: string): DiffFileItem[] | null {
+  try {
+    const value: unknown = JSON.parse(content);
+    if (!Array.isArray(value) || value.length === 0 || !value.every(isDiffFileItem)) {
+      return null;
+    }
+    return value;
+  } catch {
+    return null;
+  }
+}
+
 function MessageContent({ message }: { message: AgentMessage }) {
   if (message.kind === 'text') {
     return <p className={styles.messageContent}>{message.content}</p>;
+  }
+
+  if (message.kind === 'diff') {
+    const files = parseStoredDiff(message.content);
+    if (files) return <DiffView files={files} />;
   }
 
   return <pre className={styles.messageCode}>{message.content}</pre>;

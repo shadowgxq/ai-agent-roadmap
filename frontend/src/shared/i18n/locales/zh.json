@@ -57,6 +57,7 @@
       "text": "模型回复",
       "toolCall": "工具调用",
       "toolResult": "工具结果",
+      "diff": "文件变更",
       "contextUsage": "上下文用量",
       "done": "运行结束",
       "emptyTitle": "还没有事件",
@@ -81,6 +82,21 @@
         "duplicateCall": "检测到重复的工具调用 ID",
         "duplicateResult": "检测到重复的工具结果"
       }
+    },
+    "diff": {
+      "eyebrow": "Diff",
+      "title": "文件变更",
+      "fileList": "变更文件列表",
+      "fileCount": "{{count}} 个文件",
+      "status": {
+        "added": "新增",
+        "modified": "已修改",
+        "deleted": "已删除",
+        "binary": "二进制"
+      },
+      "binary": "二进制文件，暂不展示文本 Diff。",
+      "empty": "该文件没有可展示的文本变更。",
+      "truncated": "Diff 较大，已截断显示。"
     },
     "history": {
       "label": "Session 历史",

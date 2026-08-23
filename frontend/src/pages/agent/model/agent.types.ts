@@ -2,6 +2,7 @@ export const AGENT_EVENT_TYPES = [
   'text',
   'tool_call',
   'tool_result',
+  'diff',
   'context_usage',
   'done',
 ] as const;
@@ -41,7 +42,7 @@ export type MessageDto = {
   session_id: string;
   run_id: string;
   role: 'user' | 'assistant' | 'tool';
-  kind: 'text' | 'tool_call' | 'tool_result';
+  kind: 'text' | 'tool_call' | 'tool_result' | 'diff';
   content: string;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -145,6 +146,23 @@ export type ToolResultEventData = {
   results: ToolResultItem[];
 };
 
+export type DiffStatus = 'added' | 'modified' | 'deleted' | 'binary';
+
+export type DiffFileItem = {
+  path: string;
+  status: DiffStatus;
+  patch: string;
+  additions: number;
+  deletions: number;
+  binary: boolean;
+  truncated: boolean;
+};
+
+export type DiffEventData = {
+  turn: number;
+  files: DiffFileItem[];
+};
+
 export type ContextUsageEventData = {
   turn: number;
   context_tokens: number | null;
@@ -181,6 +199,7 @@ type AgentEventDataByType = {
   text: TextEventData;
   tool_call: ToolCallEventData;
   tool_result: ToolResultEventData;
+  diff: DiffEventData;
   context_usage: ContextUsageEventData;
   done: DoneEventData;
 };
@@ -304,6 +323,28 @@ function readToolResults(value: unknown): ToolResultItem[] {
   });
 }
 
+function readDiffFiles(value: unknown): DiffFileItem[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('data.files must be a non-empty array');
+  }
+  return value.map((item, index) => {
+    const file = readRecord(item, `data.files[${index}]`);
+    const status = readString(file.status, `data.files[${index}].status`);
+    if (!['added', 'modified', 'deleted', 'binary'].includes(status)) {
+      throw new Error(`data.files[${index}].status is not supported`);
+    }
+    return {
+      path: readString(file.path, `data.files[${index}].path`),
+      status: status as DiffStatus,
+      patch: readStringValue(file.patch, `data.files[${index}].patch`),
+      additions: readInteger(file.additions, `data.files[${index}].additions`, 0),
+      deletions: readInteger(file.deletions, `data.files[${index}].deletions`, 0),
+      binary: readBoolean(file.binary, `data.files[${index}].binary`),
+      truncated: readBoolean(file.truncated, `data.files[${index}].truncated`),
+    };
+  });
+}
+
 export function parseAgentEvent(value: unknown): AgentEvent {
   const envelope = readRecord(value, 'event');
   const sequence = readInteger(envelope.sequence, 'sequence', 0);
@@ -343,6 +384,16 @@ export function parseAgentEvent(value: unknown): AgentEvent {
         data: {
           turn: readInteger(data.turn, 'data.turn', 1),
           results: readToolResults(data.results),
+        },
+      };
+    case 'diff':
+      return {
+        sequence,
+        runId,
+        type: eventType,
+        data: {
+          turn: readInteger(data.turn, 'data.turn', 1),
+          files: readDiffFiles(data.files),
         },
       };
     case 'context_usage':

@@ -57,6 +57,7 @@
       "text": "Model response",
       "toolCall": "Tool call",
       "toolResult": "Tool result",
+      "diff": "File changes",
       "contextUsage": "Context usage",
       "done": "Run finished",
       "emptyTitle": "No events yet",
@@ -81,6 +82,21 @@
         "duplicateCall": "A duplicate tool call ID was received",
         "duplicateResult": "A duplicate tool result was received"
       }
+    },
+    "diff": {
+      "eyebrow": "Diff",
+      "title": "File changes",
+      "fileList": "Changed files",
+      "fileCount": "{{count}} files",
+      "status": {
+        "added": "Added",
+        "modified": "Modified",
+        "deleted": "Deleted",
+        "binary": "Binary"
+      },
+      "binary": "Binary file; text diff is not available.",
+      "empty": "This file has no text changes to display.",
+      "truncated": "The diff is large and has been truncated."
     },
     "history": {
       "label": "Session history",

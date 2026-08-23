@@ -10,14 +10,20 @@
 }
 
 .root[data-variant='conflict'],
-.root[data-variant='reconnecting'] {
+.root[data-variant='reconnecting'],
+.root[data-variant='waiting_confirmation'] {
   border-color: color-mix(in srgb, var(--color-warning) 52%, var(--color-border));
   background: color-mix(in srgb, var(--color-warning) 9%, var(--color-surface));
 }
 
 .root[data-variant='starting'],
-.root[data-variant='restoring'] {
+.root[data-variant='restoring'],
+.root[data-variant='waiting_confirmation'] {
   border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+}
+
+.root[data-variant='waiting_confirmation'] {
+  align-items: flex-start;
 }
 
 .icon {
@@ -57,6 +63,51 @@
   overflow-wrap: anywhere;
 }
 
+.confirmation {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, var(--color-border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-warning) 6%, var(--color-surface));
+}
+
+.confirmationField {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  line-height: var(--leading-normal);
+}
+
+.confirmationLabel {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.confirmationField code {
+  display: block;
+  overflow-x: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.confirmationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .meta {
   color: var(--color-muted);
   font-family: var(--font-family-mono);
@@ -86,6 +137,22 @@
 .action:focus-visible {
   border-color: var(--color-primary);
   color: var(--color-primary-strong);
+}
+
+.action:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.confirmAction {
+  border-color: color-mix(in srgb, var(--color-success) 42%, var(--color-border));
+  color: var(--color-success);
+}
+
+.rejectAction,
+.cancelAction {
+  border-color: color-mix(in srgb, var(--color-danger) 42%, var(--color-border));
+  color: var(--color-danger);
 }
 
 .action:focus-visible {
@@ -118,5 +185,10 @@
   .action {
     width: 100%;
     margin-left: 44px;
+  }
+
+  .confirmationActions .action {
+    width: auto;
+    margin-left: 0;
   }
 }

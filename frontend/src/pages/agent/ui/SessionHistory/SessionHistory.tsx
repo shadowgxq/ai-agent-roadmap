@@ -22,6 +22,7 @@ const statusKeys: Record<RunStatus, string> = {
   restoring: 'agent.status.restoring',
   starting: 'agent.status.starting',
   running: 'agent.status.running',
+  waiting_confirmation: 'agent.status.waitingConfirmation',
   reconnecting: 'agent.status.reconnecting',
   completed: 'agent.status.completed',
   failed: 'agent.status.failed',

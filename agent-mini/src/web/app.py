@@ -18,6 +18,10 @@ class RunRequest(BaseModel):
     task: str = Field(min_length=1)
 
 
+class RunConfirmationRequest(BaseModel):
+    approved: bool
+
+
 # 创建响应同时返回 Session/Message 关联键，前端可以立即订阅 Run 并定位历史消息。
 class RunCreated(BaseModel):
     run_id: str
@@ -72,6 +76,27 @@ def create_app(
     async def get_active_run() -> Run | None:
         """返回当前活动 Run，让 Web 刷新后可以重新订阅 SSE。"""
         return manager.get_active_run()
+
+    @app.post("/runs/{run_id}/confirm", response_model=Run)
+    async def confirm_run(
+        run_id: str,
+        request: RunConfirmationRequest,
+    ) -> Run:
+        try:
+            state = await manager.confirm(run_id, request.approved)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return state.to_model()
+
+    @app.post("/runs/{run_id}/cancel", response_model=Run)
+    async def cancel_run(run_id: str) -> Run:
+        try:
+            state = await manager.cancel(run_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return state.to_model()
 
     def active_run_conflict() -> HTTPException:
         active_run = manager.get_active_run()

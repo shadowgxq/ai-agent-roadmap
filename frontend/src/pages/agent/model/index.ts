@@ -12,6 +12,7 @@ export type {
   AgentSessionDetail,
   AgentStoredRun,
   AgentTerminalStatus,
+  ConfirmationRequest,
   RunStatus,
   StoredRunStatus,
   ToolCallItem,

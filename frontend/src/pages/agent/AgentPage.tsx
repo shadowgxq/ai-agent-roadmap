@@ -16,6 +16,7 @@ const statusKeys: Record<RunStatus, string> = {
   restoring: 'agent.status.restoring',
   starting: 'agent.status.starting',
   running: 'agent.status.running',
+  waiting_confirmation: 'agent.status.waitingConfirmation',
   reconnecting: 'agent.status.reconnecting',
   completed: 'agent.status.completed',
   failed: 'agent.status.failed',
@@ -31,10 +32,15 @@ export function AgentPage() {
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const {
     canReconnect,
+    cancelRun,
+    confirmation,
     conflict,
     error,
     events,
     isPending,
+    isCancelling,
+    isConfirming,
+    confirmRun,
     reconnectActiveRun,
     resetRun,
     resumeSession,
@@ -253,8 +259,14 @@ export function AgentPage() {
                   </div>
                 ) : null}
                 <ActiveRunBanner
+                  canCancel={Boolean(runId) && isPending && !conflict}
                   canReconnect={canReconnect}
+                  confirmation={confirmation}
                   conflict={conflict}
+                  isCancelling={isCancelling}
+                  isConfirming={isConfirming}
+                  onCancel={() => void cancelRun()}
+                  onConfirm={(approved) => void confirmRun(approved)}
                   onReconnect={() => void reconnectActiveRun()}
                   status={status}
                 />

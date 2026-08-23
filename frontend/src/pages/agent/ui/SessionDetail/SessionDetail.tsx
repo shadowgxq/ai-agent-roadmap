@@ -27,6 +27,7 @@ const roleKeys: Record<AgentMessage['role'], string> = {
 const runStatusKeys: Record<StoredRunStatus, string> = {
   queued: 'agent.history.status.queued',
   running: 'agent.history.status.running',
+  waiting_confirmation: 'agent.history.status.waitingConfirmation',
   completed: 'agent.history.status.completed',
   failed: 'agent.history.status.failed',
   max_turns: 'agent.history.status.maxTurns',

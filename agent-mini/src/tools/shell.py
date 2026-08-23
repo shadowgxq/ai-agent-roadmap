@@ -44,4 +44,9 @@ def register_shell_tools(
         return ToolExecutionResult(
             content=result.content,
             is_error=result.is_error,
+            metadata={
+                "execution_status": result.status,
+                "exit_code": result.exit_code,
+                "duration_ms": result.duration_ms,
+            },
         )

@@ -11,6 +11,7 @@ EventType = Literal[
     "tool_call",
     "tool_result",
     "diff",
+    "status",
     "context_usage",
     "done",
 ]
@@ -28,6 +29,7 @@ PUBLIC_EVENT_TYPES = frozenset(
         "tool_call",
         "tool_result",
         "diff",
+        "status",
         "context_usage",
         "done",
     }
@@ -86,6 +88,16 @@ class DiffEventData(BaseModel):
     files: list[DiffFileItem] = Field(min_length=1)
 
 
+class StatusEventData(BaseModel):
+    """Run 的非终态生命周期变化和可选确认请求。"""
+
+    status: Literal["queued", "running", "waiting_confirmation"]
+    message: str | None = None
+    confirmation_id: str | None = Field(default=None, min_length=1)
+    command: str | None = None
+    reason: str | None = None
+
+
 # Provider 不提供 token 用量时使用 None + available=false，不能把“未知”误报成 0。
 class ContextUsageEventData(BaseModel):
     turn: int = Field(ge=1)
@@ -116,6 +128,7 @@ EVENT_DATA_MODELS: dict[EventType, type[BaseModel]] = {
     "tool_call": ToolCallEventData,
     "tool_result": ToolResultEventData,
     "diff": DiffEventData,
+    "status": StatusEventData,
     "context_usage": ContextUsageEventData,
     "done": DoneEventData,
 }

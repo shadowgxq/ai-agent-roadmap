@@ -10,6 +10,7 @@
       "restoring": "恢复中",
       "starting": "启动中",
       "running": "运行中",
+      "waitingConfirmation": "等待确认",
       "reconnecting": "重连中",
       "completed": "已完成",
       "failed": "失败",
@@ -39,16 +40,26 @@
       "restoringDescription": "正在恢复运行中的任务，请稍候。",
       "startingDescription": "正在创建任务并连接 Agent。",
       "runningDescription": "任务正在运行，执行过程会实时显示在下方。",
+      "waitingConfirmationDescription": "Agent 正在等待你确认是否执行这条命令。",
       "reconnectingDescription": "事件流已中断，任务可能仍在后台运行。",
       "activeConflict": "已有任务正在运行，已切换到该任务的实时过程。",
-      "reconnect": "重新连接"
+      "reconnect": "重新连接",
+      "confirmationLabel": "命令确认",
+      "confirmationCommand": "待执行命令",
+      "confirmationReason": "需要确认的原因",
+      "confirm": "允许执行",
+      "reject": "拒绝执行",
+      "cancel": "取消任务",
+      "cancelling": "取消中"
     },
     "errors": {
       "start": "无法启动 Agent 运行。",
       "event": "Agent 返回了无法读取的事件。",
       "stream": "运行完成前事件流已断开。",
       "history": "无法加载 Session 历史。",
-      "activeRun": "无法重新连接运行中的任务。"
+      "activeRun": "无法重新连接运行中的任务。",
+      "confirm": "确认命令失败，请重试。",
+      "cancel": "取消任务失败，请重试。"
     },
     "timeline": {
       "label": "Agent 事件时间线",
@@ -126,6 +137,7 @@
       "status": {
         "queued": "排队中",
         "running": "运行中",
+        "waitingConfirmation": "等待确认",
         "completed": "已完成",
         "failed": "失败",
         "maxTurns": "达到轮次上限",

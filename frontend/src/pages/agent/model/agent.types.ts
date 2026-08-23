@@ -3,6 +3,7 @@ export const AGENT_EVENT_TYPES = [
   'tool_call',
   'tool_result',
   'diff',
+  'status',
   'context_usage',
   'done',
 ] as const;
@@ -21,6 +22,7 @@ export type RunStatus =
   | 'restoring'
   | 'starting'
   | 'running'
+  | 'waiting_confirmation'
   | 'reconnecting'
   | 'completed'
   | 'failed'
@@ -51,6 +53,7 @@ export type MessageDto = {
 export type StoredRunStatus =
   | 'queued'
   | 'running'
+  | 'waiting_confirmation'
   | 'completed'
   | 'failed'
   | 'max_turns'
@@ -64,6 +67,9 @@ export type RunDto = {
   status: StoredRunStatus;
   created_at: string;
   finished_at: string | null;
+  confirmation_id?: string | null;
+  confirmation_command?: string | null;
+  confirmation_reason?: string | null;
 };
 
 export type SessionDetailDto = {
@@ -98,12 +104,21 @@ export type AgentStoredRun = {
   status: StoredRunStatus;
   createdAt: string;
   finishedAt: string | null;
+  confirmationId?: string | null;
+  confirmationCommand?: string | null;
+  confirmationReason?: string | null;
 };
 
 export type ActiveRunConflict = {
   activeRunId: string;
   sessionId: string;
-  status: Extract<StoredRunStatus, 'queued' | 'running'>;
+  status: Extract<StoredRunStatus, 'queued' | 'running' | 'waiting_confirmation'>;
+};
+
+export type ConfirmationRequest = {
+  confirmationId: string;
+  command: string;
+  reason: string;
 };
 
 export type AgentSessionDetail = {
@@ -163,6 +178,14 @@ export type DiffEventData = {
   files: DiffFileItem[];
 };
 
+export type StatusEventData = {
+  status: Extract<StoredRunStatus, 'queued' | 'running' | 'waiting_confirmation'>;
+  message?: string;
+  confirmation_id?: string;
+  command?: string;
+  reason?: string;
+};
+
 export type ContextUsageEventData = {
   turn: number;
   context_tokens: number | null;
@@ -200,6 +223,7 @@ type AgentEventDataByType = {
   tool_call: ToolCallEventData;
   tool_result: ToolResultEventData;
   diff: DiffEventData;
+  status: StatusEventData;
   context_usage: ContextUsageEventData;
   done: DoneEventData;
 };
@@ -345,6 +369,13 @@ function readDiffFiles(value: unknown): DiffFileItem[] {
   });
 }
 
+function readRunLifecycleStatus(value: unknown): StatusEventData['status'] {
+  if (value !== 'queued' && value !== 'running' && value !== 'waiting_confirmation') {
+    throw new Error('data.status is not a supported lifecycle status');
+  }
+  return value;
+}
+
 export function parseAgentEvent(value: unknown): AgentEvent {
   const envelope = readRecord(value, 'event');
   const sequence = readInteger(envelope.sequence, 'sequence', 0);
@@ -394,6 +425,22 @@ export function parseAgentEvent(value: unknown): AgentEvent {
         data: {
           turn: readInteger(data.turn, 'data.turn', 1),
           files: readDiffFiles(data.files),
+        },
+      };
+    case 'status':
+      return {
+        sequence,
+        runId,
+        type: eventType,
+        data: {
+          status: readRunLifecycleStatus(data.status),
+          message: readOptionalString(data.message, 'data.message'),
+          confirmation_id: readOptionalString(
+            data.confirmation_id,
+            'data.confirmation_id',
+          ),
+          command: readOptionalString(data.command, 'data.command'),
+          reason: readOptionalString(data.reason, 'data.reason'),
         },
       };
     case 'context_usage':

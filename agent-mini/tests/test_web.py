@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from typing import Any
 
 import pytest
@@ -115,16 +116,22 @@ def test_session_run_and_sse_stream(tmp_path) -> None:
 
         events = read_sse_payloads(stream_response.text)
         assert [event["event"] for event in events] == [
+            "status",
+            "status",
             "text",
             "tool_call",
             "tool_result",
             "diff",
             "done",
         ]
-        assert [event["sequence"] for event in events] == [0, 1, 2, 3, 4]
-        assert events[1]["data"]["calls"][0]["tool_use_id"] == "call-1"
-        assert events[2]["data"]["results"][0]["tool_use_id"] == "call-1"
-        assert events[3]["data"]["files"][0]["path"] == "README.md"
+        assert [event["sequence"] for event in events] == [0, 1, 2, 3, 4, 5, 6]
+        assert [event["data"]["status"] for event in events[:2]] == [
+            "queued",
+            "running",
+        ]
+        assert events[3]["data"]["calls"][0]["tool_use_id"] == "call-1"
+        assert events[4]["data"]["results"][0]["tool_use_id"] == "call-1"
+        assert events[5]["data"]["files"][0]["path"] == "README.md"
         assert events[-1]["data"]["status"] == "completed"
 
         detail = client.get(f"/sessions/{session_id}").json()
@@ -197,9 +204,8 @@ def test_runner_failure_becomes_failed_done_event(tmp_path) -> None:
         )
         events = read_sse_payloads(stream_response.text)
 
-        assert len(events) == 1
-        assert events[0]["event"] == "done"
-        assert events[0]["data"] == {
+        assert [event["event"] for event in events] == ["status", "status", "done"]
+        assert events[-1]["data"] == {
             "status": "failed",
             "turn": None,
             "finish_reason": None,
@@ -231,19 +237,118 @@ def test_run_manager_stream_waits_for_live_events(tmp_path) -> None:
                 "data: ", 1
             )[1]
         )
-        assert first["event"] == "text"
+        assert first["event"] == "status"
+        assert first["data"]["status"] == "queued"
         assert state.finished is False
 
-        release.set()
         second = json.loads(
             (await asyncio.wait_for(anext(stream), timeout=1)).split(
                 "data: ", 1
             )[1]
         )
-        assert second["event"] == "done"
+        assert second["event"] == "status"
+        assert second["data"]["status"] == "running"
+
+        third = json.loads(
+            (await asyncio.wait_for(anext(stream), timeout=1)).split(
+                "data: ", 1
+            )[1]
+        )
+        assert third["event"] == "text"
+
+        release.set()
+        fourth = json.loads(
+            (await asyncio.wait_for(anext(stream), timeout=1)).split(
+                "data: ", 1
+            )[1]
+        )
+        assert fourth["event"] == "done"
         assert state.finished is True
 
         with pytest.raises(StopAsyncIteration):
             await anext(stream)
 
     asyncio.run(scenario())
+
+
+def wait_for_active_status(client: TestClient, run_id: str, expected: str) -> dict[str, Any]:
+    """等待后台 Run 进入指定状态，避免测试依赖调度时序。"""
+    deadline = time.monotonic() + 1
+    while time.monotonic() < deadline:
+        active_run = client.get("/runs/active").json()
+        if active_run and active_run["run_id"] == run_id and active_run["status"] == expected:
+            return active_run
+        time.sleep(0.01)
+    raise AssertionError(f"Run 未在限定时间进入状态: {expected}")
+
+
+def test_confirmation_pauses_run_until_web_approval(tmp_path) -> None:
+    async def confirmation_runner(**kwargs: Any) -> None:
+        callback = kwargs["event_callback"]
+        on_confirm = kwargs["on_confirm"]
+        await callback("text", {"turn": 1, "text": "准备执行受保护命令"})
+        approved = await on_confirm("git clean -fd", "命令可能删除未跟踪文件")
+        await callback(
+            "done",
+            {
+                "status": "completed" if approved else "failed",
+                "turn": 1,
+                "finish_reason": "confirmation_test",
+            },
+        )
+
+    app = create_app(
+        workdir=tmp_path,
+        settings=make_test_settings(),
+        runner=confirmation_runner,
+    )
+
+    with TestClient(app) as client:
+        run = client.post("/runs", json={"task": "请求受保护命令"}).json()
+        waiting = wait_for_active_status(client, run["run_id"], "waiting_confirmation")
+        assert waiting["confirmation_command"] == "git clean -fd"
+        assert waiting["confirmation_reason"] == "命令可能删除未跟踪文件"
+
+        confirmation_response = client.post(
+            f"/runs/{run['run_id']}/confirm",
+            json={"approved": True},
+        )
+        assert confirmation_response.status_code == 200
+
+        events = read_sse_payloads(
+            client.get(f"/runs/{run['run_id']}/events").text
+        )
+        assert [event["data"].get("status") for event in events if event["event"] == "status"] == [
+            "queued",
+            "running",
+            "waiting_confirmation",
+            "running",
+        ]
+        assert events[-1]["event"] == "done"
+
+
+def test_cancel_endpoint_closes_active_run(tmp_path) -> None:
+    async def delayed_runner(**kwargs: Any) -> None:
+        await kwargs["event_callback"]("text", {"turn": 1, "text": "运行中"})
+        await asyncio.Event().wait()
+
+    app = create_app(
+        workdir=tmp_path,
+        settings=make_test_settings(),
+        runner=delayed_runner,
+    )
+
+    with TestClient(app) as client:
+        run = client.post("/runs", json={"task": "取消任务"}).json()
+        wait_for_active_status(client, run["run_id"], "running")
+
+        cancel_response = client.post(f"/runs/{run['run_id']}/cancel")
+        assert cancel_response.status_code == 200
+        assert cancel_response.json()["status"] == "cancelled"
+        assert client.get("/runs/active").json() is None
+
+        events = read_sse_payloads(
+            client.get(f"/runs/{run['run_id']}/events").text
+        )
+        assert events[-1]["event"] == "done"
+        assert events[-1]["data"]["status"] == "cancelled"

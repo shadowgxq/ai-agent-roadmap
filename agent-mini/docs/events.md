@@ -21,7 +21,28 @@ Agent Runtime 通过公共事件协议连接 CLI/Web Adapter。日志事件不�
 - `event`：公共事件名称。
 - `data`：与事件类型对应的 payload。
 
-v1 公共事件包括：`text`、`tool_call`、`tool_result`、`diff`、`context_usage`、`done`。
+v1 公共事件包括：`status`、`text`、`tool_call`、`tool_result`、`diff`、`context_usage`、`done`。
+
+## status
+
+Run 的非终态生命周期事件。每次运行会先发布 `queued`，后台执行开始后发布
+`running`；策略命令需要用户批准时暂停为 `waiting_confirmation`。其中等待确认的
+事件会携带命令、原因和一次性 `confirmation_id`，Web/CLI Adapter 通过确认接口恢复它。
+
+```json
+{
+  "sequence": 2,
+  "run_id": "run_123",
+  "event": "status",
+  "data": {
+    "status": "waiting_confirmation",
+    "message": "命令等待用户确认",
+    "confirmation_id": "confirm_abc",
+    "command": "git clean -fd",
+    "reason": "命令可能删除未跟踪文件"
+  }
+}
+```
 
 ## text
 
@@ -175,5 +196,4 @@ Agent 请求执行一个或多个工具。`tool_use_id` 是一次工具调用的
 - `compact_usage` 是内部观测事件，由 Web Adapter 明确过滤。
 - 未知事件属于协议错误，不能通过类型转换静默进入 SSE。
 - v1 不单独发布 `error`；失败统一由 `done(status="failed")` 表达。
-- `confirm_request`、`status` 尚未进入 v1。实现对应能力时，必须同时更新 Python
-  校验、TypeScript 校验、本文档和直接消费者。
+- 新增生命周期或确认动作时，必须同时更新 Python 校验、TypeScript 校验、本文档和直接消费者。

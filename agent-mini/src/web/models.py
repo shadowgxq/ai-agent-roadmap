@@ -13,6 +13,7 @@ MessageKind = Literal["text", "tool_call", "tool_result", "diff"]
 RunStatus = Literal[
     "queued",
     "running",
+    "waiting_confirmation",
     "completed",
     "failed",
     "max_turns",
@@ -58,6 +59,9 @@ class Run(BaseModel):
     status: RunStatus = "queued"
     created_at: datetime = Field(default_factory=utc_now)
     finished_at: datetime | None = None
+    confirmation_id: str | None = None
+    confirmation_command: str | None = None
+    confirmation_reason: str | None = None
 
 
 class SessionDetail(BaseModel):

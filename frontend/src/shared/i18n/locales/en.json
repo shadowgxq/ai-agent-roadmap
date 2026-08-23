@@ -10,6 +10,7 @@
       "restoring": "Restoring",
       "starting": "Starting",
       "running": "Running",
+      "waitingConfirmation": "Waiting for confirmation",
       "reconnecting": "Reconnecting",
       "completed": "Completed",
       "failed": "Failed",
@@ -39,16 +40,26 @@
       "restoringDescription": "Restoring the active task. Please wait.",
       "startingDescription": "Creating the task and connecting to the agent.",
       "runningDescription": "The task is running. Progress will appear below in real time.",
+      "waitingConfirmationDescription": "The agent is waiting for your approval before running this command.",
       "reconnectingDescription": "The event stream disconnected. The task may still be running.",
       "activeConflict": "Another task is already running. Showing its live progress.",
-      "reconnect": "Reconnect"
+      "reconnect": "Reconnect",
+      "confirmationLabel": "Command confirmation",
+      "confirmationCommand": "Command to run",
+      "confirmationReason": "Why confirmation is required",
+      "confirm": "Allow command",
+      "reject": "Reject command",
+      "cancel": "Cancel task",
+      "cancelling": "Cancelling"
     },
     "errors": {
       "start": "Unable to start the agent run.",
       "event": "The agent sent an unreadable event.",
       "stream": "The event stream disconnected before the run finished.",
       "history": "Unable to load session history.",
-      "activeRun": "Unable to reconnect to the active run."
+      "activeRun": "Unable to reconnect to the active run.",
+      "confirm": "Unable to confirm the command. Try again.",
+      "cancel": "Unable to cancel the task. Try again."
     },
     "timeline": {
       "label": "Agent event timeline",
@@ -126,6 +137,7 @@
       "status": {
         "queued": "Queued",
         "running": "Running",
+        "waitingConfirmation": "Waiting for confirmation",
         "completed": "Completed",
         "failed": "Failed",
         "maxTurns": "Max turns",

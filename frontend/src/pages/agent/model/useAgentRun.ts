@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { isApiError } from '../../../shared/api';
 import {
   createAgentEventsUrl,
+  cancelAgentRun,
+  confirmAgentRun,
   createAgentRun,
   createAgentSession,
   getActiveAgentRun,
@@ -15,11 +17,20 @@ import {
   type ActiveRunConflict,
   type AgentEvent,
   type AgentStoredRun,
+  type ConfirmationRequest,
   type RunStatus,
 } from './agent.types';
 
-type ActiveRunTarget = Pick<AgentStoredRun, 'runId' | 'sessionId' | 'status'> & {
-  status: Extract<AgentStoredRun['status'], 'queued' | 'running'>;
+type ActiveRunTarget = Pick<
+  AgentStoredRun,
+  | 'runId'
+  | 'sessionId'
+  | 'status'
+  | 'confirmationId'
+  | 'confirmationCommand'
+  | 'confirmationReason'
+> & {
+  status: Extract<AgentStoredRun['status'], 'queued' | 'running' | 'waiting_confirmation'>;
 };
 
 type AttachRunOptions = {
@@ -46,7 +57,7 @@ function readActiveRunConflict(error: unknown): ActiveRunConflict | null {
   if (
     typeof activeRunId !== 'string' ||
     typeof sessionId !== 'string' ||
-    (status !== 'queued' && status !== 'running')
+    (status !== 'queued' && status !== 'running' && status !== 'waiting_confirmation')
   ) {
     return null;
   }
@@ -55,11 +66,20 @@ function readActiveRunConflict(error: unknown): ActiveRunConflict | null {
 }
 
 function toActiveRunTarget(run: AgentStoredRun): ActiveRunTarget | null {
-  if (run.status !== 'queued' && run.status !== 'running') return null;
+  if (
+    run.status !== 'queued' &&
+    run.status !== 'running' &&
+    run.status !== 'waiting_confirmation'
+  ) {
+    return null;
+  }
   return {
     runId: run.runId,
     sessionId: run.sessionId,
     status: run.status,
+    confirmationId: run.confirmationId,
+    confirmationCommand: run.confirmationCommand,
+    confirmationReason: run.confirmationReason,
   };
 }
 
@@ -72,7 +92,9 @@ function toConflict(target: ActiveRunTarget): ActiveRunConflict {
 }
 
 function toRunStatusFromStored(status: ActiveRunTarget['status']): RunStatus {
-  return status === 'queued' ? 'starting' : 'running';
+  if (status === 'queued') return 'starting';
+  if (status === 'waiting_confirmation') return 'waiting_confirmation';
+  return 'running';
 }
 
 function insertEventInSequence(currentEvents: AgentEvent[], event: AgentEvent) {
@@ -94,6 +116,9 @@ export function useAgentRun() {
   const [status, setStatus] = useState<RunStatus>('restoring');
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<ActiveRunConflict | null>(null);
+  const [confirmation, setConfirmation] = useState<ConfirmationRequest | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const sourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const runIdRef = useRef<string | null>(null);
@@ -114,6 +139,15 @@ export function useAgentRun() {
         isStartingRef.current = true;
         setError(null);
         setConflict(null);
+        setConfirmation(
+          target.confirmationId && target.confirmationCommand && target.confirmationReason
+            ? {
+                confirmationId: target.confirmationId,
+                command: target.confirmationCommand,
+                reason: target.confirmationReason,
+              }
+            : null,
+        );
         setStatus(toRunStatusFromStored(target.status));
         return;
       }
@@ -127,6 +161,15 @@ export function useAgentRun() {
       setRunId(target.runId);
       setError(null);
       setConflict(null);
+      setConfirmation(
+        target.confirmationId && target.confirmationCommand && target.confirmationReason
+          ? {
+              confirmationId: target.confirmationId,
+              command: target.confirmationCommand,
+              reason: target.confirmationReason,
+            }
+          : null,
+      );
       setStatus(phase ?? toRunStatusFromStored(target.status));
 
       if (!preserveEvents) {
@@ -156,9 +199,31 @@ export function useAgentRun() {
             hasFinishedRef.current = true;
             isStartingRef.current = false;
             setConflict(null);
+            setConfirmation(null);
+            setIsCancelling(false);
+            setIsConfirming(false);
             setStatus(nextStatus);
             source.close();
             sourceRef.current = null;
+            return;
+          }
+
+          if (event.type === 'status') {
+            if (
+              event.data.status === 'waiting_confirmation' &&
+              event.data.confirmation_id &&
+              event.data.command &&
+              event.data.reason
+            ) {
+              setConfirmation({
+                confirmationId: event.data.confirmation_id,
+                command: event.data.command,
+                reason: event.data.reason,
+              });
+            } else if (event.data.status !== 'waiting_confirmation') {
+              setConfirmation(null);
+            }
+            setStatus(toRunStatusFromStored(event.data.status));
             return;
           }
 
@@ -268,7 +333,12 @@ export function useAgentRun() {
         attachRun({
           runId: createdRun.runId,
           sessionId: createdRun.sessionId,
-          status: 'running',
+          status:
+            createdRun.status === 'waiting_confirmation'
+              ? 'waiting_confirmation'
+              : createdRun.status === 'running'
+                ? 'running'
+                : 'queued',
         });
       } catch (startError) {
         const activeRunConflict = readActiveRunConflict(startError);
@@ -321,6 +391,38 @@ export function useAgentRun() {
     }
   }, [attachRun, t]);
 
+  const confirmRun = useCallback(
+    async (approved: boolean) => {
+      const activeRunId = runIdRef.current;
+      if (!activeRunId || !confirmation || isConfirming) return;
+
+      setIsConfirming(true);
+      setError(null);
+      try {
+        await confirmAgentRun(activeRunId, approved);
+      } catch (confirmError) {
+        setError(getErrorMessage(confirmError, t('agent.errors.confirm')));
+      } finally {
+        setIsConfirming(false);
+      }
+    },
+    [confirmation, isConfirming, t],
+  );
+
+  const cancelRun = useCallback(async () => {
+    const activeRunId = runIdRef.current;
+    if (!activeRunId || isCancelling || hasFinishedRef.current) return;
+
+    setIsCancelling(true);
+    setError(null);
+    try {
+      await cancelAgentRun(activeRunId);
+    } catch (cancelError) {
+      setError(getErrorMessage(cancelError, t('agent.errors.cancel')));
+      setIsCancelling(false);
+    }
+  }, [isCancelling, t]);
+
   const resetRun = useCallback(() => {
     activeLookupVersionRef.current += 1;
     closeSource();
@@ -334,6 +436,9 @@ export function useAgentRun() {
     setRunId(null);
     setError(null);
     setConflict(null);
+    setConfirmation(null);
+    setIsConfirming(false);
+    setIsCancelling(false);
     setStatus('idle');
   }, [closeSource]);
 
@@ -353,6 +458,9 @@ export function useAgentRun() {
       setRunId(null);
       setError(null);
       setConflict(null);
+      setConfirmation(null);
+      setIsConfirming(false);
+      setIsCancelling(false);
       setStatus('idle');
     },
     [closeSource],
@@ -360,6 +468,8 @@ export function useAgentRun() {
 
   return {
     canReconnect: Boolean(conflict) || status === 'reconnecting',
+    cancelRun,
+    confirmation,
     conflict,
     error,
     events,
@@ -367,7 +477,11 @@ export function useAgentRun() {
       status === 'restoring' ||
       status === 'starting' ||
       status === 'running' ||
+      status === 'waiting_confirmation' ||
       status === 'reconnecting',
+    isCancelling,
+    isConfirming,
+    confirmRun,
     reconnectActiveRun,
     resetRun,
     resumeSession,

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '../../../shared/i18n';
 import {
+  cancelAgentRun,
+  confirmAgentRun,
   createAgentEventsUrl,
   createAgentRun,
   createAgentSession,
@@ -14,6 +16,8 @@ import { useAgentRun } from './useAgentRun';
 import type { AgentStoredRun } from './agent.types';
 
 vi.mock('./agent.api', () => ({
+  cancelAgentRun: vi.fn(),
+  confirmAgentRun: vi.fn(),
   createAgentEventsUrl: vi.fn(),
   createAgentRun: vi.fn(),
   createAgentSession: vi.fn(),
@@ -69,6 +73,8 @@ describe('useAgentRun', () => {
     });
     vi.mocked(createAgentEventsUrl).mockReturnValue('/runs/run-1/events');
     vi.mocked(getActiveAgentRun).mockResolvedValue(null);
+    vi.mocked(cancelAgentRun).mockResolvedValue(undefined);
+    vi.mocked(confirmAgentRun).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -87,9 +93,15 @@ describe('useAgentRun', () => {
 
     const source = FakeEventSource.instances[0];
     expect(source.url).toBe('/runs/run-1/events');
-    expect(result.current.status).toBe('running');
+    expect(result.current.status).toBe('starting');
 
     await act(async () => {
+      source.emit('status', {
+        sequence: 1,
+        run_id: 'run-1',
+        event: 'status',
+        data: { status: 'running' },
+      });
       source.emit('text', {
         sequence: 2,
         run_id: 'run-1',
@@ -110,7 +122,7 @@ describe('useAgentRun', () => {
       });
     });
 
-    expect(result.current.events.map((event) => event.sequence)).toEqual([0, 2]);
+    expect(result.current.events.map((event) => event.sequence)).toEqual([0, 1, 2]);
     expect(result.current.events[0].data).toEqual({ turn: 1, text: '开始' });
 
     await act(async () => {
@@ -125,6 +137,80 @@ describe('useAgentRun', () => {
     expect(result.current.status).toBe('completed');
     expect(result.current.isPending).toBe(false);
     expect(source.closed).toBe(true);
+  });
+
+  it('shows a confirmation request and sends the approval decision', async () => {
+    const { result } = renderHook(() => useAgentRun(), {
+      wrapper: TestWrapper,
+    });
+
+    await act(async () => {
+      await result.current.startRun('执行受保护命令');
+    });
+    const source = FakeEventSource.instances[0];
+
+    await act(async () => {
+      source.emit('status', {
+        sequence: 0,
+        run_id: 'run-1',
+        event: 'status',
+        data: {
+          status: 'waiting_confirmation',
+          confirmation_id: 'confirm-1',
+          command: 'git clean -fd',
+          reason: '可能删除未跟踪文件',
+        },
+      });
+    });
+
+    expect(result.current.status).toBe('waiting_confirmation');
+    expect(result.current.confirmation).toEqual({
+      confirmationId: 'confirm-1',
+      command: 'git clean -fd',
+      reason: '可能删除未跟踪文件',
+    });
+
+    await act(async () => {
+      await result.current.confirmRun(true);
+    });
+    expect(confirmAgentRun).toHaveBeenCalledWith('run-1', true);
+
+    await act(async () => {
+      source.emit('status', {
+        sequence: 1,
+        run_id: 'run-1',
+        event: 'status',
+        data: { status: 'running' },
+      });
+    });
+    expect(result.current.confirmation).toBeNull();
+    expect(result.current.status).toBe('running');
+  });
+
+  it('keeps cancellation pending until the cancelled terminal event arrives', async () => {
+    const { result } = renderHook(() => useAgentRun(), {
+      wrapper: TestWrapper,
+    });
+
+    await act(async () => {
+      await result.current.startRun('取消当前任务');
+      await result.current.cancelRun();
+    });
+
+    expect(cancelAgentRun).toHaveBeenCalledWith('run-1');
+    expect(result.current.isCancelling).toBe(true);
+
+    await act(async () => {
+      FakeEventSource.instances[0].emit('done', {
+        sequence: 0,
+        run_id: 'run-1',
+        event: 'done',
+        data: { status: 'cancelled' },
+      });
+    });
+
+    expect(result.current.status).toBe('interrupted');
+    expect(result.current.isCancelling).toBe(false);
   });
 
   it('turns an SSE connection error into a reconnectable run', async () => {

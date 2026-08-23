@@ -43,6 +43,9 @@ class RunState:
     finished: bool = False
     finished_at: datetime | None = None
     pending_tool_use_ids: set[str] = field(default_factory=set)
+    execution_task: asyncio.Task[None] | None = None
+    cancel_requested: bool = False
+    pending_confirmation: "ConfirmationState | None" = None
 
     def to_model(self) -> Run:
         """把可变运行状态转换为 API/历史使用的 Run 模型。"""
@@ -54,7 +57,32 @@ class RunState:
             status=self.status,
             created_at=self.created_at,
             finished_at=self.finished_at,
+            confirmation_id=(
+                self.pending_confirmation.confirmation_id
+                if self.pending_confirmation is not None
+                else None
+            ),
+            confirmation_command=(
+                self.pending_confirmation.command
+                if self.pending_confirmation is not None
+                else None
+            ),
+            confirmation_reason=(
+                self.pending_confirmation.reason
+                if self.pending_confirmation is not None
+                else None
+            ),
         )
+
+
+@dataclass
+class ConfirmationState:
+    """一次等待用户批准的 Shell 命令。"""
+
+    confirmation_id: str
+    command: str
+    reason: str
+    future: asyncio.Future[bool]
 
 
 class RunManager:
@@ -159,8 +187,9 @@ class RunManager:
             created_at=utc_now(),
         )
         self._runs[state.run_id] = state
-        # 任务以 202 形式立即返回；queued -> running 的转换由后台协程负责。
-        asyncio.create_task(
+        # 先把 queued 作为首个可回放状态发布，再由后台协程切换到 running。
+        await self._publish(state, "status", {"status": "queued"})
+        state.execution_task = asyncio.create_task(
             self._execute(state),
             name=f"agent-{state.run_id}",
         )
@@ -179,6 +208,44 @@ class RunManager:
             if not state.finished:
                 return state.to_model()
         return None
+
+    async def confirm(self, run_id: str, approved: bool) -> RunState:
+        """完成当前等待中的命令确认。"""
+        state = self.get(run_id)
+        confirmation = state.pending_confirmation
+        if confirmation is None or state.status != "waiting_confirmation":
+            raise ValueError("当前 Run 没有等待确认的命令")
+        if not confirmation.future.done():
+            confirmation.future.set_result(approved)
+        return state
+
+    async def cancel(self, run_id: str) -> RunState:
+        """请求取消 Run，并保证最终通过 cancelled done 收束。"""
+        state = self.get(run_id)
+        if state.finished:
+            return state
+
+        state.cancel_requested = True
+        if state.pending_confirmation is not None:
+            future = state.pending_confirmation.future
+            if not future.done():
+                future.set_result(False)
+
+        task = state.execution_task
+        if state.status == "queued" and not state.finished:
+            await self._publish(
+                state,
+                "done",
+                {"status": "cancelled"},
+            )
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                # 取消语义已经由 _execute 转成 cancelled done；这里等待清理完成后再返回 API。
+                pass
+        return state
 
     async def stream(self, run_id: str) -> AsyncIterator[str]:
         """先回放已保存事件，再等待队列中的新事件。"""
@@ -301,6 +368,8 @@ class RunManager:
         self._update_tool_pairing(state, item)
         self._record_event_message(state, item.event, item.data)
         state.events.append(item)
+        if event == "status":
+            state.status = item.data["status"]
         if event == "done":
             # done 是唯一终态；标记 finished 后，stream 会在发完最后一个事件时自然退出。
             status = item.data["status"]
@@ -370,8 +439,16 @@ class RunManager:
 
     async def _execute(self, state: RunState) -> None:
         """桥接 Agent Runtime 与 Web Adapter，并把异常统一收束为终态事件。"""
-        state.status = "running"
-        self._touch_session(state.session_id)
+        if state.cancel_requested:
+            if not state.finished:
+                await self._publish(
+                    state,
+                    "done",
+                    {"status": "cancelled"},
+                )
+            return
+
+        await self._publish(state, "status", {"status": "running"})
 
         async def publish(
             event: AgentEventName,
@@ -383,6 +460,41 @@ class RunManager:
                 return
             await self._publish(state, event_type, data)
 
+        async def request_confirmation(command: str, reason: str) -> bool:
+            """暂停 Runtime，等待 Web/CLI Adapter 通过 Manager 回答。"""
+            if state.cancel_requested or state.finished:
+                return False
+            loop = asyncio.get_running_loop()
+            confirmation = ConfirmationState(
+                confirmation_id=uuid4().hex,
+                command=command,
+                reason=reason,
+                future=loop.create_future(),
+            )
+            state.pending_confirmation = confirmation
+            await self._publish(
+                state,
+                "status",
+                {
+                    "status": "waiting_confirmation",
+                    "message": "命令等待用户确认",
+                    "confirmation_id": confirmation.confirmation_id,
+                    "command": command,
+                    "reason": reason,
+                },
+            )
+            try:
+                return await confirmation.future
+            finally:
+                if state.pending_confirmation is confirmation:
+                    state.pending_confirmation = None
+                if not state.finished and not state.cancel_requested:
+                    await self._publish(
+                        state,
+                        "status",
+                        {"status": "running"},
+                    )
+
         try:
             await self.runner(
                 task=state.task,
@@ -393,6 +505,7 @@ class RunManager:
                 message_id=state.message_id,
                 checkpoint_enabled=True,
                 event_callback=publish,
+                on_confirm=request_confirmation,
             )
         except MaxTurnsExceeded as exc:
             # Runtime 用异常跳出循环时，仍转换成前端可消费的标准 done 事件。

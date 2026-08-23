@@ -44,6 +44,9 @@ function toAgentStoredRun(dto: RunDto): AgentStoredRun {
     status: dto.status,
     createdAt: dto.created_at,
     finishedAt: dto.finished_at,
+    confirmationId: dto.confirmation_id,
+    confirmationCommand: dto.confirmation_command,
+    confirmationReason: dto.confirmation_reason,
   };
 }
 
@@ -106,6 +109,21 @@ export async function createAgentRun(sessionId: string, task: string) {
     sessionId: response.session_id,
     status: response.status,
   };
+}
+
+export async function confirmAgentRun(runId: string, approved: boolean) {
+  await request<RunDto, { approved: boolean }>({
+    method: 'POST',
+    url: `/runs/${encodeURIComponent(runId)}/confirm`,
+    data: { approved },
+  });
+}
+
+export async function cancelAgentRun(runId: string) {
+  await request<RunDto>({
+    method: 'POST',
+    url: `/runs/${encodeURIComponent(runId)}/cancel`,
+  });
 }
 
 export function createAgentEventsUrl(runId: string) {

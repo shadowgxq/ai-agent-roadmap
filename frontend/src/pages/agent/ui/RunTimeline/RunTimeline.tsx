@@ -1,60 +1,36 @@
-import { Activity, AlertCircle, CheckCircle2, Circle, Terminal, Wrench } from 'lucide-react';
+import { Activity, AlertCircle, CheckCircle2, Circle, Wrench } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AgentEvent } from '../../model';
+import { ToolCallCard } from '../ToolCallCard';
+import type { NonToolAgentEvent, RunTimelineItem } from './toolCallState.utils';
+import { buildTimelineItems } from './toolCallState.utils';
 import styles from './RunTimeline.module.css';
 
 type RunTimelineProps = {
   events: AgentEvent[];
 };
 
-function eventTitle(type: AgentEvent['type'], t: (key: string) => string) {
-  const labels = {
+type Translate = (key: string) => string;
+
+function eventTitle(type: NonToolAgentEvent['type'], t: Translate) {
+  const labels: Record<NonToolAgentEvent['type'], string> = {
     text: t('agent.timeline.text'),
-    tool_call: t('agent.timeline.toolCall'),
-    tool_result: t('agent.timeline.toolResult'),
     context_usage: t('agent.timeline.contextUsage'),
     done: t('agent.timeline.done'),
-  } as const;
+  };
   return labels[type];
 }
 
-function EventIcon({ type }: { type: AgentEvent['type'] }) {
+function EventIcon({ type }: { type: NonToolAgentEvent['type'] }) {
   if (type === 'text') return <Circle size={16} aria-hidden="true" />;
-  if (type === 'tool_call') return <Wrench size={16} aria-hidden="true" />;
-  if (type === 'tool_result') return <Terminal size={16} aria-hidden="true" />;
   if (type === 'context_usage') return <Activity size={16} aria-hidden="true" />;
   return <CheckCircle2 size={16} aria-hidden="true" />;
 }
 
-function EventBody({ event }: { event: AgentEvent }) {
+function EventBody({ event }: { event: NonToolAgentEvent }) {
   if (event.type === 'text') {
     return <p className={styles.text}>{event.data.text}</p>;
-  }
-
-  if (event.type === 'tool_call') {
-    return (
-      <div className={styles.detailList}>
-        {event.data.calls.map((call) => (
-          <div className={styles.detailRow} key={call.tool_use_id}>
-            <strong>{call.name}</strong>
-            <code>{call.arguments}</code>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (event.type === 'tool_result') {
-    return (
-      <div className={styles.detailList}>
-        {event.data.results.map((result) => (
-          <pre className={styles.result} key={result.tool_use_id}>
-            {result.content}
-          </pre>
-        ))}
-      </div>
-    );
   }
 
   if (event.type === 'context_usage') {
@@ -87,8 +63,46 @@ function EventBody({ event }: { event: AgentEvent }) {
   );
 }
 
+function TimelineListItem({ item, t }: { item: RunTimelineItem; t: Translate }) {
+  if (item.kind === 'tool') {
+    return (
+      <li className={styles.item}>
+        <div className={styles.marker} aria-hidden="true">
+          <Wrench size={16} />
+        </div>
+        <div className={styles.eventContent}>
+          <ToolCallCard tool={item.tool} />
+        </div>
+      </li>
+    );
+  }
+
+  const { event } = item;
+  return (
+    <li className={styles.item}>
+      <div className={styles.marker} aria-hidden="true">
+        <EventIcon type={event.type} />
+      </div>
+      <div className={styles.eventContent}>
+        <div className={styles.eventHeader}>
+          <h3>{eventTitle(event.type, t)}</h3>
+          <span>#{event.sequence + 1}</span>
+        </div>
+        <EventBody event={event} />
+      </div>
+    </li>
+  );
+}
+
+function timelineItemKey(item: RunTimelineItem) {
+  return item.kind === 'tool'
+    ? `tool-${item.tool.toolUseId}-${item.tool.sequence}`
+    : `${item.event.runId}-${item.event.sequence}`;
+}
+
 export function RunTimeline({ events }: RunTimelineProps) {
   const { t } = useTranslation();
+  const timelineItems = buildTimelineItems(events);
 
   if (events.length === 0) {
     return (
@@ -107,22 +121,11 @@ export function RunTimeline({ events }: RunTimelineProps) {
           <p className={styles.eyebrow}>{t('agent.timeline.eyebrow')}</p>
           <h2 className={styles.title}>{t('agent.timeline.title')}</h2>
         </div>
-        <span className={styles.count}>{events.length}</span>
+        <span className={styles.count}>{timelineItems.length}</span>
       </div>
       <ol className={styles.list}>
-        {events.map((event) => (
-          <li className={styles.item} key={`${event.runId}-${event.sequence}`}>
-            <div className={styles.marker} aria-hidden="true">
-              <EventIcon type={event.type} />
-            </div>
-            <div className={styles.eventContent}>
-              <div className={styles.eventHeader}>
-                <h3>{eventTitle(event.type, t)}</h3>
-                <span>#{event.sequence + 1}</span>
-              </div>
-              <EventBody event={event} />
-            </div>
-          </li>
+        {timelineItems.map((item) => (
+          <TimelineListItem item={item} key={timelineItemKey(item)} t={t} />
         ))}
       </ol>
     </section>

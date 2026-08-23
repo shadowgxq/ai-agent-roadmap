@@ -17,8 +17,10 @@ export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
 export type AgentTerminalStatus = (typeof AGENT_TERMINAL_STATUSES)[number];
 export type RunStatus =
   | 'idle'
+  | 'restoring'
   | 'starting'
   | 'running'
+  | 'reconnecting'
   | 'completed'
   | 'failed'
   | 'interrupted';
@@ -34,11 +36,86 @@ export type SessionDto = {
   updated_at: string;
 };
 
+export type MessageDto = {
+  message_id: string;
+  session_id: string;
+  run_id: string;
+  role: 'user' | 'assistant' | 'tool';
+  kind: 'text' | 'tool_call' | 'tool_result';
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type StoredRunStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'max_turns'
+  | 'cancelled';
+
+export type RunDto = {
+  run_id: string;
+  session_id: string;
+  message_id: string;
+  task: string;
+  status: StoredRunStatus;
+  created_at: string;
+  finished_at: string | null;
+};
+
+export type SessionDetailDto = {
+  session: SessionDto;
+  runs: RunDto[];
+  messages: MessageDto[];
+};
+
+export type AgentSession = {
+  sessionId: string;
+  status: SessionDto['status'];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentMessage = {
+  messageId: string;
+  sessionId: string;
+  runId: string;
+  role: MessageDto['role'];
+  kind: MessageDto['kind'];
+  content: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type AgentStoredRun = {
+  runId: string;
+  sessionId: string;
+  messageId: string;
+  task: string;
+  status: StoredRunStatus;
+  createdAt: string;
+  finishedAt: string | null;
+};
+
+export type ActiveRunConflict = {
+  activeRunId: string;
+  sessionId: string;
+  status: Extract<StoredRunStatus, 'queued' | 'running'>;
+};
+
+export type AgentSessionDetail = {
+  session: AgentSession;
+  runs: AgentStoredRun[];
+  messages: AgentMessage[];
+};
+
 export type RunCreatedDto = {
   run_id: string;
   session_id: string;
   message_id: string;
-  status: string;
+  status: StoredRunStatus;
 };
 
 export type TextEventData = {
@@ -60,6 +137,7 @@ export type ToolCallEventData = {
 export type ToolResultItem = {
   tool_use_id: string;
   content: string;
+  is_error: boolean;
 };
 
 export type ToolResultEventData = {
@@ -81,6 +159,22 @@ export type DoneEventData = {
   finish_reason?: string;
   error?: string;
   max_turns?: number;
+};
+
+export type ToolCallStatus = 'running' | 'success' | 'failed';
+export type ToolCallWarning =
+  | 'missing_call'
+  | 'missing_result'
+  | 'duplicate_call'
+  | 'duplicate_result';
+
+export type ToolCallCardModel = {
+  toolUseId: string;
+  call: ToolCallItem | null;
+  result: ToolResultItem | null;
+  sequence: number;
+  status: ToolCallStatus;
+  warning?: ToolCallWarning;
 };
 
 type AgentEventDataByType = {
@@ -205,6 +299,7 @@ function readToolResults(value: unknown): ToolResultItem[] {
     return {
       tool_use_id: readString(result.tool_use_id, `data.results[${index}].tool_use_id`),
       content: readStringValue(result.content, `data.results[${index}].content`),
+      is_error: readBoolean(result.is_error, `data.results[${index}].is_error`),
     };
   });
 }
@@ -297,7 +392,7 @@ export function parseAgentEvent(value: unknown): AgentEvent {
 
 export function toRunStatus(
   value: AgentTerminalStatus,
-): Exclude<RunStatus, 'idle' | 'starting' | 'running'> {
+): Exclude<RunStatus, 'idle' | 'restoring' | 'starting' | 'running' | 'reconnecting'> {
   if (value === 'completed') return 'completed';
   if (value === 'cancelled') return 'interrupted';
   return 'failed';

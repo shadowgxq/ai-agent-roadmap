@@ -7,8 +7,10 @@
     "title": "Run a task against your project",
     "status": {
       "idle": "Ready",
+      "restoring": "Restoring",
       "starting": "Starting",
       "running": "Running",
+      "reconnecting": "Reconnecting",
       "completed": "Completed",
       "failed": "Failed",
       "interrupted": "Interrupted"
@@ -17,10 +19,13 @@
       "eyebrow": "Task input",
       "title": "Describe the work",
       "label": "Task",
+      "helper": "Input is locked while a run is active; reset the session to start with fresh context.",
       "placeholder": "Ask the agent to inspect, change, and verify a project...",
       "run": "Run agent",
       "running": "Running",
-      "newRun": "New run"
+      "ready": "Ready",
+      "shortcuts": "Enter to send · Shift+Enter for a new line",
+      "newSession": "New session"
     },
     "run": {
       "label": "Agent run",
@@ -29,12 +34,21 @@
       "sessionNotStarted": "No session created",
       "id": "Run ID",
       "notStarted": "No run started",
-      "live": "Live"
+      "live": "Live",
+      "conflictStatus": "Another task is already running",
+      "restoringDescription": "Restoring the active task. Please wait.",
+      "startingDescription": "Creating the task and connecting to the agent.",
+      "runningDescription": "The task is running. Progress will appear below in real time.",
+      "reconnectingDescription": "The event stream disconnected. The task may still be running.",
+      "activeConflict": "Another task is already running. Showing its live progress.",
+      "reconnect": "Reconnect"
     },
     "errors": {
       "start": "Unable to start the agent run.",
       "event": "The agent sent an unreadable event.",
-      "stream": "The event stream disconnected before the run finished."
+      "stream": "The event stream disconnected before the run finished.",
+      "history": "Unable to load session history.",
+      "activeRun": "Unable to reconnect to the active run."
     },
     "timeline": {
       "label": "Agent event timeline",
@@ -47,6 +61,60 @@
       "done": "Run finished",
       "emptyTitle": "No events yet",
       "emptyDescription": "Start a run to watch the agent inspect the project and report each step."
+    },
+    "tool": {
+      "eyebrow": "Tool call",
+      "id": "Call ID",
+      "unknownName": "Unknown tool",
+      "arguments": "Arguments",
+      "result": "Result",
+      "waiting": "Waiting for the tool result...",
+      "missingCall": "No matching tool call was found",
+      "status": {
+        "running": "Running",
+        "success": "Succeeded",
+        "failed": "Failed"
+      },
+      "warning": {
+        "missingCall": "The result has no matching tool call",
+        "missingResult": "The tool call has no result",
+        "duplicateCall": "A duplicate tool call ID was received",
+        "duplicateResult": "A duplicate tool result was received"
+      }
+    },
+    "history": {
+      "label": "Session history",
+      "eyebrow": "Stored History",
+      "title": "Session history",
+      "refresh": "Refresh session history",
+      "refreshAction": "Refresh",
+      "open": "View sessions",
+      "close": "Back to run",
+      "loading": "Loading session history...",
+      "sessions": "Session list",
+      "empty": "No stored sessions yet",
+      "activeHint": "Current task",
+      "selectTitle": "Select a session",
+      "selectDescription": "Choose a session from the history to view its runs and messages.",
+      "detailEyebrow": "Current Session",
+      "runCount": "runs",
+      "runs": "Runs",
+      "noRuns": "This session has no runs yet",
+      "messages": "Messages",
+      "noMessages": "This session has no messages yet",
+      "roles": {
+        "user": "User",
+        "assistant": "Agent",
+        "tool": "Tool"
+      },
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed",
+        "maxTurns": "Max turns",
+        "cancelled": "Cancelled"
+      }
     }
   },
   "errors": {

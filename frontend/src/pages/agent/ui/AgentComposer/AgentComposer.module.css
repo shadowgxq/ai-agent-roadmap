@@ -1,19 +1,31 @@
 .root {
   display: grid;
-  gap: var(--space-5);
-  padding: 20px;
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-md);
 }
 
 .header,
-.actions {
+.heading,
+.headerActions,
+.inputMeta,
+.inputFooter {
   display: flex;
   align-items: center;
+}
+
+.header,
+.inputMeta,
+.inputFooter {
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+.heading {
+  min-width: 0;
 }
 
 .eyebrow {
@@ -28,16 +40,25 @@
 .title {
   margin: var(--space-1) 0 0;
   color: var(--color-text);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-tight);
 }
 
-.count {
-  align-self: flex-start;
+.headerActions {
+  flex: 0 0 auto;
+  gap: var(--space-2);
+}
+
+.count,
+.shortcuts,
+.statusHint {
   color: var(--color-muted);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
+}
+
+.count {
   white-space: nowrap;
 }
 
@@ -46,21 +67,53 @@
   gap: var(--space-2);
 }
 
+.inputMeta {
+  min-height: 24px;
+}
+
 .label {
   color: var(--color-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
 }
 
+.statusHint {
+  color: var(--color-primary-strong);
+  font-family: var(--font-family-base);
+}
+
+.inputShell {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-background) 82%, var(--color-surface));
+  transition:
+    border-color 160ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.inputShell:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-focus-ring) 22%, transparent);
+}
+
+.inputShell[data-pending='true'] {
+  background: color-mix(in srgb, var(--color-background) 92%, var(--color-surface));
+}
+
 .textarea {
   width: 100%;
-  min-height: 196px;
-  resize: vertical;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  min-height: 48px;
+  max-height: 220px;
+  resize: none;
+  overflow-y: hidden;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
   outline: 0;
-  background: color-mix(in srgb, var(--color-background) 84%, var(--color-surface));
+  background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-md);
   line-height: var(--leading-relaxed);
@@ -71,26 +124,36 @@
   opacity: 0.85;
 }
 
-.textarea:focus-visible {
-  border-color: var(--color-primary);
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
 .textarea:disabled {
   cursor: wait;
   opacity: 0.65;
 }
 
-.actions {
-  justify-content: flex-start;
-  flex-wrap: wrap;
+.inputFooter {
+  align-items: flex-end;
+  min-width: 0;
+  padding: 0 var(--space-1) var(--space-1);
+}
+
+.helper {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+
+.shortcuts {
+  margin: 0;
+  line-height: var(--leading-normal);
 }
 
 .primaryButton,
 .secondaryButton {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 44px;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
@@ -99,6 +162,7 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     background 160ms ease-out,
     border-color 160ms ease-out,
@@ -142,7 +206,13 @@
 }
 
 .spin {
-  animation: spin 900ms linear infinite;
+  animation: composer-spin 900ms linear infinite;
+}
+
+@keyframes composer-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -151,8 +221,22 @@
   }
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+@media (max-width: 560px) {
+  .header {
+    align-items: flex-start;
+  }
+
+  .headerActions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .inputFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton {
+    width: 100%;
   }
 }

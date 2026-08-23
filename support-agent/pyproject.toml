@@ -1,0 +1,29 @@
+[project]
+name = "support-agent"
+version = "0.1.0"
+description = "An enterprise support agent built with LangChain and LangGraph"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=1.0.0",
+    "langchain-openai>=1.0.0",
+    "langgraph>=1.0.0",
+    "pydantic-settings>=2.10.1",
+]
+
+[project.scripts]
+support-agent = "support_agent.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+package = true

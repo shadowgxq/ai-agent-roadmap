@@ -41,4 +41,32 @@ describe('normalizeApiError', () => {
     expect(isApiError(apiError)).toBe(true);
     expect(apiError.message).toBe('Forbidden');
   });
+
+  it('reads structured FastAPI detail payloads', () => {
+    const response: AxiosResponse = {
+      config: {
+        headers: new AxiosHeaders(),
+      },
+      data: {
+        detail: {
+          code: 'active_run',
+          message: 'Another run is active',
+          active_run_id: 'run-1',
+        },
+      },
+      headers: {},
+      status: 409,
+      statusText: 'Conflict',
+    };
+    const error = AxiosError.from(new Error('Request failed'), undefined, undefined, undefined, response);
+
+    expect(normalizeApiError(error)).toMatchObject({
+      message: 'Another run is active',
+      status: 409,
+      code: 'active_run',
+      details: {
+        active_run_id: 'run-1',
+      },
+    });
+  });
 });

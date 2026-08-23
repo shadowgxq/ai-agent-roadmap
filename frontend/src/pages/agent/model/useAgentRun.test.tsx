@@ -1,16 +1,23 @@
 import type { PropsWithChildren } from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '../../../shared/i18n';
-import { createAgentEventsUrl, createAgentRun, createAgentSession } from './agent.api';
+import {
+  createAgentEventsUrl,
+  createAgentRun,
+  createAgentSession,
+  getActiveAgentRun,
+} from './agent.api';
 import { useAgentRun } from './useAgentRun';
+import type { AgentStoredRun } from './agent.types';
 
 vi.mock('./agent.api', () => ({
   createAgentEventsUrl: vi.fn(),
   createAgentRun: vi.fn(),
   createAgentSession: vi.fn(),
+  getActiveAgentRun: vi.fn(),
 }));
 
 class FakeEventSource {
@@ -61,6 +68,7 @@ describe('useAgentRun', () => {
       status: 'queued',
     });
     vi.mocked(createAgentEventsUrl).mockReturnValue('/runs/run-1/events');
+    vi.mocked(getActiveAgentRun).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -119,7 +127,7 @@ describe('useAgentRun', () => {
     expect(source.closed).toBe(true);
   });
 
-  it('turns an SSE connection error into a failed run', async () => {
+  it('turns an SSE connection error into a reconnectable run', async () => {
     const { result } = renderHook(() => useAgentRun(), {
       wrapper: TestWrapper,
     });
@@ -131,11 +139,129 @@ describe('useAgentRun', () => {
     const source = FakeEventSource.instances[0] as FakeEventSource & {
       onerror?: () => void;
     };
-    source.onerror?.();
+    act(() => {
+      source.onerror?.();
+    });
 
-    expect(result.current.status).toBe('failed');
+    expect(result.current.status).toBe('reconnecting');
     expect(result.current.error).toBeTruthy();
+    expect(result.current.canReconnect).toBe(true);
     expect(source.closed).toBe(true);
+  });
+
+  it('restores an active run and reconnects to its event stream', async () => {
+    const activeRun: AgentStoredRun = {
+      runId: 'run-active',
+      sessionId: 'session-active',
+      messageId: 'message-active',
+      task: '恢复中的任务',
+      status: 'running',
+      createdAt: '2026-08-21T00:00:00.000Z',
+      finishedAt: null,
+    };
+    vi.mocked(getActiveAgentRun).mockResolvedValue(activeRun);
+    vi.mocked(createAgentEventsUrl).mockReturnValue('/runs/run-active/events');
+
+    const { result } = renderHook(() => useAgentRun(), {
+      wrapper: TestWrapper,
+    });
+
+    await waitFor(() => expect(result.current.runId).toBe('run-active'));
+    expect(result.current.status).toBe('restoring');
+    expect(result.current.sessionId).toBe('session-active');
+    expect(result.current.runId).toBe('run-active');
+    expect(FakeEventSource.instances[0].url).toBe('/runs/run-active/events');
+
+    await act(async () => {
+      FakeEventSource.instances[0].emit('text', {
+        sequence: 0,
+        run_id: 'run-active',
+        event: 'text',
+        data: { turn: 1, text: '已恢复' },
+      });
+    });
+
+    expect(result.current.status).toBe('running');
+  });
+
+  it('reconnects to the same active run after the event stream disconnects', async () => {
+    const activeRun: AgentStoredRun = {
+      runId: 'run-1',
+      sessionId: 'session-1',
+      messageId: 'message-active',
+      task: '恢复中的任务',
+      status: 'running',
+      createdAt: '2026-08-21T00:00:00.000Z',
+      finishedAt: null,
+    };
+    const { result } = renderHook(() => useAgentRun(), {
+      wrapper: TestWrapper,
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('idle'));
+    vi.mocked(getActiveAgentRun).mockResolvedValueOnce(null).mockResolvedValueOnce(activeRun);
+
+    await act(async () => {
+      await result.current.startRun('断线后重连');
+    });
+
+    const firstSource = FakeEventSource.instances[0] as FakeEventSource & {
+      onerror?: () => void;
+    };
+    act(() => {
+      firstSource.onerror?.();
+    });
+    expect(result.current.status).toBe('reconnecting');
+
+    await act(async () => {
+      await result.current.reconnectActiveRun();
+    });
+
+    const secondSource = FakeEventSource.instances[1];
+    expect(result.current.status).toBe('reconnecting');
+    expect(result.current.events).toHaveLength(0);
+
+    await act(async () => {
+      secondSource.emit('text', {
+        sequence: 0,
+        run_id: 'run-1',
+        event: 'text',
+        data: { turn: 1, text: '重新连接成功' },
+      });
+    });
+
+    expect(result.current.status).toBe('running');
+  });
+
+  it('reattaches the active run when a start request receives a 409 conflict', async () => {
+    vi.mocked(createAgentRun).mockRejectedValueOnce({
+      __apiError: true,
+      message: 'Another run is active',
+      status: 409,
+      code: 'active_run',
+      details: {
+        active_run_id: 'run-active',
+        session_id: 'session-active',
+        status: 'running',
+      },
+    });
+    vi.mocked(createAgentEventsUrl).mockReturnValue('/runs/run-active/events');
+
+    const { result } = renderHook(() => useAgentRun(), {
+      wrapper: TestWrapper,
+    });
+
+    await act(async () => {
+      await result.current.startRun('重复提交');
+    });
+
+    expect(result.current.status).toBe('running');
+    expect(result.current.runId).toBe('run-active');
+    expect(result.current.conflict).toEqual({
+      activeRunId: 'run-active',
+      sessionId: 'session-active',
+      status: 'running',
+    });
   });
 
   it('creates one session and reuses it for subsequent runs', async () => {

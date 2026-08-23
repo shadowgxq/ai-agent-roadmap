@@ -7,8 +7,10 @@
     "title": "让 Agent 在项目中执行任务",
     "status": {
       "idle": "待命",
+      "restoring": "恢复中",
       "starting": "启动中",
       "running": "运行中",
+      "reconnecting": "重连中",
       "completed": "已完成",
       "failed": "失败",
       "interrupted": "已中断"
@@ -17,10 +19,13 @@
       "eyebrow": "任务输入",
       "title": "描述要做的事",
       "label": "任务",
+      "helper": "运行期间输入会暂时锁定；清空会话后可以开始全新的上下文。",
       "placeholder": "让 Agent 检查、修改并验证项目中的问题……",
       "run": "运行 Agent",
       "running": "运行中",
-      "newRun": "新建运行"
+      "ready": "可以开始",
+      "shortcuts": "Enter 发送 · Shift+Enter 换行",
+      "newSession": "新建会话"
     },
     "run": {
       "label": "Agent 运行",
@@ -29,12 +34,21 @@
       "sessionNotStarted": "尚未创建会话",
       "id": "运行 ID",
       "notStarted": "尚未开始运行",
-      "live": "实时"
+      "live": "实时",
+      "conflictStatus": "已有运行中的任务",
+      "restoringDescription": "正在恢复运行中的任务，请稍候。",
+      "startingDescription": "正在创建任务并连接 Agent。",
+      "runningDescription": "任务正在运行，执行过程会实时显示在下方。",
+      "reconnectingDescription": "事件流已中断，任务可能仍在后台运行。",
+      "activeConflict": "已有任务正在运行，已切换到该任务的实时过程。",
+      "reconnect": "重新连接"
     },
     "errors": {
       "start": "无法启动 Agent 运行。",
       "event": "Agent 返回了无法读取的事件。",
-      "stream": "运行完成前事件流已断开。"
+      "stream": "运行完成前事件流已断开。",
+      "history": "无法加载 Session 历史。",
+      "activeRun": "无法重新连接运行中的任务。"
     },
     "timeline": {
       "label": "Agent 事件时间线",
@@ -47,6 +61,60 @@
       "done": "运行结束",
       "emptyTitle": "还没有事件",
       "emptyDescription": "开始一次运行后，这里会实时展示 Agent 探索项目和执行任务的过程。"
+    },
+    "tool": {
+      "eyebrow": "工具调用",
+      "id": "调用 ID",
+      "unknownName": "未知工具",
+      "arguments": "调用参数",
+      "result": "执行结果",
+      "waiting": "等待工具返回……",
+      "missingCall": "没有找到对应的工具调用",
+      "status": {
+        "running": "执行中",
+        "success": "已成功",
+        "failed": "失败"
+      },
+      "warning": {
+        "missingCall": "结果没有匹配的工具调用",
+        "missingResult": "工具调用没有返回结果",
+        "duplicateCall": "检测到重复的工具调用 ID",
+        "duplicateResult": "检测到重复的工具结果"
+      }
+    },
+    "history": {
+      "label": "Session 历史",
+      "eyebrow": "Stored History",
+      "title": "会话历史",
+      "refresh": "刷新会话历史",
+      "refreshAction": "刷新",
+      "open": "查看会话",
+      "close": "返回运行区",
+      "loading": "正在加载会话历史……",
+      "sessions": "Session 列表",
+      "empty": "还没有历史 Session",
+      "activeHint": "当前任务",
+      "selectTitle": "选择一个会话",
+      "selectDescription": "从左侧历史中选择会话，查看运行记录和消息内容。",
+      "detailEyebrow": "当前 Session",
+      "runCount": "次运行",
+      "runs": "Runs",
+      "noRuns": "这个 Session 还没有 Run",
+      "messages": "Messages",
+      "noMessages": "这个 Session 还没有消息",
+      "roles": {
+        "user": "用户",
+        "assistant": "Agent",
+        "tool": "工具"
+      },
+      "status": {
+        "queued": "排队中",
+        "running": "运行中",
+        "completed": "已完成",
+        "failed": "失败",
+        "maxTurns": "达到轮次上限",
+        "cancelled": "已取消"
+      }
     }
   },
   "errors": {

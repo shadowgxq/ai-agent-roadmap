@@ -25,20 +25,28 @@ export function normalizeApiError(error: unknown): ApiError {
 
   if (axios.isAxiosError(error)) {
     const data = isRecord(error.response?.data) ? error.response.data : undefined;
+    const detail = data?.detail;
+    const detailRecord = isRecord(detail) ? detail : undefined;
     const message =
       (typeof data?.message === 'string' && data.message) ||
       (typeof data?.msg === 'string' && data.msg) ||
+      (typeof detail === 'string' && detail) ||
+      (typeof detailRecord?.message === 'string' && detailRecord.message) ||
       error.message ||
       DEFAULT_API_ERROR_MESSAGE;
     const code =
-      typeof data?.code === 'string' || typeof data?.code === 'number' ? data.code : error.code;
+      typeof data?.code === 'string' || typeof data?.code === 'number'
+        ? data.code
+        : typeof detailRecord?.code === 'string' || typeof detailRecord?.code === 'number'
+          ? detailRecord.code
+          : error.code;
 
     return {
       __apiError: true,
       message,
       status: error.response?.status,
       code,
-      details: data?.details,
+      details: data?.details ?? detailRecord ?? detail,
     };
   }
 

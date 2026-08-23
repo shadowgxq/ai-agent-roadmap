@@ -14,7 +14,7 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
 from ..execution.executor import DockerExecutor, Executor, LocalExecutor
-from ..execution.workspace import LocalWorkspace
+from ..execution.workspace import LocalWorkspace, Workspace
 from ..rag import OpenAIEmbedder
 from ..tools import (
     MCPClientManager,
@@ -66,6 +66,7 @@ async def run_coding_agent(
     workdir: Path,
     settings: AgentSettings,
     *,
+    workspace: Workspace | None = None,
     cost_calculator: CostCalculator | None = None,
     model: str | None = None,
     router_enabled: bool | None = None,
@@ -98,8 +99,8 @@ async def run_coding_agent(
     ``event_callback`` 是 CLI/Web Adapter 的可选观察出口。Runtime 只负责
     将它传给唯一的 Agent Loop，不在这里加入任何展示或传输逻辑。
     """
-    workspace = LocalWorkspace(workdir)
-    workdir = workspace.root
+    selected_workspace = workspace or LocalWorkspace(workdir)
+    workdir = selected_workspace.root
     if tool_mode not in {"all", "rag", "search"}:
         raise ValueError(f"不支持的 tool_mode: {tool_mode}")
     main_model = model if model is not None else settings.main_model_name
@@ -154,7 +155,7 @@ async def run_coding_agent(
         selected_executor = executor
     elif settings.executor_backend == "docker":
         selected_executor = DockerExecutor(
-            workspace,
+            selected_workspace,
             image=settings.docker_image,
             docker_binary=settings.docker_binary,
             timeout=settings.docker_timeout,
@@ -167,21 +168,21 @@ async def run_coding_agent(
         )
     else:
         selected_executor = LocalExecutor(
-            workspace,
+            selected_workspace,
             max_output_chars=settings.max_tool_output_chars,
             on_confirm=on_confirm,
         )
     if tool_mode == "all":
-        register_fs_tools(registry, workspace)
-        register_search_tools(registry, workspace)
+        register_fs_tools(registry, selected_workspace)
+        register_search_tools(registry, selected_workspace)
         register_shell_tools(
             registry,
-            workspace,
+            selected_workspace,
             executor=selected_executor,
         )
     elif tool_mode == "search":
-        register_read_file_tool(registry, workspace)
-        register_grep_tool(registry, workspace)
+        register_read_file_tool(registry, selected_workspace)
+        register_grep_tool(registry, selected_workspace)
 
     if context is None:
         context = Context()

@@ -8,6 +8,7 @@ from .executor import (
     LocalExecutor,
     truncate_output,
 )
+from .repository import Repository, RepositoryError, RepositoryWorkspace
 from .workspace import LocalWorkspace, Workspace, WorkspaceError, as_workspace
 
 __all__ = [
@@ -17,6 +18,9 @@ __all__ = [
     "Executor",
     "LocalExecutor",
     "LocalWorkspace",
+    "Repository",
+    "RepositoryError",
+    "RepositoryWorkspace",
     "Workspace",
     "WorkspaceError",
     "as_workspace",

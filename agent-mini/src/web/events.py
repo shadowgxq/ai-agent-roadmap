@@ -10,6 +10,7 @@ EventType = Literal[
     "text",
     "tool_call",
     "tool_result",
+    "diff",
     "context_usage",
     "done",
 ]
@@ -26,6 +27,7 @@ PUBLIC_EVENT_TYPES = frozenset(
         "text",
         "tool_call",
         "tool_result",
+        "diff",
         "context_usage",
         "done",
     }
@@ -65,6 +67,25 @@ class ToolResultEventData(BaseModel):
     results: list[ToolResultItem] = Field(min_length=1)
 
 
+class DiffFileItem(BaseModel):
+    """一次文件变更的结构化摘要；patch 可被前端折叠展示。"""
+
+    path: str = Field(min_length=1)
+    status: Literal["added", "modified", "deleted", "binary"]
+    patch: str
+    additions: int = Field(ge=0)
+    deletions: int = Field(ge=0)
+    binary: bool = False
+    truncated: bool = False
+
+
+class DiffEventData(BaseModel):
+    """一轮工具执行产生的文件变更集合。"""
+
+    turn: int = Field(ge=1)
+    files: list[DiffFileItem] = Field(min_length=1)
+
+
 # Provider 不提供 token 用量时使用 None + available=false，不能把“未知”误报成 0。
 class ContextUsageEventData(BaseModel):
     turn: int = Field(ge=1)
@@ -94,6 +115,7 @@ EVENT_DATA_MODELS: dict[EventType, type[BaseModel]] = {
     "text": TextEventData,
     "tool_call": ToolCallEventData,
     "tool_result": ToolResultEventData,
+    "diff": DiffEventData,
     "context_usage": ContextUsageEventData,
     "done": DoneEventData,
 }

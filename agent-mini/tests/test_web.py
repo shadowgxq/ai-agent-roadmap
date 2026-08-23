@@ -48,6 +48,23 @@ async def emit_conversation(**kwargs: Any) -> None:
         },
     )
     await callback(
+        "diff",
+        {
+            "turn": 1,
+            "files": [
+                {
+                    "path": "README.md",
+                    "status": "modified",
+                    "patch": "--- a/README.md\n+++ b/README.md",
+                    "additions": 1,
+                    "deletions": 1,
+                    "binary": False,
+                    "truncated": False,
+                }
+            ],
+        },
+    )
+    await callback(
         "done",
         {
             "status": "completed",
@@ -101,11 +118,13 @@ def test_session_run_and_sse_stream(tmp_path) -> None:
             "text",
             "tool_call",
             "tool_result",
+            "diff",
             "done",
         ]
-        assert [event["sequence"] for event in events] == [0, 1, 2, 3]
+        assert [event["sequence"] for event in events] == [0, 1, 2, 3, 4]
         assert events[1]["data"]["calls"][0]["tool_use_id"] == "call-1"
         assert events[2]["data"]["results"][0]["tool_use_id"] == "call-1"
+        assert events[3]["data"]["files"][0]["path"] == "README.md"
         assert events[-1]["data"]["status"] == "completed"
 
         detail = client.get(f"/sessions/{session_id}").json()
@@ -114,6 +133,7 @@ def test_session_run_and_sse_stream(tmp_path) -> None:
             "text",
             "tool_call",
             "tool_result",
+            "diff",
         ]
         assert detail["runs"][0]["status"] == "completed"
 

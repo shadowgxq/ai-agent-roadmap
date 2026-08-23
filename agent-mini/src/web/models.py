@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 # 这些 Literal 集合同时约束内存状态和 API 输出，避免前后端自行扩展出不一致的状态值。
 SessionStatus = Literal["active", "archived"]
 MessageRole = Literal["user", "assistant", "tool"]
-MessageKind = Literal["text", "tool_call", "tool_result"]
+MessageKind = Literal["text", "tool_call", "tool_result", "diff"]
 RunStatus = Literal[
     "queued",
     "running",

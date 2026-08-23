@@ -78,6 +78,18 @@ def render_agent_event(event: AgentEventName, data: dict[str, Any]) -> None:
                     )
         return
 
+    if event == "diff":
+        files = data.get("files")
+        if isinstance(files, list):
+            for file in files:
+                if isinstance(file, dict):
+                    print(
+                        f"[diff] {file.get('status', 'modified')} "
+                        f"{file.get('path', '<unknown>')} "
+                        f"(+{file.get('additions', 0)}/-{file.get('deletions', 0)})"
+                    )
+        return
+
     if event == "context_usage":
         context_tokens = data.get("context_tokens", "unknown")
         context_window = data.get("context_window_tokens", "unknown")

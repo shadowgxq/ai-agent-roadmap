@@ -87,6 +87,18 @@ class RepositoryWorkspace:
             raise RepositoryError("RepositoryWorkspace 尚未打开")
         return self._workspace.resolve(path)
 
+    def snapshot_file(self, path: str | Path) -> bytes | None:
+        """将文件快照操作转发给临时 LocalWorkspace。"""
+        if self._workspace is None:
+            raise RepositoryError("RepositoryWorkspace 尚未打开")
+        return self._workspace.snapshot_file(path)
+
+    def diff_file(self, path: str | Path, before: bytes | None):
+        """将 Diff 操作转发给临时 LocalWorkspace。"""
+        if self._workspace is None:
+            raise RepositoryError("RepositoryWorkspace 尚未打开")
+        return self._workspace.diff_file(path, before)
+
     def __enter__(self) -> "RepositoryWorkspace":
         if self._workspace is not None:
             raise RepositoryError("RepositoryWorkspace 不能重复打开")

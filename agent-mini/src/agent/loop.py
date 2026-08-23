@@ -30,6 +30,7 @@ AgentEventName = Literal[
     "text",
     "tool_call",
     "tool_result",
+    "diff",
     "context_usage",
     "compact_usage",
     "done",
@@ -971,6 +972,17 @@ async def run(
                 ],
             },
         )
+        diff_files = [
+            diff
+            for result in tool_results
+            for diff in result.get("metadata", {}).get("diffs", [])
+        ]
+        if diff_files:
+            await emit_event(
+                event_callback,
+                "diff",
+                {"turn": turn, "files": diff_files},
+            )
         if checkpoint_callback is not None:
             checkpoint_callback(context, stats, turn, "running")
 
@@ -1259,6 +1271,7 @@ async def execute_tools(
             else nullcontext()
         )
         with observation_context as tool_observation:
+            metadata: dict[str, Any] = {}
             if stats is not None:
                 stats.record_tool_call(
                     name,
@@ -1280,6 +1293,7 @@ async def execute_tools(
                     )
                     content = execution.content
                     status = "error" if execution.is_error else "ok"
+                    metadata = dict(execution.metadata)
                 except TimeoutError:
                     content = (
                         f"工具 {name} 执行超时（超过 {tool_timeout:g} 秒）"
@@ -1334,6 +1348,7 @@ async def execute_tools(
                 "tool_call_id": tool_call.id,
                 "content": content,
                 "is_error": status != "ok",
+                "metadata": metadata,
             }
         )
     return tool_results

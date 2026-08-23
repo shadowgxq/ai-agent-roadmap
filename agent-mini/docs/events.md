@@ -21,7 +21,7 @@ Agent Runtime 通过公共事件协议连接 CLI/Web Adapter。日志事件不�
 - `event`：公共事件名称。
 - `data`：与事件类型对应的 payload。
 
-v1 公共事件只有：`text`、`tool_call`、`tool_result`、`context_usage`、`done`。
+v1 公共事件包括：`text`、`tool_call`、`tool_result`、`diff`、`context_usage`、`done`。
 
 ## text
 
@@ -79,6 +79,33 @@ Agent 请求执行一个或多个工具。`tool_use_id` 是一次工具调用的
         "tool_use_id": "call_abc",
         "content": "# agent-mini",
         "is_error": false
+      }
+    ]
+  }
+}
+```
+
+## diff
+
+文件工具完成写入或编辑后发送结构化 Diff。Diff 与产生它的工具调用保持同一轮次，
+前端按 `path` 展示文件状态、增删行和可折叠的 unified patch；二进制文件只保留元信息。
+
+```json
+{
+  "sequence": 3,
+  "run_id": "run_123",
+  "event": "diff",
+  "data": {
+    "turn": 1,
+    "files": [
+      {
+        "path": "src/main.py",
+        "status": "modified",
+        "patch": "--- a/src/main.py\n+++ b/src/main.py\n@@ -1 +1 @@\n-print('old')\n+print('new')",
+        "additions": 1,
+        "deletions": 1,
+        "binary": false,
+        "truncated": false
       }
     ]
   }
@@ -148,5 +175,5 @@ Agent 请求执行一个或多个工具。`tool_use_id` 是一次工具调用的
 - `compact_usage` 是内部观测事件，由 Web Adapter 明确过滤。
 - 未知事件属于协议错误，不能通过类型转换静默进入 SSE。
 - v1 不单独发布 `error`；失败统一由 `done(status="failed")` 表达。
-- `diff`、`confirm_request`、`status` 尚未进入 v1。实现对应能力时，必须同时更新
-  Python 校验、TypeScript 校验、本文档和直接消费者。
+- `confirm_request`、`status` 尚未进入 v1。实现对应能力时，必须同时更新 Python
+  校验、TypeScript 校验、本文档和直接消费者。

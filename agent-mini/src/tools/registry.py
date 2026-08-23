@@ -6,7 +6,7 @@ import inspect
 import json
 import re
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, get_type_hints
 
 from pydantic import BaseModel, TypeAdapter
@@ -33,6 +33,7 @@ class ToolExecutionResult:
 
     content: str
     is_error: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def _parse_docstring(handler: ToolHandler) -> tuple[str, dict[str, str]]:

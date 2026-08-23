@@ -9,13 +9,20 @@ from .executor import (
     truncate_output,
 )
 from .repository import Repository, RepositoryError, RepositoryWorkspace
-from .workspace import LocalWorkspace, Workspace, WorkspaceError, as_workspace
+from .workspace import (
+    FileDiff,
+    LocalWorkspace,
+    Workspace,
+    WorkspaceError,
+    as_workspace,
+)
 
 __all__ = [
     "DockerExecutor",
     "ExecutionResult",
     "ExecutionStatus",
     "Executor",
+    "FileDiff",
     "LocalExecutor",
     "LocalWorkspace",
     "Repository",

@@ -260,6 +260,14 @@ class RunManager:
             )
             role = "tool"
             kind = "tool_result"
+        elif event == "diff":
+            content = json.dumps(
+                data.get("files", []),
+                ensure_ascii=False,
+                default=str,
+            )
+            role = "assistant"
+            kind = "diff"
         else:
             return
 

@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from ..execution.workspace import Workspace, as_workspace
-from .registry import ToolRegistry
+from .registry import ToolExecutionResult, ToolRegistry
 
 
 def resolve_path(workdir: Path | Workspace, path: str) -> Path:
@@ -92,8 +92,17 @@ def register_fs_tools(
             path: 相对于工作目录的文件路径。
             content: 要写入文件的完整内容。
         """
+        before = workspace.snapshot_file(path)
         written = workspace.write_text(path, content)
-        return f"已写入文件：{path}，共 {written} 个字符"
+        diff = workspace.diff_file(path, before)
+        return ToolExecutionResult(
+            content=f"已写入文件：{path}，共 {written} 个字符",
+            metadata=(
+                {"diffs": [diff.to_dict()]}
+                if diff.patch or diff.binary
+                else {}
+            ),
+        )
 
     @registry.tool
     def edit_file(path: str, old_string: str, new_string: str) -> str:
@@ -107,6 +116,7 @@ def register_fs_tools(
         if not old_string:
             raise ValueError("old_string 不能为空")
 
+        before = workspace.snapshot_file(path)
         content = workspace.read_text(path)
         occurrences = content.count(old_string)
         if occurrences == 0:
@@ -118,4 +128,12 @@ def register_fs_tools(
 
         updated = content.replace(old_string, new_string, 1)
         workspace.write_text(path, updated)
-        return f"已更新文件：{path}"
+        diff = workspace.diff_file(path, before)
+        return ToolExecutionResult(
+            content=f"已更新文件：{path}",
+            metadata=(
+                {"diffs": [diff.to_dict()]}
+                if diff.patch or diff.binary
+                else {}
+            ),
+        )

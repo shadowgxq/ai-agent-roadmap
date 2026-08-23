@@ -2,34 +2,31 @@
 
 from pathlib import Path
 
+from ..execution.workspace import Workspace, as_workspace
 from .registry import ToolRegistry
 
 
-def resolve_path(workdir: Path, path: str) -> Path:
+def resolve_path(workdir: Path | Workspace, path: str) -> Path:
     """解析工作目录内的路径，并拒绝越界访问。"""
-    root = workdir.resolve()
-    target = (root / path).resolve()
-
-    if not target.is_relative_to(root):
-        raise ValueError(f"路径超出工作目录：{path}")
-
-    return target
+    return as_workspace(workdir).resolve(path)
 
 
 def register_readonly_fs_tools(
     registry: ToolRegistry,
-    workdir: Path,
+    workdir: Path | Workspace,
 ) -> None:
     """注册绑定到指定工作目录的只读文件工具。"""
-    register_read_file_tool(registry, workdir)
-    register_list_dir_tool(registry, workdir)
+    workspace = as_workspace(workdir)
+    register_read_file_tool(registry, workspace)
+    register_list_dir_tool(registry, workspace)
 
 
 def register_read_file_tool(
     registry: ToolRegistry,
-    workdir: Path,
+    workdir: Path | Workspace,
 ) -> None:
     """只注册读取文件工具。"""
+    workspace = as_workspace(workdir)
 
     @registry.tool
     def read_file(
@@ -49,22 +46,17 @@ def register_read_file_tool(
         if limit < 1:
             raise ValueError("limit 必须大于等于 1")
 
-        target = resolve_path(workdir, path)
-        if not target.exists():
-            raise FileNotFoundError(f"文件不存在：{path}")
-        if not target.is_file():
-            raise IsADirectoryError(f"路径不是文件：{path}")
-
-        lines = target.read_text(encoding="utf-8").splitlines()
+        lines = workspace.read_text(path).splitlines()
         start = offset - 1
         return "\n".join(lines[start:start + limit])
 
 
 def register_list_dir_tool(
     registry: ToolRegistry,
-    workdir: Path,
+    workdir: Path | Workspace,
 ) -> None:
     """只注册列目录工具。"""
+    workspace = as_workspace(workdir)
 
     @registry.tool
     def list_dir(path: str = ".") -> str:
@@ -73,16 +65,7 @@ def register_list_dir_tool(
         Args:
             path: 相对于工作目录的目录路径，默认为工作目录。
         """
-        target = resolve_path(workdir, path)
-        if not target.exists():
-            raise FileNotFoundError(f"路径不存在：{path}")
-        if not target.is_dir():
-            raise IsADirectoryError(f"路径不是目录：{path}")
-
-        entries = sorted(
-            target.iterdir(),
-            key=lambda entry: entry.name.lower(),
-        )
+        entries = workspace.list_dir(path)
         if not entries:
             return "(目录为空)"
 
@@ -95,10 +78,11 @@ def register_list_dir_tool(
 
 def register_fs_tools(
     registry: ToolRegistry,
-    workdir: Path,
+    workdir: Path | Workspace,
 ) -> None:
     """注册绑定到指定工作目录的完整文件工具。"""
-    register_readonly_fs_tools(registry, workdir)
+    workspace = as_workspace(workdir)
+    register_readonly_fs_tools(registry, workspace)
 
     @registry.tool
     def write_file(path: str, content: str) -> str:
@@ -108,12 +92,7 @@ def register_fs_tools(
             path: 相对于工作目录的文件路径。
             content: 要写入文件的完整内容。
         """
-        target = resolve_path(workdir, path)
-        if target.exists() and target.is_dir():
-            raise IsADirectoryError(f"路径是目录：{path}")
-
-        target.parent.mkdir(parents=True, exist_ok=True)
-        written = target.write_text(content, encoding="utf-8")
+        written = workspace.write_text(path, content)
         return f"已写入文件：{path}，共 {written} 个字符"
 
     @registry.tool
@@ -128,13 +107,7 @@ def register_fs_tools(
         if not old_string:
             raise ValueError("old_string 不能为空")
 
-        target = resolve_path(workdir, path)
-        if not target.exists():
-            raise FileNotFoundError(f"文件不存在：{path}")
-        if not target.is_file():
-            raise IsADirectoryError(f"路径不是文件：{path}")
-
-        content = target.read_text(encoding="utf-8")
+        content = workspace.read_text(path)
         occurrences = content.count(old_string)
         if occurrences == 0:
             raise ValueError("文件中找不到 old_string")
@@ -144,5 +117,5 @@ def register_fs_tools(
             )
 
         updated = content.replace(old_string, new_string, 1)
-        target.write_text(updated, encoding="utf-8")
+        workspace.write_text(path, updated)
         return f"已更新文件：{path}"

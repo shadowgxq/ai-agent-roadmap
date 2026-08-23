@@ -13,6 +13,7 @@ from langfuse import Langfuse, propagate_attributes
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
+from ..execution.workspace import LocalWorkspace
 from ..rag import OpenAIEmbedder
 from ..tools import (
     MCPClientManager,
@@ -95,9 +96,8 @@ async def run_coding_agent(
     ``event_callback`` 是 CLI/Web Adapter 的可选观察出口。Runtime 只负责
     将它传给唯一的 Agent Loop，不在这里加入任何展示或传输逻辑。
     """
-    workdir = workdir.resolve()
-    if not workdir.is_dir():
-        raise NotADirectoryError(f"工作目录不存在或不是目录: {workdir}")
+    workspace = LocalWorkspace(workdir)
+    workdir = workspace.root
     if tool_mode not in {"all", "rag", "search"}:
         raise ValueError(f"不支持的 tool_mode: {tool_mode}")
     main_model = model if model is not None else settings.main_model_name
@@ -149,8 +149,8 @@ async def run_coding_agent(
 
     registry = ToolRegistry()
     if tool_mode == "all":
-        register_fs_tools(registry, workdir)
-        register_search_tools(registry, workdir)
+        register_fs_tools(registry, workspace)
+        register_search_tools(registry, workspace)
         register_shell_tools(
             registry,
             workdir,
@@ -158,8 +158,8 @@ async def run_coding_agent(
             on_confirm=on_confirm,
         )
     elif tool_mode == "search":
-        register_read_file_tool(registry, workdir)
-        register_grep_tool(registry, workdir)
+        register_read_file_tool(registry, workspace)
+        register_grep_tool(registry, workspace)
 
     if context is None:
         context = Context()

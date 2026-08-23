@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 
-from .fs import resolve_path
+from ..execution.workspace import Workspace, as_workspace
 from .registry import ToolRegistry
 
 
@@ -32,18 +32,19 @@ def _iter_files(target: Path, root: Path) -> Iterator[Path]:
 
 def register_search_tools(
     registry: ToolRegistry,
-    workdir: Path,
+    workdir: Path | Workspace,
 ) -> None:
     """注册绑定到指定工作目录的搜索工具。"""
-    register_grep_tool(registry, workdir)
+    register_grep_tool(registry, as_workspace(workdir))
 
 
 def register_grep_tool(
     registry: ToolRegistry,
-    workdir: Path,
+    workdir: Path | Workspace,
 ) -> None:
     """只注册 grep 工具。"""
-    root = workdir.resolve()
+    workspace = as_workspace(workdir)
+    root = workspace.root
 
     @registry.tool
     def grep(
@@ -63,7 +64,7 @@ def register_grep_tool(
         if max_results < 1:
             raise ValueError("max_results 必须大于等于 1")
 
-        target = resolve_path(root, path)
+        target = workspace.resolve(path)
         if not target.exists():
             raise FileNotFoundError(f"路径不存在：{path}")
         if not target.is_file() and not target.is_dir():

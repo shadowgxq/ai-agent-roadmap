@@ -13,6 +13,7 @@ from langfuse import Langfuse, propagate_attributes
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
+from ..execution.executor import Executor, LocalExecutor
 from ..execution.workspace import LocalWorkspace
 from ..rag import OpenAIEmbedder
 from ..tools import (
@@ -86,6 +87,7 @@ async def run_coding_agent(
     start_sha: str | None = None,
     event_callback: EventCallback | None = None,
     on_confirm: ConfirmCallback | None = None,
+    executor: Executor | None = None,
     trace_metadata: dict[str, Any] | None = None,
     trace_tags: list[str] | None = None,
     log_start: bool = True,
@@ -148,14 +150,18 @@ async def run_coding_agent(
     run_started_at = perf_counter()
 
     registry = ToolRegistry()
+    selected_executor = executor or LocalExecutor(
+        workspace,
+        max_output_chars=settings.max_tool_output_chars,
+        on_confirm=on_confirm,
+    )
     if tool_mode == "all":
         register_fs_tools(registry, workspace)
         register_search_tools(registry, workspace)
         register_shell_tools(
             registry,
-            workdir,
-            max_output_chars=settings.max_tool_output_chars,
-            on_confirm=on_confirm,
+            workspace,
+            executor=selected_executor,
         )
     elif tool_mode == "search":
         register_read_file_tool(registry, workspace)

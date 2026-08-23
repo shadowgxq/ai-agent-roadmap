@@ -12,6 +12,7 @@ from uuid import uuid4
 from ..agent.config import AgentSettings
 from ..agent.loop import AgentEventName, MaxTurnsExceeded
 from ..agent.runtime import run_coding_agent
+from ..execution.repository import Repository
 from .events import AgentEvent, EventType, to_public_event
 from .models import (
     Message,
@@ -94,9 +95,14 @@ class RunManager:
         workdir: Path,
         settings: AgentSettings | None = None,
         runner: AgentRunner | None = None,
+        repository_isolation: bool = False,
     ) -> None:
         self.workdir = workdir.resolve()
         self.settings = settings
+        # Demo/宿主可以打开 Git 临时 Worktree；默认保持 W11 的本地目录行为，便于测试注入。
+        self.repository = (
+            Repository.discover(self.workdir) if repository_isolation else None
+        )
         # 生产环境使用真实 Runtime；测试可注入 fake runner，隔离 LLM、工具和外部服务。
         self.runner = runner if runner is not None else run_coding_agent
         # Session/Message 保存可查询历史；RunState 另外保存 SSE 回放和队列所需的可变运行态。
@@ -495,18 +501,34 @@ class RunManager:
                         {"status": "running"},
                     )
 
+        async def execute_runner() -> None:
+            runner_kwargs = {
+                "task": state.task,
+                "settings": self.settings or AgentSettings(),
+                "run_id": state.run_id,
+                "session_id": state.session_id,
+                "message_id": state.message_id,
+                "checkpoint_enabled": True,
+                "event_callback": publish,
+                "on_confirm": request_confirmation,
+            }
+            if self.repository is None:
+                await self.runner(
+                    workdir=self.workdir,
+                    **runner_kwargs,
+                )
+                return
+
+            # Worktree 的打开、运行和清理必须在同一生命周期内，避免 Sandbox 挂载已被删除的目录。
+            with self.repository.open_workspace() as workspace:
+                await self.runner(
+                    workdir=workspace.root,
+                    workspace=workspace,
+                    **runner_kwargs,
+                )
+
         try:
-            await self.runner(
-                task=state.task,
-                workdir=self.workdir,
-                settings=self.settings or AgentSettings(),
-                run_id=state.run_id,
-                session_id=state.session_id,
-                message_id=state.message_id,
-                checkpoint_enabled=True,
-                event_callback=publish,
-                on_confirm=request_confirmation,
-            )
+            await execute_runner()
         except MaxTurnsExceeded as exc:
             # Runtime 用异常跳出循环时，仍转换成前端可消费的标准 done 事件。
             if not state.finished:

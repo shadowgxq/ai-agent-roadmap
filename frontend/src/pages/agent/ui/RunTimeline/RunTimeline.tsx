@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Circle,
   GitCompareArrows,
+  ShieldAlert,
   Wrench,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,7 @@ type Translate = (key: string) => string;
 function eventTitle(type: NonToolAgentEvent['type'], t: Translate) {
   const labels: Record<NonToolAgentEvent['type'], string> = {
     text: t('agent.timeline.text'),
+    status: t('agent.timeline.status.title'),
     context_usage: t('agent.timeline.contextUsage'),
     diff: t('agent.timeline.diff'),
     done: t('agent.timeline.done'),
@@ -33,21 +35,20 @@ function eventTitle(type: NonToolAgentEvent['type'], t: Translate) {
 
 function EventIcon({ type }: { type: NonToolAgentEvent['type'] }) {
   if (type === 'text') return <Circle size={16} aria-hidden="true" />;
+  if (type === 'status') return <ShieldAlert size={16} aria-hidden="true" />;
   if (type === 'context_usage') return <Activity size={16} aria-hidden="true" />;
   if (type === 'diff') return <GitCompareArrows size={16} aria-hidden="true" />;
   return <CheckCircle2 size={16} aria-hidden="true" />;
 }
 
-function EventBody({ event }: { event: NonToolAgentEvent }) {
+function EventBody({ event, t }: { event: NonToolAgentEvent; t: Translate }) {
   if (event.type === 'text') {
     return <p className={styles.text}>{event.data.text}</p>;
   }
 
   if (event.type === 'context_usage') {
     const contextTokens =
-      event.data.context_tokens !== null
-        ? event.data.context_tokens.toLocaleString()
-        : 'unknown';
+      event.data.context_tokens !== null ? event.data.context_tokens.toLocaleString() : 'unknown';
     const contextWindow = event.data.context_window_tokens.toLocaleString();
     const usage =
       event.data.context_usage_percent !== null
@@ -58,6 +59,15 @@ function EventBody({ event }: { event: NonToolAgentEvent }) {
         {contextTokens} / {contextWindow} tokens ({usage})
       </p>
     );
+  }
+
+  if (event.type === 'status') {
+    const statusKeys: Record<typeof event.data.status, string> = {
+      queued: 'agent.timeline.status.queued',
+      running: 'agent.timeline.status.running',
+      waiting_confirmation: 'agent.timeline.status.waitingConfirmation',
+    };
+    return <p className={styles.contextUsage}>{t(statusKeys[event.data.status])}</p>;
   }
 
   if (event.type === 'diff') {
@@ -102,7 +112,7 @@ function TimelineListItem({ item, t }: { item: RunTimelineItem; t: Translate }) 
           <h3>{eventTitle(event.type, t)}</h3>
           <span>#{event.sequence + 1}</span>
         </div>
-        <EventBody event={event} />
+        <EventBody event={event} t={t} />
       </div>
     </li>
   );

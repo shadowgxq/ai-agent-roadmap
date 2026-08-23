@@ -35,16 +35,24 @@ def create_app(
     workdir: Path | None = None,
     settings: AgentSettings | None = None,
     runner: AgentRunner | None = None,
+    repository_isolation: bool | None = None,
 ) -> FastAPI:
     """Build an app with an explicit workdir and optional injected settings."""
     # 显式参数优先；未注入时才读取环境变量，便于测试或宿主按实例隔离工作目录。
     configured_workdir = workdir or Path(
         os.environ.get("AGENT_WORKDIR", Path.cwd())
     )
+    use_repository_isolation = (
+        repository_isolation
+        if repository_isolation is not None
+        else os.environ.get("AGENT_REPOSITORY_WORKTREE", "false").lower()
+        in {"1", "true", "yes", "on"}
+    )
     manager = RunManager(
         workdir=configured_workdir,
         settings=settings,
         runner=runner,
+        repository_isolation=use_repository_isolation,
     )
     app = FastAPI(title="agent-mini viewer")
     # 将 Manager 放入 app.state，既供路由闭包使用，也保留给宿主/调试工具查看运行态的入口。

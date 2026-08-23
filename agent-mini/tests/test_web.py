@@ -2,7 +2,9 @@
 
 import asyncio
 import json
+import subprocess
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -352,3 +354,51 @@ def test_cancel_endpoint_closes_active_run(tmp_path) -> None:
         )
         assert events[-1]["event"] == "done"
         assert events[-1]["data"]["status"] == "cancelled"
+
+
+def test_web_run_uses_and_cleans_repository_worktree(tmp_path) -> None:
+    repository_root = tmp_path / "repository"
+    repository_root.mkdir()
+    (repository_root / "README.md").write_text("demo\n", encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=repository_root, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "agent@example.test"],
+        cwd=repository_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "agent-test"],
+        cwd=repository_root,
+        check=True,
+    )
+    subprocess.run(["git", "add", "README.md"], cwd=repository_root, check=True)
+    subprocess.run(
+        ["git", "commit", "--quiet", "-m", "initial"],
+        cwd=repository_root,
+        check=True,
+    )
+    workspace_roots: list[str] = []
+
+    async def isolated_runner(**kwargs: Any) -> None:
+        workspace = kwargs["workspace"]
+        workspace_roots.append(str(workspace.root))
+        (workspace.root / "demo.txt").write_text("temporary\n", encoding="utf-8")
+        await kwargs["event_callback"]("text", {"turn": 1, "text": "已在临时工作区读取仓库"})
+        await kwargs["event_callback"]("done", {"status": "completed", "turn": 1})
+
+    app = create_app(
+        workdir=repository_root,
+        settings=make_test_settings(),
+        runner=isolated_runner,
+        repository_isolation=True,
+    )
+
+    with TestClient(app) as client:
+        run = client.post("/runs", json={"task": "读取并修改临时仓库"}).json()
+        events = read_sse_payloads(client.get(f"/runs/{run['run_id']}/events").text)
+
+    assert events[-1]["data"]["status"] == "completed"
+    assert workspace_roots
+    assert workspace_roots[0] != str(repository_root)
+    assert not (Path(workspace_roots[0]) / "demo.txt").exists()
+    assert not (repository_root / "demo.txt").exists()

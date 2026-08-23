@@ -66,6 +66,12 @@
       "eyebrow": "事件流",
       "title": "运行时间线",
       "text": "模型回复",
+      "status": {
+        "title": "任务状态",
+        "queued": "排队中",
+        "running": "执行中",
+        "waitingConfirmation": "等待确认"
+      },
       "toolCall": "工具调用",
       "toolResult": "工具结果",
       "diff": "文件变更",

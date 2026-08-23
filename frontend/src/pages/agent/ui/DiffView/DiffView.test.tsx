@@ -31,7 +31,7 @@ describe('DiffView', () => {
     );
 
     expect(screen.getByRole('navigation', { name: 'Changed files' })).toBeInTheDocument();
-    expect(screen.getByText('src/main.py')).toBeInTheDocument();
+    expect(screen.getAllByText('src/main.py')).toHaveLength(2);
     expect(screen.getByText('+new')).toBeInTheDocument();
 
     const header = screen.getByRole('button', { name: /src\/main\.py.*Modified/ });

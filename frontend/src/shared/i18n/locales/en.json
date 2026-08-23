@@ -66,6 +66,12 @@
       "eyebrow": "Event stream",
       "title": "Run timeline",
       "text": "Model response",
+      "status": {
+        "title": "Task status",
+        "queued": "Queued",
+        "running": "Running",
+        "waitingConfirmation": "Waiting for confirmation"
+      },
       "toolCall": "Tool call",
       "toolResult": "Tool result",
       "diff": "File changes",

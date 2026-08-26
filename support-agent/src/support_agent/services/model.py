@@ -16,5 +16,9 @@ def create_chat_model(settings: AgentSettings) -> ChatOpenAI:
     }
     if settings.resolved_base_url is not None:
         model_kwargs["base_url"] = settings.resolved_base_url
+    if settings.model.startswith("deepseek-"):
+        model_kwargs["extra_body"] = {
+            "thinking": {"type": settings.deepseek_thinking_mode},
+        }
 
     return ChatOpenAI(**model_kwargs)

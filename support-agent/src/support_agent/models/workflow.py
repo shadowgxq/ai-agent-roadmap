@@ -1,0 +1,97 @@
+"""Typed contracts for the W14 ticket workflow."""
+
+from typing import Literal, NotRequired, TypedDict
+
+from pydantic import BaseModel, Field
+
+
+TicketCategory = Literal[
+    "billing",
+    "account",
+    "product",
+    "technical",
+    "other",
+]
+TicketPriority = Literal["low", "normal", "high", "urgent"]
+RiskLevel = Literal["low", "medium", "high"]
+TicketStatus = Literal[
+    "pending",
+    "normalized",
+    "classified",
+    "needs_clarification",
+    "retrieving",
+    "drafted",
+    "assessed",
+    "completed",
+    "failed",
+]
+TicketErrorCode = Literal[
+    "INVALID_TICKET",
+    "MISSING_CLASSIFICATION",
+    "RESPONSE_SUBGRAPH_NOT_READY",
+]
+
+
+class EvidenceRef(BaseModel):
+    """Small, serializable reference to policy evidence."""
+
+    source_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    snippet: str = Field(min_length=1)
+
+
+class TicketAgentState(TypedDict):
+    """Serializable business state shared by the W14 ticket graph."""
+
+    # identity
+    organization_id: str
+    user_id: str
+    ticket_id: str
+    run_id: str
+    thread_id: str
+
+    # input
+    subject: str
+    description: str
+    customer_tier: str
+
+    # control
+    status: TicketStatus
+    error_code: NotRequired[TicketErrorCode]
+    error_message: NotRequired[str]
+
+    # understanding
+    normalized_text: NotRequired[str]
+    category: NotRequired[TicketCategory]
+    priority: NotRequired[TicketPriority]
+    missing_fields: NotRequired[list[str]]
+
+    # evidence
+    evidence_refs: NotRequired[list[EvidenceRef]]
+
+    # output
+    draft_response: NotRequired[str]
+    risk_level: NotRequired[RiskLevel]
+    risk_reasons: NotRequired[list[str]]
+    requires_approval: NotRequired[bool]
+
+
+class RiskAssessment(BaseModel):
+    """Validated semantic risk result for a ticket response."""
+
+    risk_level: RiskLevel
+    risk_reasons: list[str] = Field(default_factory=list)
+    requires_approval: bool
+
+
+class TicketWorkflowClassification(BaseModel):
+    """Validated classification result for the W14 workflow."""
+
+    category: TicketCategory = Field(description="工单所属业务类别")
+    priority: TicketPriority = Field(description="工单处理优先级")
+    needs_clarification: bool = Field(description="是否需要补充信息")
+    missing_fields: list[str] = Field(
+        default_factory=list,
+        description="继续处理所需但当前缺失的字段",
+    )
+    reason: str = Field(min_length=1, description="分类判断依据")

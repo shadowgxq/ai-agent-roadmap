@@ -13,6 +13,7 @@ dependencies = [
 [project.scripts]
 support-agent = "support_agent.cli:main"
 support-routing = "support_agent.routing_cli:main"
+support-ticket-contract = "support_agent.ticket_contract_cli:main"
 
 [dependency-groups]
 dev = [

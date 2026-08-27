@@ -198,7 +198,7 @@ class TicketWorkflowClassification(BaseModel):
     category: TicketCategory
     priority: TicketPriority
     needs_clarification: bool
-    missing_fields: list[str]
+    missing_fields: list[TicketMissingField]
     reason: str
 ```
 
@@ -379,7 +379,7 @@ deterministic_demo.draft_response:
 
 ## 15. 下一步
 
-W14 Session 2 将实现：
+W14 Session 2 已实现：
 
 ```text
 normalize_ticket
@@ -387,4 +387,6 @@ normalize_ticket
   → clarification branch
 ```
 
-届时才会接入结构化分类模型，并验证信息缺失的工单不会进入 response subgraph。
+本节接入结构化分类模型，并验证信息缺失的工单不会进入 response subgraph。详细教程和命令见：
+
+`tutorials/w14-session-02-classification-clarification.md`

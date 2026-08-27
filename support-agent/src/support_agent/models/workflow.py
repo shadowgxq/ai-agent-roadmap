@@ -13,6 +13,16 @@ TicketCategory = Literal[
     "other",
 ]
 TicketPriority = Literal["low", "normal", "high", "urgent"]
+TicketMissingField = Literal[
+    "order_id",
+    "refund_reason",
+    "account_id",
+    "account_email",
+    "affected_feature",
+    "reproduction_steps",
+    "error_message",
+    "request_id",
+]
 RiskLevel = Literal["low", "medium", "high"]
 TicketStatus = Literal[
     "pending",
@@ -64,7 +74,7 @@ class TicketAgentState(TypedDict):
     normalized_text: NotRequired[str]
     category: NotRequired[TicketCategory]
     priority: NotRequired[TicketPriority]
-    missing_fields: NotRequired[list[str]]
+    missing_fields: NotRequired[list[TicketMissingField]]
 
     # evidence
     evidence_refs: NotRequired[list[EvidenceRef]]
@@ -90,8 +100,12 @@ class TicketWorkflowClassification(BaseModel):
     category: TicketCategory = Field(description="工单所属业务类别")
     priority: TicketPriority = Field(description="工单处理优先级")
     needs_clarification: bool = Field(description="是否需要补充信息")
-    missing_fields: list[str] = Field(
+    missing_fields: list[TicketMissingField] = Field(
         default_factory=list,
-        description="继续处理所需但当前缺失的字段",
+        description=(
+            "继续处理所需但当前缺失的 canonical 字段名，"
+            "只能使用 order_id、refund_reason、account_id、account_email、"
+            "affected_feature、reproduction_steps、error_message、request_id"
+        ),
     )
     reason: str = Field(min_length=1, description="分类判断依据")

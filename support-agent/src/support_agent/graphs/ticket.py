@@ -84,7 +84,20 @@ CLASSIFICATION_SYSTEM_PROMPT = """你是企业客服工单分类器。
 只根据工单内容判断 category、priority 和缺失字段，不生成客服回复。
 category 只能是 billing、account、product、technical、other 之一；
 priority 只能是 low、normal、high、urgent 之一。
-如果继续处理需要但工单没有提供的信息，列入 missing_fields。
+category 判定规则：billing 是账单、扣款、退款；account 是登录、账户资料或账户安全；
+product 是产品功能使用、配置或操作入口咨询（例如导出数据）；technical 只用于错误、
+异常、接口失败或服务故障；不符合以上类别才使用 other。产品使用问题即使提到某个功能，
+也不要误判为 technical，除非用户明确报告错误或失败。
+如果继续处理需要但工单没有提供的信息，列入 missing_fields；
+needs_clarification 必须等于 missing_fields 是否非空。
+missing_fields 只能使用 canonical 字段名：order_id、refund_reason、account_id、
+account_email、affected_feature、reproduction_steps、error_message、request_id。
+billing 的退款问题通常需要 order_id 和 refund_reason；非退款账单问题只按其实际需要
+的字段判断，不能因为 category 是 billing 就要求 refund_reason。
+account 问题通常需要 account_email 或 account_id；如果文本已经给出邮箱或账户标识，
+不要再次要求账户标识。technical 问题通常需要 affected_feature、error_message 或
+reproduction_steps；如果文本已经清楚提供这些信息，不要因为还可以追问更多细节而标记缺失。
+只列出真正阻塞下一步处理的字段，不要猜测字段值，也不要把可选信息列入 missing_fields。
 """
 
 CLARIFICATION_QUESTIONS = {
@@ -95,6 +108,7 @@ CLARIFICATION_QUESTIONS = {
     "affected_feature": "请说明受影响的账户功能。",
     "reproduction_steps": "请提供问题的复现步骤。",
     "error_message": "请提供完整的错误信息。",
+    "request_id": "请提供请求 ID。",
 }
 
 
@@ -158,6 +172,15 @@ def classify_ticket(
         SystemMessage(content=CLASSIFICATION_SYSTEM_PROMPT),
         HumanMessage(content=state["normalized_text"]),
     ])
+    if result.needs_clarification and not result.missing_fields:
+        return {
+            "status": "failed",
+            "error_code": "MISSING_CLASSIFICATION",
+            "error_message": (
+                "分类结果声明需要澄清，但没有提供 missing_fields，"
+                "无法生成精确的澄清问题。"
+            ),
+        }
     return {
         "category": result.category,
         "priority": result.priority,

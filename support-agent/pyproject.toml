@@ -14,6 +14,7 @@ dependencies = [
 support-agent = "support_agent.cli:main"
 support-routing = "support_agent.routing_cli:main"
 support-ticket-contract = "support_agent.ticket_contract_cli:main"
+support-ticket-workflow = "support_agent.ticket_workflow_cli:main"
 
 [dependency-groups]
 dev = [

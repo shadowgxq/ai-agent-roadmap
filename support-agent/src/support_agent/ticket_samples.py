@@ -15,6 +15,8 @@ class TicketSample:
     customer_tier: str
     expected_clarification: bool | None
     notes: str
+    expected_risk_level: str | None = None
+    expected_requires_approval: bool | None = None
 
 
 SESSION_02_SAMPLES: tuple[TicketSample, ...] = (
@@ -93,6 +95,36 @@ SESSION_02_SAMPLES: tuple[TicketSample, ...] = (
         customer_tier="standard",
         expected_clarification=False,
         notes="不属于需要业务字段补充的工单。",
+    ),
+)
+
+
+SESSION_03_RISK_SAMPLES: tuple[TicketSample, ...] = (
+    TicketSample(
+        sample_id="query-billing",
+        subject="查询账单",
+        description=(
+            "请查询账单周期 2026 年 8 月中订单号 BILL-2026-08 的费用明细，解释收费项目。"
+            "这是只读查询，不执行任何修改或扣款。"
+        ),
+        customer_tier="standard",
+        expected_clarification=False,
+        notes="只读账单咨询，预期低风险。",
+        expected_risk_level="low",
+        expected_requires_approval=False,
+    ),
+    TicketSample(
+        sample_id="request-refund-action",
+        subject="代我退款",
+        description=(
+            "订单号：R-10086。退款原因：商品与描述不符。"
+            "请直接代我提交退款并完成退款操作。"
+        ),
+        customer_tier="standard",
+        expected_clarification=False,
+        notes="明确要求执行退款，预期高风险并需要审批。",
+        expected_risk_level="high",
+        expected_requires_approval=True,
     ),
 )
 

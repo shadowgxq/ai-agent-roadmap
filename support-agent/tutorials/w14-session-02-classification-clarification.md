@@ -4,7 +4,7 @@
 
 Session 1 冻结了 `TicketAgentState` 和主图骨架，但 `classify_ticket` 还没有接入真实模型。Session 2 把这份契约推进成可运行的业务分支：模型只做结构化理解，LangGraph 条件边决定工单继续走澄清还是进入回复子图。
 
-本节仍然不实现政策检索、回复生成和风险评估。完整输入进入 `response_subgraph` 后，会在当前已知边界得到 `RESPONSE_SUBGRAPH_NOT_READY`，这是诚实的未完成状态，不是成功回复。
+本节的实现范围仍然不包含政策检索、回复生成和风险评估。Session 2 当时让完整输入进入 `response_subgraph` 占位边界；这些节点已在 Session 3 实现，当前完整流程见 `tutorials/w14-session-03-policy-response-risk.md`。
 
 ## 2. 学习目标
 
@@ -80,7 +80,7 @@ return "response"
 信息完整 → response_subgraph ∈ visited_nodes
 ```
 
-完整输入目前仍会在响应子图的占位节点失败。因此“进入响应子图”与“已经能生成客服回复”是两个独立结论。
+在 Session 2 的验收时，完整输入会在响应子图的占位节点失败。因此当时“进入响应子图”与“已经能生成客服回复”是两个独立结论；Session 3 已替换该占位实现。
 
 ## 5. 可执行命令
 
@@ -134,7 +134,7 @@ normalize_ticket → classify_ticket → build_clarification → finalize
 normalize_ticket → classify_ticket → response_subgraph → finalize
 ```
 
-当前结果中的 `error_code` 应为 `RESPONSE_SUBGRAPH_NOT_READY`。这证明路由正确，但不代表 Session 3 的回复流程已经完成。
+Session 2 当时的结果中的 `error_code` 是 `RESPONSE_SUBGRAPH_NOT_READY`，这证明了路由正确，但不代表回复流程已经完成。现在应阅读 Session 3 教程查看完成后的 response subgraph 结果。
 
 ### 6.1 本次真实执行结果
 
@@ -189,4 +189,4 @@ normalize_ticket → classify_ticket → response_subgraph → finalize
 
 ## 10. 下一步
 
-Session 3 将实现固定 policy corpus、证据引用和 response subgraph 内的回复生成与风险评估。届时才会验证“查询账单”与“代我退款”的证据和风险结果。
+Session 3 已实现固定 policy corpus、证据引用和 response subgraph 内的回复生成与风险评估，并真实验证了“查询账单”与“代我退款”的证据和风险结果。详见 `tutorials/w14-session-03-policy-response-risk.md`。

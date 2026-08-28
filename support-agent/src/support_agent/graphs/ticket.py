@@ -1,15 +1,19 @@
 """W14 ticket workflow graph and node I/O contracts."""
 
 from dataclasses import dataclass
+import json
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
 from support_agent.models import (
+    EvidenceRef,
+    RiskAssessment,
     TicketAgentState,
     TicketWorkflowClassification,
 )
+from support_agent.policy_corpus import POLICY_CORPUS
 
 
 @dataclass(frozen=True)
@@ -51,13 +55,14 @@ NODE_IO_CONTRACTS: dict[str, NodeIOContract] = {
         reads=("category",),
         writes=("evidence_refs", "status", "error_code", "error_message"),
         calls_model=False,
-        error_codes=("RESPONSE_SUBGRAPH_NOT_READY",),
+        error_codes=("POLICY_NOT_FOUND",),
     ),
     "draft_response": NodeIOContract(
         reads=("normalized_text", "evidence_refs"),
         writes=("draft_response", "status", "error_code", "error_message"),
         calls_model=True,
-        error_codes=("RESPONSE_SUBGRAPH_NOT_READY",),
+        error_codes=("MODEL_NOT_CONFIGURED", "POLICY_NOT_FOUND",
+                     "DRAFT_GENERATION_FAILED"),
     ),
     "assess_risk": NodeIOContract(
         reads=("normalized_text", "draft_response"),
@@ -70,7 +75,7 @@ NODE_IO_CONTRACTS: dict[str, NodeIOContract] = {
             "error_message",
         ),
         calls_model=True,
-        error_codes=("RESPONSE_SUBGRAPH_NOT_READY",),
+        error_codes=("MODEL_NOT_CONFIGURED", "RISK_ASSESSMENT_FAILED"),
     ),
     "finalize": NodeIOContract(
         reads=("status", "draft_response", "risk_level"),
@@ -94,10 +99,25 @@ missing_fields 只能使用 canonical 字段名：order_id、refund_reason、acc
 account_email、affected_feature、reproduction_steps、error_message、request_id。
 billing 的退款问题通常需要 order_id 和 refund_reason；非退款账单问题只按其实际需要
 的字段判断，不能因为 category 是 billing 就要求 refund_reason。
+billing 问题只允许在确实缺少 order_id、refund_reason 或 request_id 时提出补充；
+不要因为账单查询是只读操作而要求 account_email、account_id 或其他账户字段。
 account 问题通常需要 account_email 或 account_id；如果文本已经给出邮箱或账户标识，
 不要再次要求账户标识。technical 问题通常需要 affected_feature、error_message 或
 reproduction_steps；如果文本已经清楚提供这些信息，不要因为还可以追问更多细节而标记缺失。
 只列出真正阻塞下一步处理的字段，不要猜测字段值，也不要把可选信息列入 missing_fields。
+"""
+
+DRAFT_SYSTEM_PROMPT = """你是企业客服回复草稿生成器。
+只根据工单内容和提供的政策证据生成中文客服回复，不要编造证据中没有的政策、承诺或处理结果。
+回复必须引用至少一个证据的 source_id，格式为 [source_id]，并在回复最后单独一行写“依据：[source_id]”；
+如果证据不足，明确说明无法确认，并提出下一步需要补充的信息。只输出给客户看的回复草稿，
+不输出分析过程。
+"""
+
+RISK_SYSTEM_PROMPT = """你是企业客服风险评估器。
+只返回 risk_level、risk_reasons 和 requires_approval。
+low 表示只读咨询或普通信息答复；medium 表示需要人工关注；high 表示可能产生退款、账户变更、
+删除数据或其他不可逆副作用。不要因为回复草稿语气平稳就降低用户请求本身的风险等级。
 """
 
 CLARIFICATION_QUESTIONS = {
@@ -221,15 +241,187 @@ def build_clarification(state: TicketAgentState) -> dict[str, object]:
     }
 
 
-def _response_not_ready(_: TicketAgentState) -> dict[str, object]:
-    """Keep future response nodes explicit without pretending they are implemented."""
+def retrieve_policy_stub(state: TicketAgentState) -> dict[str, object]:
+    """Return small, deterministic evidence references for the classified category."""
 
+    category = state.get("category")
+    evidence = POLICY_CORPUS.get(category) if category is not None else None
+    if evidence is None:
+        return {
+            "status": "failed",
+            "error_code": "POLICY_NOT_FOUND",
+            "error_message": f"没有找到 category={category!r} 的政策证据。",
+        }
     return {
-        "status": "failed",
-        "error_code": "RESPONSE_SUBGRAPH_NOT_READY",
-        "error_message": (
-            "retrieve_policy_stub、draft_response 和 assess_risk 将在后续 W14 Session 实现。"
+        "evidence_refs": [ref.model_copy(deep=True) for ref in evidence],
+        "status": "retrieving",
+    }
+
+
+def _message_text(message: object) -> str:
+    content = getattr(message, "content", "")
+    if isinstance(content, str):
+        return content.strip()
+    return str(content).strip()
+
+
+def _evidence_payload(evidence_refs: list[EvidenceRef]) -> str:
+    return json.dumps(
+        [ref.model_dump() for ref in evidence_refs],
+        ensure_ascii=False,
+    )
+
+
+def draft_response(
+    state: TicketAgentState,
+    *,
+    model: BaseChatModel | None,
+) -> dict[str, object]:
+    """Generate an evidence-grounded draft and require a source citation."""
+
+    if model is None:
+        return {
+            "status": "failed",
+            "error_code": "MODEL_NOT_CONFIGURED",
+            "error_message": "draft_response 需要注入模型 client。",
+        }
+
+    evidence_refs = state.get("evidence_refs", [])
+    if not evidence_refs:
+        return {
+            "status": "failed",
+            "error_code": "POLICY_NOT_FOUND",
+            "error_message": "draft_response 没有收到政策证据。",
+        }
+
+    prompt = (
+        f"工单内容：\n{state['normalized_text']}\n\n"
+        f"政策证据（只允许使用这些内容）：\n{_evidence_payload(evidence_refs)}\n\n"
+        "可用引用 ID："
+        + ", ".join(f"[{ref.source_id}]" for ref in evidence_refs)
+        + "\n请至少选择一个可用引用 ID，并严格写入回复最后一行。"
+    )
+    try:
+        response = model.invoke([
+            SystemMessage(content=DRAFT_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
+    except Exception as exc:  # noqa: BLE001 - convert provider failure to workflow state.
+        return {
+            "status": "failed",
+            "error_code": "DRAFT_GENERATION_FAILED",
+            "error_message": f"draft_response 模型调用失败：{type(exc).__name__}: {exc}",
+        }
+
+    draft = _message_text(response)
+    if not draft:
+        return {
+            "status": "failed",
+            "error_code": "DRAFT_GENERATION_FAILED",
+            "error_message": "draft_response 返回了空内容。",
+        }
+    if not any(ref.source_id in draft for ref in evidence_refs):
+        return {
+            "status": "failed",
+            "error_code": "DRAFT_GENERATION_FAILED",
+            "error_message": "回复草稿没有引用任何政策 source_id。",
+        }
+    return {
+        "draft_response": draft,
+        "status": "drafted",
+    }
+
+
+RISK_RANK = {"low": 0, "medium": 1, "high": 2}
+
+
+def _hard_risk_assessment(text: str) -> RiskAssessment:
+    """Detect explicit side-effect requests before consulting the model."""
+
+    reasons: list[str] = []
+    if "退款" in text and ("代我" in text or "直接" in text or "帮我完成" in text):
+        reasons.append("用户明确要求代为执行退款，可能产生资金副作用。")
+    if any(
+        phrase in text
+        for phrase in (
+            "帮我修改账户",
+            "请直接修改账户",
+            "代我修改账户",
+            "帮我删除数据",
+            "请直接删除数据",
+            "代我删除数据",
+            "帮我删除账户",
+            "请直接删除账户",
+        )
+    ):
+        reasons.append("用户明确要求修改或删除账户数据，可能产生不可逆副作用。")
+    if reasons:
+        return RiskAssessment(
+            risk_level="high",
+            risk_reasons=reasons,
+            requires_approval=True,
+        )
+    return RiskAssessment(
+        risk_level="low",
+        risk_reasons=[],
+        requires_approval=False,
+    )
+
+
+def assess_risk(
+    state: TicketAgentState,
+    *,
+    assessor=None,
+) -> dict[str, object]:
+    """Merge hard-rule risk with semantic model risk without allowing downgrade."""
+
+    hard_result = _hard_risk_assessment(state["normalized_text"])
+    if assessor is None:
+        return {
+            "risk_level": hard_result.risk_level,
+            "risk_reasons": hard_result.risk_reasons,
+            "requires_approval": hard_result.requires_approval,
+            "status": "failed",
+            "error_code": "MODEL_NOT_CONFIGURED",
+            "error_message": "assess_risk 需要注入结构化风险模型。",
+        }
+
+    prompt = (
+        f"工单内容：\n{state['normalized_text']}\n\n"
+        f"回复草稿：\n{state.get('draft_response', '')}\n\n"
+        "请评估语义风险。硬规则结果由代码合并，不能降低其风险等级。"
+    )
+    try:
+        model_result = assessor.invoke([
+            SystemMessage(content=RISK_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
+    except Exception as exc:  # noqa: BLE001 - convert provider failure to workflow state.
+        return {
+            "risk_level": hard_result.risk_level,
+            "risk_reasons": hard_result.risk_reasons,
+            "requires_approval": hard_result.requires_approval,
+            "status": "failed",
+            "error_code": "RISK_ASSESSMENT_FAILED",
+            "error_message": f"assess_risk 模型调用失败：{type(exc).__name__}: {exc}",
+        }
+
+    final_level = (
+        hard_result.risk_level
+        if RISK_RANK[hard_result.risk_level] >= RISK_RANK[model_result.risk_level]
+        else model_result.risk_level
+    )
+    reasons = list(dict.fromkeys(
+        hard_result.risk_reasons + model_result.risk_reasons))
+    return {
+        "risk_level": final_level,
+        "risk_reasons": reasons,
+        "requires_approval": (
+            final_level == "high"
+            or hard_result.requires_approval
+            or model_result.requires_approval
         ),
+        "status": "assessed",
     }
 
 
@@ -237,13 +429,30 @@ def _route_response(state: TicketAgentState) -> str:
     return "failed" if state["status"] == "failed" else "continue"
 
 
-def create_response_subgraph():
-    """Build the response subgraph boundary for later W14 sessions."""
+def _build_risk_assessor(model: BaseChatModel | None):
+    if model is None:
+        return None
+    return model.with_structured_output(
+        RiskAssessment,
+        method="function_calling",
+    )
+
+
+def create_response_subgraph(model: BaseChatModel | None = None):
+    """Build the policy-grounded response and risk subgraph."""
+
+    risk_assessor = _build_risk_assessor(model)
+
+    def draft_node(state: TicketAgentState) -> dict[str, object]:
+        return draft_response(state, model=model)
+
+    def assess_node(state: TicketAgentState) -> dict[str, object]:
+        return assess_risk(state, assessor=risk_assessor)
 
     builder = StateGraph(TicketAgentState)
-    builder.add_node("retrieve_policy_stub", _response_not_ready)
-    builder.add_node("draft_response", _response_not_ready)
-    builder.add_node("assess_risk", _response_not_ready)
+    builder.add_node("retrieve_policy_stub", retrieve_policy_stub)
+    builder.add_node("draft_response", draft_node)
+    builder.add_node("assess_risk", assess_node)
     builder.add_edge(START, "retrieve_policy_stub")
     builder.add_conditional_edges(
         "retrieve_policy_stub",
@@ -253,7 +462,14 @@ def create_response_subgraph():
             "continue": "draft_response",
         },
     )
-    builder.add_edge("draft_response", "assess_risk")
+    builder.add_conditional_edges(
+        "draft_response",
+        _route_response,
+        {
+            "failed": END,
+            "continue": "assess_risk",
+        },
+    )
     builder.add_edge("assess_risk", END)
     return builder.compile()
 
@@ -270,7 +486,7 @@ def create_ticket_graph(model: BaseChatModel | None = None):
     """Build the W14 parent graph with an optional classification model."""
 
     classifier = _build_classifier(model)
-    response_subgraph = create_response_subgraph()
+    response_subgraph = create_response_subgraph(model)
 
     def classify_node(state: TicketAgentState) -> dict[str, object]:
         return classify_ticket(state, classifier=classifier)

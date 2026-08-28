@@ -134,6 +134,28 @@ def test_inconsistent_clarification_result_fails_explicitly() -> None:
     assert "build_clarification" not in result
 
 
+def test_ambiguous_other_result_uses_request_context() -> None:
+    state = initial_state_for_sample(SESSION_02_SAMPLES[0])
+    model = StubModel(
+        TicketWorkflowClassification(
+            category="other",
+            priority="normal",
+            needs_clarification=True,
+            missing_fields=[],
+            reason="ambiguous request",
+        )
+    )
+    graph = create_ticket_graph(model)
+
+    result = graph.invoke(state)
+
+    assert result["status"] == "completed"
+    assert result["missing_fields"] == ["request_context"]
+    assert result["draft_response"] == "请说明具体要咨询或处理的事项。"
+    assert model.draft_calls == 0
+    assert model.risk_calls == 0
+
+
 def test_missing_fields_use_canonical_identifiers() -> None:
     with pytest.raises(ValidationError):
         TicketWorkflowClassification(

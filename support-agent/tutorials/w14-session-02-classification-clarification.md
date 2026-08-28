@@ -54,7 +54,7 @@ classifier = model.with_structured_output(
 
 模型只能返回有限的 category、priority 和 canonical `missing_fields`。分类节点只把后续业务真正需要的字段写回 state，不把 `reason` 当作客服回复，也不把模型 client 放进 state。
 
-如果模型说需要澄清却没有返回 `missing_fields`，节点会返回 `MISSING_CLASSIFICATION`。没有精确字段就不能生成精确问题，也不能继续猜测。`missing_fields` 使用 `order_id`、`refund_reason`、`account_email` 等稳定字段名，`build_clarification` 再由代码映射成用户可读问题。
+如果普通业务类别的模型结果说需要澄清却没有返回 `missing_fields`，节点会返回 `MISSING_CLASSIFICATION`。没有精确字段就不能生成精确问题，也不能继续猜测。对于 `category=other` 且连具体事项都没有说清楚的模糊工单，代码会把缺失项归一化为 `request_context`，再由 `build_clarification` 生成明确问题。`missing_fields` 使用 `order_id`、`refund_reason`、`account_email` 等稳定字段名，`build_clarification` 再由代码映射成用户可读问题。
 
 ### 4.2 条件边
 
@@ -173,7 +173,7 @@ Session 2 当时的结果中的 `error_code` 是 `RESPONSE_SUBGRAPH_NOT_READY`�
 
 - [x] `classify_ticket` 使用 `TicketWorkflowClassification` 结构化输出；
 - [x] 分类只产生允许的 category 和 priority；
-- [x] `needs_clarification=True` 时必须有 `missing_fields`，否则返回 `MISSING_CLASSIFICATION`；
+- [x] `needs_clarification=True` 时普通业务类别必须有 `missing_fields`，否则返回 `MISSING_CLASSIFICATION`；模糊 `other` 工单归一化为 `request_context`；
 - [x] 3 个信息缺失样例均未进入 `response_subgraph`；
 - [x] 完整样例进入 `response_subgraph`，当前边界错误码明确；
 - [x] 每个样例只进行一次分类模型调用；

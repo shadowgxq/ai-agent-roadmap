@@ -96,7 +96,13 @@ product 是产品功能使用、配置或操作入口咨询（例如导出数据
 如果继续处理需要但工单没有提供的信息，列入 missing_fields；
 needs_clarification 必须等于 missing_fields 是否非空。
 missing_fields 只能使用 canonical 字段名：order_id、refund_reason、account_id、
-account_email、affected_feature、reproduction_steps、error_message、request_id。
+account_email、affected_feature、reproduction_steps、error_message、request_id、
+request_context。
+如果 category=other 且用户没有说清楚要咨询或处理的具体事项，必须设置
+needs_clarification=true，并将 request_context 放入 missing_fields；公司资料等
+明确的 other 咨询不需要因此澄清。明确但超出客服业务范围的问题（例如“请问今天
+上海天气如何”）也属于信息完整的 other，必须设置 needs_clarification=false、
+missing_fields=[]，不能为了把请求转回客服范围而要求 request_context。
 billing 的退款问题通常需要 order_id 和 refund_reason；非退款账单问题只按其实际需要
 的字段判断，不能因为 category 是 billing 就要求 refund_reason。
 billing 问题只允许在确实缺少 order_id、refund_reason 或 request_id 时提出补充；
@@ -129,6 +135,7 @@ CLARIFICATION_QUESTIONS = {
     "reproduction_steps": "请提供问题的复现步骤。",
     "error_message": "请提供完整的错误信息。",
     "request_id": "请提供请求 ID。",
+    "request_context": "请说明具体要咨询或处理的事项。",
 }
 
 
@@ -193,6 +200,13 @@ def classify_ticket(
         HumanMessage(content=state["normalized_text"]),
     ])
     if result.needs_clarification and not result.missing_fields:
+        if result.category == "other":
+            return {
+                "category": result.category,
+                "priority": result.priority,
+                "missing_fields": ["request_context"],
+                "status": "classified",
+            }
         return {
             "status": "failed",
             "error_code": "MISSING_CLASSIFICATION",

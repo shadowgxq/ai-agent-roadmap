@@ -98,24 +98,42 @@ def evaluate_case(
         "response_subgraph" in visited_nodes
         or "retrieve_policy_stub" in visited_nodes
     )
-    expected_clarification = bool(sample.expected_clarification)
-    if entered_clarification != expected_clarification:
+    event_names = [event.event for event in events]
+    if sample.expected_clarification is not None:
+        expected_clarification = sample.expected_clarification
+        if entered_clarification != expected_clarification:
+            _failure(
+                failures,
+                "clarification",
+                (
+                    "预期进入澄清分支。"
+                    if expected_clarification
+                    else "预期进入 response_subgraph。"
+                ),
+            )
+        if expected_clarification and entered_response:
+            _failure(failures, "clarification", "澄清工单进入了 response_subgraph。")
+    elif entered_clarification and entered_response:
         _failure(
             failures,
             "clarification",
-            (
-                "预期进入澄清分支。"
-                if expected_clarification
-                else "预期进入 response_subgraph。"
-            ),
+            "压力样例同时进入了澄清分支和 response_subgraph。",
         )
-    if expected_clarification and entered_response:
-        _failure(failures, "clarification", "澄清工单进入了 response_subgraph。")
-    if expected_clarification and "text" not in [event.event for event in events]:
+    elif not entered_clarification and not entered_response:
+        _failure(
+            failures,
+            "clarification",
+            "压力样例没有进入澄清分支或 response_subgraph。",
+        )
+
+    if entered_clarification and "text" not in event_names:
         _failure(failures, "clarification", "澄清分支没有输出 text 事件。")
 
-    event_names = [event.event for event in events]
-    if not expected_clarification:
+    should_check_response = (
+        sample.expected_clarification is False
+        or sample.expected_clarification is None and entered_response
+    )
+    if should_check_response:
         if not entered_response:
             _failure(failures, "clarification", "完整工单没有进入 response_subgraph。")
         if "retrieval" not in event_names:

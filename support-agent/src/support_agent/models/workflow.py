@@ -22,6 +22,7 @@ TicketMissingField = Literal[
     "reproduction_steps",
     "error_message",
     "request_id",
+    "request_context",
 ]
 RiskLevel = Literal["low", "medium", "high"]
 TicketStatus = Literal[
@@ -109,7 +110,8 @@ class TicketWorkflowClassification(BaseModel):
         description=(
             "继续处理所需但当前缺失的 canonical 字段名，"
             "只能使用 order_id、refund_reason、account_id、account_email、"
-            "affected_feature、reproduction_steps、error_message、request_id"
+            "affected_feature、reproduction_steps、error_message、request_id、"
+            "request_context"
         ),
     )
     reason: str = Field(min_length=1, description="分类判断依据")

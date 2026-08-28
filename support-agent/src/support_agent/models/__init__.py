@@ -1,5 +1,6 @@
 """Domain and structured-output models for support-agent."""
 
+from .events import AgentEvent, AgentEventName
 from .routing import RouteDecision, RouteName, RoutingState
 from .ticket import TicketClassification
 from .workflow import (
@@ -16,6 +17,8 @@ from .workflow import (
 )
 
 __all__ = [
+    "AgentEvent",
+    "AgentEventName",
     "RouteDecision",
     "RouteName",
     "RoutingState",

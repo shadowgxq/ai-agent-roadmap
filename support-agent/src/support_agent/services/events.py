@@ -4,6 +4,8 @@ from collections.abc import AsyncIterable, AsyncIterator, Callable, Mapping
 from datetime import datetime, timezone
 from typing import Any
 
+from langchain_core.runnables import RunnableConfig
+
 from support_agent.models import AgentEvent, AgentEventName, TicketAgentState
 
 
@@ -30,10 +32,15 @@ class GraphEventAdapter:
         self,
         graph: Any,
         state: TicketAgentState,
+        *,
+        config: RunnableConfig | None = None,
     ) -> AsyncIterator[AgentEvent]:
         """Stream public events for one graph run."""
 
-        source = graph.astream_events(state, version="v2")
+        if config is None:
+            source = graph.astream_events(state, version="v2")
+        else:
+            source = graph.astream_events(state, config=config, version="v2")
         async for event in self.adapt(source, run_id=state["run_id"]):
             yield event
 

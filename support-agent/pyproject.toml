@@ -7,6 +7,8 @@ dependencies = [
     "langchain>=1.0.0",
     "langchain-openai>=1.0.0",
     "langgraph>=1.0.0",
+    "langgraph-checkpoint-postgres>=3.1.2",
+    "psycopg[binary,pool]>=3.3.4",
     "pydantic-settings>=2.10.1",
 ]
 
@@ -17,6 +19,7 @@ support-ticket-contract = "support_agent.ticket_contract_cli:main"
 support-ticket-workflow = "support_agent.ticket_workflow_cli:main"
 support-ticket-events = "support_agent.ticket_event_cli:main"
 support-ticket-acceptance = "support_agent.ticket_acceptance_cli:main"
+support-ticket-checkpoint = "support_agent.ticket_checkpoint_cli:main"
 
 [dependency-groups]
 dev = [

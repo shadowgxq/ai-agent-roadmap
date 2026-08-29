@@ -27,6 +27,7 @@ class AgentSettings(BaseSettings):
     timeout_seconds: float = Field(default=30.0, gt=0)
     max_run_cost_usd: Decimal = Field(default=Decimal("0.50"), gt=0)
     deepseek_thinking_mode: Literal["enabled", "disabled"] = "disabled"
+    database_url: str = Field(min_length=1)
 
     @property
     def resolved_base_url(self) -> str | None:

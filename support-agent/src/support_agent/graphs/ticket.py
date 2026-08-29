@@ -5,6 +5,7 @@ import json
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
 from support_agent.models import (
@@ -496,8 +497,12 @@ def finalize_ticket(state: TicketAgentState) -> dict[str, object]:
     return {"status": "completed"}
 
 
-def create_ticket_graph(model: BaseChatModel | None = None):
-    """Build the W14 parent graph with an optional classification model."""
+def create_ticket_graph(
+    model: BaseChatModel | None = None,
+    *,
+    checkpointer: BaseCheckpointSaver | None = None,
+):
+    """Build the ticket graph with optional model and persistence resources."""
 
     classifier = _build_classifier(model)
     response_subgraph = create_response_subgraph(model)
@@ -534,4 +539,4 @@ def create_ticket_graph(model: BaseChatModel | None = None):
     builder.add_edge("response_subgraph", "finalize")
     builder.add_edge("finalize", END)
 
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)

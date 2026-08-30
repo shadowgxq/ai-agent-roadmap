@@ -10,6 +10,7 @@ from .proposals import (
 from .runner import (
     ThreadNotWaitingForApprovalError,
     build_thread_config,
+    continue_run,
     get_run_snapshot,
     resume_run,
     start_run,
@@ -22,6 +23,7 @@ __all__ = [
     "build_idempotency_key",
     "build_proposal_hash",
     "canonical_json",
+    "continue_run",
     "create_chat_model",
     "get_run_snapshot",
     "resume_run",

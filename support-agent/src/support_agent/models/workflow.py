@@ -37,6 +37,7 @@ TicketStatus = Literal[
     "approved",
     "rejected",
     "revising",
+    "tool_executed",
     "completed",
     "failed",
 ]
@@ -49,6 +50,7 @@ TicketErrorCode = Literal[
     "RISK_ASSESSMENT_FAILED",
     "RESPONSE_SUBGRAPH_NOT_READY",
     "INVALID_APPROVAL_DECISION",
+    "TOOL_NOT_CONFIGURED",
     "REVISION_LIMIT_REACHED",
 ]
 
@@ -96,12 +98,17 @@ class TicketAgentState(TypedDict):
     risk_reasons: NotRequired[list[str]]
     requires_approval: NotRequired[bool]
 
-    # human approval control state; durable business records arrive in Session 3
+    # human approval control state
     approval_decision: NotRequired[ApprovalDecision]
     approval_feedback: NotRequired[str | None]
     approval_error: NotRequired[str | None]
     proposal_hash: NotRequired[str]
     revision_count: NotRequired[int]
+
+    # idempotent tool execution projection; authoritative facts stay in PostgreSQL
+    idempotency_key: NotRequired[str]
+    tool_result: NotRequired[dict[str, object]]
+    tool_replayed: NotRequired[bool]
 
 
 class ApprovalResume(BaseModel):

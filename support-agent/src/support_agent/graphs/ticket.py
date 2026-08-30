@@ -1,5 +1,6 @@
 """W14-W15 ticket workflow graph and node I/O contracts."""
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import json
 from typing import Any, Literal
@@ -12,13 +13,17 @@ from langgraph.types import Command, interrupt
 
 from support_agent.models import (
     ApprovalResume,
+    CrmUpdateResult,
     EvidenceRef,
     RiskAssessment,
     TicketAgentState,
     TicketWorkflowClassification,
 )
 from support_agent.policy_corpus import POLICY_CORPUS
-from support_agent.services.proposals import build_proposal_hash
+from support_agent.services.proposals import (
+    build_idempotency_key,
+    build_proposal_hash,
+)
 
 
 @dataclass(frozen=True)
@@ -106,11 +111,23 @@ NODE_IO_CONTRACTS: dict[str, NodeIOContract] = {
         writes=("proposal_hash", "approval_error"),
         calls_model=False,
     ),
-    "execute_tool_stub": NodeIOContract(
-        reads=("approval_decision",),
-        writes=("status", "error_code", "error_message"),
+    "execute_tool": NodeIOContract(
+        reads=(
+            "organization_id",
+            "ticket_id",
+            "run_id",
+            "approval_decision",
+        ),
+        writes=(
+            "idempotency_key",
+            "tool_result",
+            "tool_replayed",
+            "status",
+            "error_code",
+            "error_message",
+        ),
         calls_model=False,
-        error_codes=("INVALID_APPROVAL_DECISION",),
+        error_codes=("INVALID_APPROVAL_DECISION", "TOOL_NOT_CONFIGURED"),
     ),
     "finalize": NodeIOContract(
         reads=(
@@ -395,6 +412,11 @@ def draft_response(
 
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
 MAX_REVISIONS = 2
+CrmToolExecutor = Callable[..., Awaitable[CrmUpdateResult]]
+
+
+class SimulatedToolCrash(RuntimeError):
+    """Fault injected after the durable CRM transaction has committed."""
 
 
 def _hard_risk_assessment(text: str) -> RiskAssessment:
@@ -544,7 +566,7 @@ def approval_gate(
 ) -> Command[
     Literal[
         "approval_gate",
-        "execute_tool_stub",
+        "execute_tool",
         "finalize",
         "response_subgraph",
     ]
@@ -572,7 +594,7 @@ def approval_gate(
                 "approval_error": None,
                 "status": "approved",
             },
-            goto="execute_tool_stub",
+            goto="execute_tool",
         )
 
     if decision.decision == "reject":
@@ -612,16 +634,57 @@ def approval_gate(
     )
 
 
-def execute_tool_stub(state: TicketAgentState) -> dict[str, object]:
-    """Mark the approved path without performing an external side effect."""
+async def execute_tool(
+    state: TicketAgentState,
+    *,
+    tool_executor: CrmToolExecutor | None,
+    crash_after_tool_commit: bool = False,
+) -> dict[str, object]:
+    """Execute the approved CRM update through a durable idempotency adapter."""
 
     if state.get("approval_decision") != "approve":
         return {
             "status": "failed",
             "error_code": "INVALID_APPROVAL_DECISION",
-            "error_message": "只有 approve 决策可以进入工具占位节点。",
+            "error_message": "只有 approve 决策可以进入 CRM 工具节点。",
         }
-    return {"status": "approved"}
+    if tool_executor is None:
+        return {
+            "status": "failed",
+            "error_code": "TOOL_NOT_CONFIGURED",
+            "error_message": "CRM 工具节点没有注入持久化执行器。",
+        }
+
+    payload = {
+        "ticket_id": state["ticket_id"],
+        "status": "resolved",
+    }
+    idempotency_key = build_idempotency_key(
+        organization_id=state["organization_id"],
+        ticket_id=state["ticket_id"],
+        run_id=state["run_id"],
+        action_type="update_crm_ticket",
+        payload=payload,
+    )
+    result = await tool_executor(
+        organization_id=state["organization_id"],
+        ticket_id=state["ticket_id"],
+        run_id=state["run_id"],
+        status="resolved",
+        idempotency_key=idempotency_key,
+    )
+
+    if crash_after_tool_commit and not result.replayed:
+        raise SimulatedToolCrash(
+            "simulated crash after external side effect"
+        )
+
+    return {
+        "idempotency_key": idempotency_key,
+        "tool_result": result.model_dump(exclude={"replayed"}),
+        "tool_replayed": result.replayed,
+        "status": "tool_executed",
+    }
 
 
 def _build_risk_assessor(model: BaseChatModel | None):
@@ -684,6 +747,8 @@ def create_ticket_graph(
     *,
     checkpointer: BaseCheckpointSaver | None = None,
     response_subgraph: Any | None = None,
+    tool_executor: CrmToolExecutor | None = None,
+    crash_after_tool_commit: bool = False,
 ):
     """Build the ticket graph with optional model and persistence resources."""
 
@@ -697,6 +762,15 @@ def create_ticket_graph(
     def classify_node(state: TicketAgentState) -> dict[str, object]:
         return classify_ticket(state, classifier=classifier)
 
+    async def execute_tool_node(
+        state: TicketAgentState,
+    ) -> dict[str, object]:
+        return await execute_tool(
+            state,
+            tool_executor=tool_executor,
+            crash_after_tool_commit=crash_after_tool_commit,
+        )
+
     builder = StateGraph(TicketAgentState)
     builder.add_node("normalize_ticket", normalize_ticket)
     builder.add_node("classify_ticket", classify_node)
@@ -704,7 +778,7 @@ def create_ticket_graph(
     builder.add_node("response_subgraph", response_graph)
     builder.add_node("prepare_approval", prepare_approval)
     builder.add_node("approval_gate", approval_gate)
-    builder.add_node("execute_tool_stub", execute_tool_stub)
+    builder.add_node("execute_tool", execute_tool_node)
     builder.add_node("finalize", finalize_ticket)
 
     builder.add_edge(START, "normalize_ticket")
@@ -736,7 +810,7 @@ def create_ticket_graph(
         },
     )
     builder.add_edge("prepare_approval", "approval_gate")
-    builder.add_edge("execute_tool_stub", "finalize")
+    builder.add_edge("execute_tool", "finalize")
     builder.add_edge("finalize", END)
 
     return builder.compile(checkpointer=checkpointer)

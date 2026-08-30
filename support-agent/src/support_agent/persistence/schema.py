@@ -53,10 +53,28 @@ CREATE TABLE IF NOT EXISTS tool_actions (
 """
 
 
+CRM_TICKETS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS crm_tickets (
+    organization_id TEXT NOT NULL,
+    ticket_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    update_count INTEGER NOT NULL,
+    last_idempotency_key TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (organization_id, ticket_id),
+    CONSTRAINT crm_tickets_update_count_check
+        CHECK (update_count >= 1),
+    CONSTRAINT crm_tickets_idempotency_key_check
+        CHECK (last_idempotency_key ~ '^[0-9a-f]{64}$')
+)
+"""
+
+
 async def initialize_business_schema(database_url: str) -> None:
-    """Create the two small business tables used by the W15 learning flow."""
+    """Create the small business tables used by the W15 learning flow."""
 
     async with await AsyncConnection.connect(database_url) as connection:
         async with connection.cursor() as cursor:
             await cursor.execute(APPROVALS_TABLE_SQL)
             await cursor.execute(TOOL_ACTIONS_TABLE_SQL)
+            await cursor.execute(CRM_TICKETS_TABLE_SQL)

@@ -1,4 +1,4 @@
-"""Offline W15 CLI for checkpoint and human-approval experiments."""
+"""Offline W15 CLI for checkpoint, approval, and idempotent CRM experiments."""
 
 import argparse
 import asyncio
@@ -13,12 +13,14 @@ from support_agent.graphs import create_ticket_graph
 from support_agent.models import ApprovalDecision, TicketAgentState
 from support_agent.persistence import (
     ApprovalRepository,
+    MockCrmRepository,
     ToolActionRepository,
     create_checkpointer,
     initialize_business_schema,
 )
 from support_agent.services import (
     build_idempotency_key,
+    continue_run,
     get_run_snapshot,
     resume_run,
     start_run,
@@ -131,6 +133,9 @@ def _snapshot_payload(
         "approval_error": values.get("approval_error"),
         "proposal_hash": values.get("proposal_hash"),
         "revision_count": values.get("revision_count", 0),
+        "idempotency_key": values.get("idempotency_key"),
+        "tool_result": values.get("tool_result"),
+        "tool_replayed": values.get("tool_replayed"),
         "waiting_for_approval": bool(interrupts),
         "interrupts": interrupts,
     }
@@ -154,10 +159,12 @@ async def _approval_start(
     thread_id: str,
 ) -> dict[str, object]:
     await initialize_business_schema(settings.database_url)
+    crm_repository = MockCrmRepository(settings.database_url)
     async with create_checkpointer(settings.database_url) as checkpointer:
         graph = create_ticket_graph(
             checkpointer=checkpointer,
             response_subgraph=_create_offline_approval_subgraph(),
+            tool_executor=crm_repository.update_ticket,
         )
         state = build_approval_demo_state(thread_id)
         result = await start_run(graph, state)
@@ -177,14 +184,18 @@ async def _resume(
     actor_id: str,
     proposal_hash: str,
     feedback: str | None,
+    crash_after_tool_commit: bool,
 ) -> dict[str, object]:
     await initialize_business_schema(settings.database_url)
     approval_repository = ApprovalRepository(settings.database_url)
     tool_action_repository = ToolActionRepository(settings.database_url)
+    crm_repository = MockCrmRepository(settings.database_url)
     async with create_checkpointer(settings.database_url) as checkpointer:
         graph = create_ticket_graph(
             checkpointer=checkpointer,
             response_subgraph=_create_offline_approval_subgraph(),
+            tool_executor=crm_repository.update_ticket,
+            crash_after_tool_commit=crash_after_tool_commit,
         )
         result = await resume_run(
             graph,
@@ -193,7 +204,6 @@ async def _resume(
             actor_id=actor_id,
             proposal_hash=proposal_hash,
             approval_repository=approval_repository,
-            tool_action_repository=tool_action_repository,
             feedback=feedback,
         )
         snapshot = await get_run_snapshot(graph, thread_id=thread_id)
@@ -202,48 +212,125 @@ async def _resume(
             thread_id=thread_id,
             result=result,
         )
-        values = dict(snapshot.values or {})
-        run_id = values.get("run_id")
-        approvals = (
-            await approval_repository.list_for_run(str(run_id))
-            if run_id is not None
-            else []
+        await _attach_business_records(
+            payload,
+            snapshot,
+            approval_repository=approval_repository,
+            tool_action_repository=tool_action_repository,
+            crm_repository=crm_repository,
         )
-        payload["approvals"] = [
-            record.model_dump(mode="json") for record in approvals
-        ]
+        return payload
 
-        if decision == "approve" and run_id is not None:
-            action_payload = {
-                "ticket_id": str(values["ticket_id"]),
-                "status": "resolved",
-            }
-            idempotency_key = build_idempotency_key(
-                organization_id=str(values["organization_id"]),
-                ticket_id=str(values["ticket_id"]),
-                run_id=str(run_id),
-                action_type="update_crm_ticket",
-                payload=action_payload,
-            )
-            action = await tool_action_repository.get_by_key(idempotency_key)
-            payload["tool_action"] = (
-                action.model_dump(mode="json") if action is not None else None
-            )
-        else:
-            payload["tool_action"] = None
+
+async def _attach_business_records(
+    payload: dict[str, object],
+    snapshot: object,
+    *,
+    approval_repository: ApprovalRepository,
+    tool_action_repository: ToolActionRepository,
+    crm_repository: MockCrmRepository,
+) -> None:
+    values = dict(getattr(snapshot, "values", {}) or {})
+    run_id = values.get("run_id")
+    organization_id = values.get("organization_id")
+    ticket_id = values.get("ticket_id")
+
+    approvals = (
+        await approval_repository.list_for_run(str(run_id))
+        if run_id is not None
+        else []
+    )
+    payload["approvals"] = [
+        record.model_dump(mode="json") for record in approvals
+    ]
+
+    if all(value is not None for value in (run_id, organization_id, ticket_id)):
+        action_payload = {
+            "ticket_id": str(ticket_id),
+            "status": "resolved",
+        }
+        idempotency_key = build_idempotency_key(
+            organization_id=str(organization_id),
+            ticket_id=str(ticket_id),
+            run_id=str(run_id),
+            action_type="update_crm_ticket",
+            payload=action_payload,
+        )
+        action = await tool_action_repository.get_by_key(idempotency_key)
+        crm_ticket = await crm_repository.get_ticket(
+            organization_id=str(organization_id),
+            ticket_id=str(ticket_id),
+        )
+    else:
+        action = None
+        crm_ticket = None
+
+    payload["tool_action"] = (
+        action.model_dump(mode="json") if action is not None else None
+    )
+    payload["crm_ticket"] = (
+        crm_ticket.model_dump(mode="json")
+        if crm_ticket is not None
+        else None
+    )
+
+
+async def _continue(settings: AgentSettings, thread_id: str) -> dict[str, object]:
+    await initialize_business_schema(settings.database_url)
+    approval_repository = ApprovalRepository(settings.database_url)
+    tool_action_repository = ToolActionRepository(settings.database_url)
+    crm_repository = MockCrmRepository(settings.database_url)
+    async with create_checkpointer(settings.database_url) as checkpointer:
+        graph = create_ticket_graph(
+            checkpointer=checkpointer,
+            response_subgraph=_create_offline_approval_subgraph(),
+            tool_executor=crm_repository.update_ticket,
+        )
+        result = await continue_run(graph, thread_id=thread_id)
+        snapshot = await get_run_snapshot(graph, thread_id=thread_id)
+        payload = _snapshot_payload(
+            snapshot,
+            thread_id=thread_id,
+            result=result,
+        )
+        await _attach_business_records(
+            payload,
+            snapshot,
+            approval_repository=approval_repository,
+            tool_action_repository=tool_action_repository,
+            crm_repository=crm_repository,
+        )
         return payload
 
 
 async def _inspect(settings: AgentSettings, thread_id: str) -> dict[str, object]:
+    await initialize_business_schema(settings.database_url)
+    approval_repository = ApprovalRepository(settings.database_url)
+    tool_action_repository = ToolActionRepository(settings.database_url)
+    crm_repository = MockCrmRepository(settings.database_url)
     async with create_checkpointer(settings.database_url) as checkpointer:
-        graph = create_ticket_graph(checkpointer=checkpointer)
+        graph = create_ticket_graph(
+            checkpointer=checkpointer,
+            response_subgraph=_create_offline_approval_subgraph(),
+            tool_executor=crm_repository.update_ticket,
+        )
         snapshot = await get_run_snapshot(graph, thread_id=thread_id)
-        return _snapshot_payload(snapshot, thread_id=thread_id)
+        payload = _snapshot_payload(snapshot, thread_id=thread_id)
+        await _attach_business_records(
+            payload,
+            snapshot,
+            approval_repository=approval_repository,
+            tool_action_repository=tool_action_repository,
+            crm_repository=crm_repository,
+        )
+        return payload
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create or inspect a W15 PostgreSQL checkpoint without LLM calls."
+        description=(
+            "Run W15 PostgreSQL checkpoint and mock CRM flows without LLM calls."
+        )
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -285,6 +372,17 @@ def _build_parser() -> argparse.ArgumentParser:
     resume_parser.add_argument("--actor-id", required=True)
     resume_parser.add_argument("--proposal-hash", required=True)
     resume_parser.add_argument("--feedback")
+    resume_parser.add_argument(
+        "--crash-after-tool-commit",
+        action="store_true",
+        help="Raise after the CRM transaction commits and before node completion.",
+    )
+
+    continue_parser = subparsers.add_parser(
+        "continue",
+        help="Continue a thread from the checkpoint left by a node crash.",
+    )
+    continue_parser.add_argument("thread_id")
     return parser
 
 
@@ -301,6 +399,8 @@ def main() -> int:
     elif args.command == "approval-start":
         thread_id = args.thread_id or str(uuid4())
         payload = asyncio.run(_approval_start(settings, thread_id))
+    elif args.command == "continue":
+        payload = asyncio.run(_continue(settings, args.thread_id))
     else:
         feedback = args.feedback.strip() if args.feedback else None
         if args.decision in {"reject", "revise"} and not feedback:
@@ -313,6 +413,7 @@ def main() -> int:
                 actor_id=args.actor_id,
                 proposal_hash=args.proposal_hash,
                 feedback=feedback,
+                crash_after_tool_commit=args.crash_after_tool_commit,
             )
         )
 

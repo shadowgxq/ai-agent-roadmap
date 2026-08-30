@@ -20,7 +20,7 @@ NODE_STAGE_BY_NAME: dict[str, str] = {
     "assess_risk": "assessing_risk",
     "prepare_approval": "preparing_approval",
     "approval_gate": "waiting_approval",
-    "execute_tool_stub": "approved_action_stub",
+    "execute_tool": "executing_approved_action",
     "finalize": "finalizing",
 }
 

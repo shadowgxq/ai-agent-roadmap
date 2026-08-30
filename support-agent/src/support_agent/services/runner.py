@@ -7,9 +7,6 @@ from langgraph.types import Command
 
 from support_agent.models import ApprovalDecision, ApprovalResume, TicketAgentState
 from support_agent.persistence.approvals import ApprovalRepository
-from support_agent.persistence.tool_actions import ToolActionRepository
-
-from .proposals import build_idempotency_key
 
 
 class ThreadNotWaitingForApprovalError(RuntimeError):
@@ -40,6 +37,16 @@ async def get_run_snapshot(graph: Any, *, thread_id: str):
     return await graph.aget_state(build_thread_config(thread_id))
 
 
+async def continue_run(graph: Any, *, thread_id: str) -> dict[str, object]:
+    """Continue the same thread from its latest durable checkpoint."""
+
+    config = build_thread_config(thread_id)
+    snapshot = await graph.aget_state(config)
+    if not snapshot.values:
+        raise LookupError(f"没有找到 thread_id={thread_id!r} 的 checkpoint。")
+    return await graph.ainvoke(None, config=config)
+
+
 async def resume_run(
     graph: Any,
     *,
@@ -48,7 +55,6 @@ async def resume_run(
     actor_id: str,
     proposal_hash: str,
     approval_repository: ApprovalRepository,
-    tool_action_repository: ToolActionRepository,
     feedback: str | None = None,
 ) -> dict[str, object]:
     """Persist one decision, then resume the matching interrupted proposal."""
@@ -83,26 +89,6 @@ async def resume_run(
             feedback=resume_value.feedback,
             proposal_hash=resume_value.proposal_hash,
         )
-        if resume_value.decision == "approve":
-            action_payload = {
-                "ticket_id": str(values["ticket_id"]),
-                "status": "resolved",
-            }
-            idempotency_key = build_idempotency_key(
-                organization_id=str(values["organization_id"]),
-                ticket_id=str(values["ticket_id"]),
-                run_id=str(values["run_id"]),
-                action_type="update_crm_ticket",
-                payload=action_payload,
-            )
-            await tool_action_repository.reserve_action(
-                organization_id=str(values["organization_id"]),
-                ticket_id=str(values["ticket_id"]),
-                run_id=str(values["run_id"]),
-                action_type="update_crm_ticket",
-                idempotency_key=idempotency_key,
-                request_json=action_payload,
-            )
 
     return await graph.ainvoke(
         Command(resume=resume_value.model_dump(exclude_none=True)),

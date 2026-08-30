@@ -1,6 +1,7 @@
 """Domain and structured-output models for support-agent."""
 
 from .approval import ApprovalRecord, ToolActionRecord, ToolActionStatus
+from .crm import CrmTicketRecord, CrmUpdateResult
 from .events import AgentEvent, AgentEventName
 from .routing import RouteDecision, RouteName, RoutingState
 from .ticket import TicketClassification
@@ -25,6 +26,8 @@ __all__ = [
     "ApprovalDecision",
     "ApprovalRecord",
     "ApprovalResume",
+    "CrmTicketRecord",
+    "CrmUpdateResult",
     "RouteDecision",
     "RouteName",
     "RoutingState",

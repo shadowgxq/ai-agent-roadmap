@@ -11,8 +11,18 @@ from langgraph.graph import END, START, StateGraph
 from support_agent.config import AgentSettings
 from support_agent.graphs import create_ticket_graph
 from support_agent.models import ApprovalDecision, TicketAgentState
-from support_agent.persistence import create_checkpointer
-from support_agent.services import get_run_snapshot, resume_run, start_run
+from support_agent.persistence import (
+    ApprovalRepository,
+    ToolActionRepository,
+    create_checkpointer,
+    initialize_business_schema,
+)
+from support_agent.services import (
+    build_idempotency_key,
+    get_run_snapshot,
+    resume_run,
+    start_run,
+)
 
 
 def build_demo_state(thread_id: str) -> TicketAgentState:
@@ -118,6 +128,8 @@ def _snapshot_payload(
         "draft_response": values.get("draft_response"),
         "approval_decision": values.get("approval_decision"),
         "approval_feedback": values.get("approval_feedback"),
+        "approval_error": values.get("approval_error"),
+        "proposal_hash": values.get("proposal_hash"),
         "revision_count": values.get("revision_count", 0),
         "waiting_for_approval": bool(interrupts),
         "interrupts": interrupts,
@@ -141,6 +153,7 @@ async def _approval_start(
     settings: AgentSettings,
     thread_id: str,
 ) -> dict[str, object]:
+    await initialize_business_schema(settings.database_url)
     async with create_checkpointer(settings.database_url) as checkpointer:
         graph = create_ticket_graph(
             checkpointer=checkpointer,
@@ -161,8 +174,13 @@ async def _resume(
     *,
     thread_id: str,
     decision: ApprovalDecision,
+    actor_id: str,
+    proposal_hash: str,
     feedback: str | None,
 ) -> dict[str, object]:
+    await initialize_business_schema(settings.database_url)
+    approval_repository = ApprovalRepository(settings.database_url)
+    tool_action_repository = ToolActionRepository(settings.database_url)
     async with create_checkpointer(settings.database_url) as checkpointer:
         graph = create_ticket_graph(
             checkpointer=checkpointer,
@@ -172,14 +190,48 @@ async def _resume(
             graph,
             thread_id=thread_id,
             decision=decision,
+            actor_id=actor_id,
+            proposal_hash=proposal_hash,
+            approval_repository=approval_repository,
+            tool_action_repository=tool_action_repository,
             feedback=feedback,
         )
         snapshot = await get_run_snapshot(graph, thread_id=thread_id)
-        return _snapshot_payload(
+        payload = _snapshot_payload(
             snapshot,
             thread_id=thread_id,
             result=result,
         )
+        values = dict(snapshot.values or {})
+        run_id = values.get("run_id")
+        approvals = (
+            await approval_repository.list_for_run(str(run_id))
+            if run_id is not None
+            else []
+        )
+        payload["approvals"] = [
+            record.model_dump(mode="json") for record in approvals
+        ]
+
+        if decision == "approve" and run_id is not None:
+            action_payload = {
+                "ticket_id": str(values["ticket_id"]),
+                "status": "resolved",
+            }
+            idempotency_key = build_idempotency_key(
+                organization_id=str(values["organization_id"]),
+                ticket_id=str(values["ticket_id"]),
+                run_id=str(run_id),
+                action_type="update_crm_ticket",
+                payload=action_payload,
+            )
+            action = await tool_action_repository.get_by_key(idempotency_key)
+            payload["tool_action"] = (
+                action.model_dump(mode="json") if action is not None else None
+            )
+        else:
+            payload["tool_action"] = None
+        return payload
 
 
 async def _inspect(settings: AgentSettings, thread_id: str) -> dict[str, object]:
@@ -230,6 +282,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "decision",
         choices=("approve", "reject", "revise"),
     )
+    resume_parser.add_argument("--actor-id", required=True)
+    resume_parser.add_argument("--proposal-hash", required=True)
     resume_parser.add_argument("--feedback")
     return parser
 
@@ -251,12 +305,16 @@ def main() -> int:
         feedback = args.feedback.strip() if args.feedback else None
         if args.decision in {"reject", "revise"} and not feedback:
             parser.error("reject 或 revise 必须通过 --feedback 提供人工意见。")
-        payload = asyncio.run(_resume(
-            settings,
-            thread_id=args.thread_id,
-            decision=args.decision,
-            feedback=feedback,
-        ))
+        payload = asyncio.run(
+            _resume(
+                settings,
+                thread_id=args.thread_id,
+                decision=args.decision,
+                actor_id=args.actor_id,
+                proposal_hash=args.proposal_hash,
+                feedback=feedback,
+            )
+        )
 
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["found"] else 1

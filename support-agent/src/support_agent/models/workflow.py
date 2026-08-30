@@ -99,6 +99,8 @@ class TicketAgentState(TypedDict):
     # human approval control state; durable business records arrive in Session 3
     approval_decision: NotRequired[ApprovalDecision]
     approval_feedback: NotRequired[str | None]
+    approval_error: NotRequired[str | None]
+    proposal_hash: NotRequired[str]
     revision_count: NotRequired[int]
 
 
@@ -106,10 +108,16 @@ class ApprovalResume(BaseModel):
     """Validated human decision supplied through Command(resume=...)."""
 
     decision: ApprovalDecision
+    actor_id: str = Field(min_length=1)
+    proposal_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     feedback: str | None = None
 
     @model_validator(mode="after")
     def require_feedback_for_reject_or_revise(self) -> Self:
+        actor_id = self.actor_id.strip()
+        if not actor_id:
+            raise ValueError("actor_id 不能为空。")
+        self.actor_id = actor_id
         if self.decision in {"reject", "revise"}:
             feedback = self.feedback.strip() if self.feedback else ""
             if not feedback:

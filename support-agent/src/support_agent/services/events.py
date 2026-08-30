@@ -18,6 +18,7 @@ NODE_STAGE_BY_NAME: dict[str, str] = {
     "retrieve_policy_stub": "retrieving_policy",
     "draft_response": "drafting_response",
     "assess_risk": "assessing_risk",
+    "prepare_approval": "preparing_approval",
     "approval_gate": "waiting_approval",
     "execute_tool_stub": "approved_action_stub",
     "finalize": "finalizing",

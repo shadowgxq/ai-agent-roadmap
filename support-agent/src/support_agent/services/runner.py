@@ -6,6 +6,14 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
 from support_agent.models import ApprovalDecision, ApprovalResume, TicketAgentState
+from support_agent.persistence.approvals import ApprovalRepository
+from support_agent.persistence.tool_actions import ToolActionRepository
+
+from .proposals import build_idempotency_key
+
+
+class ThreadNotWaitingForApprovalError(RuntimeError):
+    """The requested thread has no active approval interrupt."""
 
 
 def build_thread_config(thread_id: str) -> RunnableConfig:
@@ -37,15 +45,66 @@ async def resume_run(
     *,
     thread_id: str,
     decision: ApprovalDecision,
+    actor_id: str,
+    proposal_hash: str,
+    approval_repository: ApprovalRepository,
+    tool_action_repository: ToolActionRepository,
     feedback: str | None = None,
 ) -> dict[str, object]:
-    """Resume one interrupted thread with a validated human decision."""
+    """Persist one decision, then resume the matching interrupted proposal."""
 
     resume_value = ApprovalResume(
         decision=decision,
+        actor_id=actor_id,
+        proposal_hash=proposal_hash,
         feedback=feedback,
-    ).model_dump(exclude_none=True)
+    )
+    config = build_thread_config(thread_id)
+    snapshot = await graph.aget_state(config)
+    values = dict(snapshot.values or {})
+    has_interrupt = any(
+        getattr(task, "interrupts", ())
+        for task in (snapshot.tasks or ())
+    )
+    if not values or not has_interrupt:
+        raise ThreadNotWaitingForApprovalError(
+            f"thread_id={thread_id!r} 当前没有等待中的审批。"
+        )
+
+    current_proposal_hash = values.get("proposal_hash")
+    if resume_value.proposal_hash == current_proposal_hash:
+        await approval_repository.record_decision(
+            organization_id=str(values["organization_id"]),
+            ticket_id=str(values["ticket_id"]),
+            run_id=str(values["run_id"]),
+            thread_id=thread_id,
+            actor_id=resume_value.actor_id,
+            decision=resume_value.decision,
+            feedback=resume_value.feedback,
+            proposal_hash=resume_value.proposal_hash,
+        )
+        if resume_value.decision == "approve":
+            action_payload = {
+                "ticket_id": str(values["ticket_id"]),
+                "status": "resolved",
+            }
+            idempotency_key = build_idempotency_key(
+                organization_id=str(values["organization_id"]),
+                ticket_id=str(values["ticket_id"]),
+                run_id=str(values["run_id"]),
+                action_type="update_crm_ticket",
+                payload=action_payload,
+            )
+            await tool_action_repository.reserve_action(
+                organization_id=str(values["organization_id"]),
+                ticket_id=str(values["ticket_id"]),
+                run_id=str(values["run_id"]),
+                action_type="update_crm_ticket",
+                idempotency_key=idempotency_key,
+                request_json=action_payload,
+            )
+
     return await graph.ainvoke(
-        Command(resume=resume_value),
-        config=build_thread_config(thread_id),
+        Command(resume=resume_value.model_dump(exclude_none=True)),
+        config=config,
     )

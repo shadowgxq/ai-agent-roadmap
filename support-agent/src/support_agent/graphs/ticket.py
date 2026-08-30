@@ -18,6 +18,7 @@ from support_agent.models import (
     TicketWorkflowClassification,
 )
 from support_agent.policy_corpus import POLICY_CORPUS
+from support_agent.services.proposals import build_proposal_hash
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,11 @@ NODE_IO_CONTRACTS: dict[str, NodeIOContract] = {
         ),
         calls_model=False,
         error_codes=("REVISION_LIMIT_REACHED",),
+    ),
+    "prepare_approval": NodeIOContract(
+        reads=("ticket_id", "draft_response"),
+        writes=("proposal_hash", "approval_error"),
+        calls_model=False,
     ),
     "execute_tool_stub": NodeIOContract(
         reads=("approval_decision",),
@@ -498,6 +504,10 @@ def route_after_response(state: TicketAgentState) -> str:
 def build_approval_payload(state: TicketAgentState) -> dict[str, object]:
     """Describe the exact proposed action using JSON-serializable values."""
 
+    arguments = {
+        "ticket_id": state["ticket_id"],
+        "status": "resolved",
+    }
     return {
         "type": "crm_update",
         "ticket_id": state["ticket_id"],
@@ -505,18 +515,39 @@ def build_approval_payload(state: TicketAgentState) -> dict[str, object]:
         "risk_level": state.get("risk_level", "high"),
         "risk_reasons": list(state.get("risk_reasons", [])),
         "tool": "update_crm_ticket",
-        "arguments": {
-            "ticket_id": state["ticket_id"],
-            "status": "resolved",
-        },
+        "arguments": arguments,
+        "proposal_hash": state.get("proposal_hash"),
+        "approval_error": state.get("approval_error"),
         "revision_count": state.get("revision_count", 0),
+    }
+
+
+def prepare_approval(state: TicketAgentState) -> dict[str, object]:
+    """Checkpoint the stable identity of the exact proposal before pausing."""
+
+    arguments = {
+        "ticket_id": state["ticket_id"],
+        "status": "resolved",
+    }
+    return {
+        "proposal_hash": build_proposal_hash(
+            draft_response=state.get("draft_response", ""),
+            tool_name="update_crm_ticket",
+            arguments=arguments,
+        ),
+        "approval_error": None,
     }
 
 
 def approval_gate(
     state: TicketAgentState,
 ) -> Command[
-    Literal["execute_tool_stub", "finalize", "response_subgraph"]
+    Literal[
+        "approval_gate",
+        "execute_tool_stub",
+        "finalize",
+        "response_subgraph",
+    ]
 ]:
     """Pause for a validated human decision and route without side effects."""
 
@@ -524,12 +555,21 @@ def approval_gate(
     # exception, and this node intentionally restarts from the beginning.
     resume_value = interrupt(build_approval_payload(state))
     decision = ApprovalResume.model_validate(resume_value)
+    current_proposal_hash = state.get("proposal_hash")
+    if decision.proposal_hash != current_proposal_hash:
+        return Command(
+            update={
+                "approval_error": "审批内容已经变化，请核对新 Proposal 后重新提交。",
+            },
+            goto="approval_gate",
+        )
 
     if decision.decision == "approve":
         return Command(
             update={
                 "approval_decision": "approve",
                 "approval_feedback": None,
+                "approval_error": None,
                 "status": "approved",
             },
             goto="execute_tool_stub",
@@ -540,6 +580,7 @@ def approval_gate(
             update={
                 "approval_decision": "reject",
                 "approval_feedback": decision.feedback,
+                "approval_error": None,
                 "status": "rejected",
             },
             goto="finalize",
@@ -551,6 +592,7 @@ def approval_gate(
             update={
                 "approval_decision": "revise",
                 "approval_feedback": decision.feedback,
+                "approval_error": None,
                 "status": "failed",
                 "error_code": "REVISION_LIMIT_REACHED",
                 "error_message": f"回复最多允许修改 {MAX_REVISIONS} 次。",
@@ -562,6 +604,7 @@ def approval_gate(
         update={
             "approval_decision": "revise",
             "approval_feedback": decision.feedback,
+            "approval_error": None,
             "revision_count": revision_count + 1,
             "status": "revising",
         },
@@ -659,6 +702,7 @@ def create_ticket_graph(
     builder.add_node("classify_ticket", classify_node)
     builder.add_node("build_clarification", build_clarification)
     builder.add_node("response_subgraph", response_graph)
+    builder.add_node("prepare_approval", prepare_approval)
     builder.add_node("approval_gate", approval_gate)
     builder.add_node("execute_tool_stub", execute_tool_stub)
     builder.add_node("finalize", finalize_ticket)
@@ -687,10 +731,11 @@ def create_ticket_graph(
         route_after_response,
         {
             "failed": "finalize",
-            "approval": "approval_gate",
+            "approval": "prepare_approval",
             "complete": "finalize",
         },
     )
+    builder.add_edge("prepare_approval", "approval_gate")
     builder.add_edge("execute_tool_stub", "finalize")
     builder.add_edge("finalize", END)
 

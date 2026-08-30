@@ -17,6 +17,7 @@ from .ticket import (
     execute_tool_stub,
     finalize_ticket,
     normalize_ticket,
+    prepare_approval,
     retrieve_policy_stub,
 )
 
@@ -37,5 +38,6 @@ __all__ = [
     "execute_tool_stub",
     "finalize_ticket",
     "normalize_ticket",
+    "prepare_approval",
     "retrieve_policy_stub",
 ]

@@ -416,7 +416,7 @@ CrmToolExecutor = Callable[..., Awaitable[CrmUpdateResult]]
 
 
 class SimulatedToolCrash(RuntimeError):
-    """Fault injected after the durable CRM transaction has committed."""
+    """Controlled fault injected at a tool-execution boundary."""
 
 
 def _hard_risk_assessment(text: str) -> RiskAssessment:
@@ -638,6 +638,7 @@ async def execute_tool(
     state: TicketAgentState,
     *,
     tool_executor: CrmToolExecutor | None,
+    crash_before_tool: bool = False,
     crash_after_tool_commit: bool = False,
 ) -> dict[str, object]:
     """Execute the approved CRM update through a durable idempotency adapter."""
@@ -666,6 +667,11 @@ async def execute_tool(
         action_type="update_crm_ticket",
         payload=payload,
     )
+    if crash_before_tool:
+        raise SimulatedToolCrash(
+            "simulated crash before external side effect"
+        )
+
     result = await tool_executor(
         organization_id=state["organization_id"],
         ticket_id=state["ticket_id"],
@@ -748,7 +754,9 @@ def create_ticket_graph(
     checkpointer: BaseCheckpointSaver | None = None,
     response_subgraph: Any | None = None,
     tool_executor: CrmToolExecutor | None = None,
+    crash_before_tool: bool = False,
     crash_after_tool_commit: bool = False,
+    interrupt_before: list[str] | None = None,
 ):
     """Build the ticket graph with optional model and persistence resources."""
 
@@ -768,6 +776,7 @@ def create_ticket_graph(
         return await execute_tool(
             state,
             tool_executor=tool_executor,
+            crash_before_tool=crash_before_tool,
             crash_after_tool_commit=crash_after_tool_commit,
         )
 
@@ -813,4 +822,7 @@ def create_ticket_graph(
     builder.add_edge("execute_tool", "finalize")
     builder.add_edge("finalize", END)
 
-    return builder.compile(checkpointer=checkpointer)
+    return builder.compile(
+        checkpointer=checkpointer,
+        interrupt_before=interrupt_before,
+    )

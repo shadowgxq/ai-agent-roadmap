@@ -112,6 +112,26 @@ class ToolActionRepository:
                 row = await cursor.fetchone()
         return ToolActionRecord.model_validate(row) if row is not None else None
 
+    async def list_for_run(self, run_id: str) -> list[ToolActionRecord]:
+        """Return all durable tool actions for one workflow run."""
+
+        async with await AsyncConnection.connect(
+            self._database_url,
+            row_factory=dict_row,
+        ) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    """
+                    SELECT *
+                    FROM tool_actions
+                    WHERE run_id = %s
+                    ORDER BY created_at, id
+                    """,
+                    (run_id,),
+                )
+                rows = await cursor.fetchall()
+        return [ToolActionRecord.model_validate(row) for row in rows]
+
     async def mark_status(
         self,
         *,

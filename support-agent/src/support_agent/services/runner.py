@@ -3,8 +3,9 @@
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 
-from support_agent.models import TicketAgentState
+from support_agent.models import ApprovalDecision, ApprovalResume, TicketAgentState
 
 
 def build_thread_config(thread_id: str) -> RunnableConfig:
@@ -29,3 +30,22 @@ async def get_run_snapshot(graph: Any, *, thread_id: str):
     """Read the latest checkpoint without executing the graph again."""
 
     return await graph.aget_state(build_thread_config(thread_id))
+
+
+async def resume_run(
+    graph: Any,
+    *,
+    thread_id: str,
+    decision: ApprovalDecision,
+    feedback: str | None = None,
+) -> dict[str, object]:
+    """Resume one interrupted thread with a validated human decision."""
+
+    resume_value = ApprovalResume(
+        decision=decision,
+        feedback=feedback,
+    ).model_dump(exclude_none=True)
+    return await graph.ainvoke(
+        Command(resume=resume_value),
+        config=build_thread_config(thread_id),
+    )

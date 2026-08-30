@@ -1,14 +1,17 @@
-"""W14 ticket workflow graph and node I/O contracts."""
+"""W14-W15 ticket workflow graph and node I/O contracts."""
 
 from dataclasses import dataclass
 import json
+from typing import Any, Literal
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
 
 from support_agent.models import (
+    ApprovalResume,
     EvidenceRef,
     RiskAssessment,
     TicketAgentState,
@@ -59,7 +62,7 @@ NODE_IO_CONTRACTS: dict[str, NodeIOContract] = {
         error_codes=("POLICY_NOT_FOUND",),
     ),
     "draft_response": NodeIOContract(
-        reads=("normalized_text", "evidence_refs"),
+        reads=("normalized_text", "evidence_refs", "approval_feedback"),
         writes=("draft_response", "status", "error_code", "error_message"),
         calls_model=True,
         error_codes=("MODEL_NOT_CONFIGURED", "POLICY_NOT_FOUND",
@@ -78,8 +81,38 @@ NODE_IO_CONTRACTS: dict[str, NodeIOContract] = {
         calls_model=True,
         error_codes=("MODEL_NOT_CONFIGURED", "RISK_ASSESSMENT_FAILED"),
     ),
+    "approval_gate": NodeIOContract(
+        reads=(
+            "ticket_id",
+            "draft_response",
+            "risk_level",
+            "risk_reasons",
+            "revision_count",
+        ),
+        writes=(
+            "approval_decision",
+            "approval_feedback",
+            "revision_count",
+            "status",
+            "error_code",
+            "error_message",
+        ),
+        calls_model=False,
+        error_codes=("REVISION_LIMIT_REACHED",),
+    ),
+    "execute_tool_stub": NodeIOContract(
+        reads=("approval_decision",),
+        writes=("status", "error_code", "error_message"),
+        calls_model=False,
+        error_codes=("INVALID_APPROVAL_DECISION",),
+    ),
     "finalize": NodeIOContract(
-        reads=("status", "draft_response", "risk_level"),
+        reads=(
+            "status",
+            "draft_response",
+            "risk_level",
+            "approval_decision",
+        ),
         writes=("status",),
         calls_model=False,
     ),
@@ -316,6 +349,13 @@ def draft_response(
         + ", ".join(f"[{ref.source_id}]" for ref in evidence_refs)
         + "\n请至少选择一个可用引用 ID，并严格写入回复最后一行。"
     )
+    approval_feedback = state.get("approval_feedback")
+    if approval_feedback:
+        prompt += (
+            "\n\n人工审批要求重新修改回复。修改意见：\n"
+            f"{approval_feedback}\n"
+            "请生成新版本，不要声称已经执行退款或其他外部操作。"
+        )
     try:
         response = model.invoke([
             SystemMessage(content=DRAFT_SYSTEM_PROMPT),
@@ -348,6 +388,7 @@ def draft_response(
 
 
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
+MAX_REVISIONS = 2
 
 
 def _hard_risk_assessment(text: str) -> RiskAssessment:
@@ -444,6 +485,102 @@ def _route_response(state: TicketAgentState) -> str:
     return "failed" if state["status"] == "failed" else "continue"
 
 
+def route_after_response(state: TicketAgentState) -> str:
+    """Send only high-risk proposals to the durable approval gate."""
+
+    if state["status"] == "failed":
+        return "failed"
+    if state.get("requires_approval") is True:
+        return "approval"
+    return "complete"
+
+
+def build_approval_payload(state: TicketAgentState) -> dict[str, object]:
+    """Describe the exact proposed action using JSON-serializable values."""
+
+    return {
+        "type": "crm_update",
+        "ticket_id": state["ticket_id"],
+        "draft_response": state.get("draft_response", ""),
+        "risk_level": state.get("risk_level", "high"),
+        "risk_reasons": list(state.get("risk_reasons", [])),
+        "tool": "update_crm_ticket",
+        "arguments": {
+            "ticket_id": state["ticket_id"],
+            "status": "resolved",
+        },
+        "revision_count": state.get("revision_count", 0),
+    }
+
+
+def approval_gate(
+    state: TicketAgentState,
+) -> Command[
+    Literal["execute_tool_stub", "finalize", "response_subgraph"]
+]:
+    """Pause for a validated human decision and route without side effects."""
+
+    # Do not wrap this call in broad try/except: interrupt uses a control-flow
+    # exception, and this node intentionally restarts from the beginning.
+    resume_value = interrupt(build_approval_payload(state))
+    decision = ApprovalResume.model_validate(resume_value)
+
+    if decision.decision == "approve":
+        return Command(
+            update={
+                "approval_decision": "approve",
+                "approval_feedback": None,
+                "status": "approved",
+            },
+            goto="execute_tool_stub",
+        )
+
+    if decision.decision == "reject":
+        return Command(
+            update={
+                "approval_decision": "reject",
+                "approval_feedback": decision.feedback,
+                "status": "rejected",
+            },
+            goto="finalize",
+        )
+
+    revision_count = state.get("revision_count", 0)
+    if revision_count >= MAX_REVISIONS:
+        return Command(
+            update={
+                "approval_decision": "revise",
+                "approval_feedback": decision.feedback,
+                "status": "failed",
+                "error_code": "REVISION_LIMIT_REACHED",
+                "error_message": f"回复最多允许修改 {MAX_REVISIONS} 次。",
+            },
+            goto="finalize",
+        )
+
+    return Command(
+        update={
+            "approval_decision": "revise",
+            "approval_feedback": decision.feedback,
+            "revision_count": revision_count + 1,
+            "status": "revising",
+        },
+        goto="response_subgraph",
+    )
+
+
+def execute_tool_stub(state: TicketAgentState) -> dict[str, object]:
+    """Mark the approved path without performing an external side effect."""
+
+    if state.get("approval_decision") != "approve":
+        return {
+            "status": "failed",
+            "error_code": "INVALID_APPROVAL_DECISION",
+            "error_message": "只有 approve 决策可以进入工具占位节点。",
+        }
+    return {"status": "approved"}
+
+
 def _build_risk_assessor(model: BaseChatModel | None):
     if model is None:
         return None
@@ -494,6 +631,8 @@ def finalize_ticket(state: TicketAgentState) -> dict[str, object]:
 
     if state["status"] == "failed":
         return {"status": "failed"}
+    if state["status"] == "rejected":
+        return {"status": "rejected"}
     return {"status": "completed"}
 
 
@@ -501,11 +640,16 @@ def create_ticket_graph(
     model: BaseChatModel | None = None,
     *,
     checkpointer: BaseCheckpointSaver | None = None,
+    response_subgraph: Any | None = None,
 ):
     """Build the ticket graph with optional model and persistence resources."""
 
     classifier = _build_classifier(model)
-    response_subgraph = create_response_subgraph(model)
+    response_graph = (
+        response_subgraph
+        if response_subgraph is not None
+        else create_response_subgraph(model)
+    )
 
     def classify_node(state: TicketAgentState) -> dict[str, object]:
         return classify_ticket(state, classifier=classifier)
@@ -514,7 +658,9 @@ def create_ticket_graph(
     builder.add_node("normalize_ticket", normalize_ticket)
     builder.add_node("classify_ticket", classify_node)
     builder.add_node("build_clarification", build_clarification)
-    builder.add_node("response_subgraph", response_subgraph)
+    builder.add_node("response_subgraph", response_graph)
+    builder.add_node("approval_gate", approval_gate)
+    builder.add_node("execute_tool_stub", execute_tool_stub)
     builder.add_node("finalize", finalize_ticket)
 
     builder.add_edge(START, "normalize_ticket")
@@ -536,7 +682,16 @@ def create_ticket_graph(
         },
     )
     builder.add_edge("build_clarification", "finalize")
-    builder.add_edge("response_subgraph", "finalize")
+    builder.add_conditional_edges(
+        "response_subgraph",
+        route_after_response,
+        {
+            "failed": "finalize",
+            "approval": "approval_gate",
+            "complete": "finalize",
+        },
+    )
+    builder.add_edge("execute_tool_stub", "finalize")
     builder.add_edge("finalize", END)
 
     return builder.compile(checkpointer=checkpointer)

@@ -1,8 +1,8 @@
-"""Typed contracts for the W14 ticket workflow."""
+"""Typed contracts for the W14-W15 ticket workflow."""
 
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal, NotRequired, Self, TypedDict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 TicketCategory = Literal[
@@ -25,6 +25,7 @@ TicketMissingField = Literal[
     "request_context",
 ]
 RiskLevel = Literal["low", "medium", "high"]
+ApprovalDecision = Literal["approve", "reject", "revise"]
 TicketStatus = Literal[
     "pending",
     "normalized",
@@ -33,6 +34,9 @@ TicketStatus = Literal[
     "retrieving",
     "drafted",
     "assessed",
+    "approved",
+    "rejected",
+    "revising",
     "completed",
     "failed",
 ]
@@ -44,6 +48,8 @@ TicketErrorCode = Literal[
     "DRAFT_GENERATION_FAILED",
     "RISK_ASSESSMENT_FAILED",
     "RESPONSE_SUBGRAPH_NOT_READY",
+    "INVALID_APPROVAL_DECISION",
+    "REVISION_LIMIT_REACHED",
 ]
 
 
@@ -89,6 +95,27 @@ class TicketAgentState(TypedDict):
     risk_level: NotRequired[RiskLevel]
     risk_reasons: NotRequired[list[str]]
     requires_approval: NotRequired[bool]
+
+    # human approval control state; durable business records arrive in Session 3
+    approval_decision: NotRequired[ApprovalDecision]
+    approval_feedback: NotRequired[str | None]
+    revision_count: NotRequired[int]
+
+
+class ApprovalResume(BaseModel):
+    """Validated human decision supplied through Command(resume=...)."""
+
+    decision: ApprovalDecision
+    feedback: str | None = None
+
+    @model_validator(mode="after")
+    def require_feedback_for_reject_or_revise(self) -> Self:
+        if self.decision in {"reject", "revise"}:
+            feedback = self.feedback.strip() if self.feedback else ""
+            if not feedback:
+                raise ValueError("reject 或 revise 必须提供 feedback。")
+            self.feedback = feedback
+        return self
 
 
 class RiskAssessment(BaseModel):

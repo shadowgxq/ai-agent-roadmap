@@ -18,6 +18,8 @@ NODE_STAGE_BY_NAME: dict[str, str] = {
     "retrieve_policy_stub": "retrieving_policy",
     "draft_response": "drafting_response",
     "assess_risk": "assessing_risk",
+    "approval_gate": "waiting_approval",
+    "execute_tool_stub": "approved_action_stub",
     "finalize": "finalizing",
 }
 
@@ -101,6 +103,8 @@ class GraphEventAdapter:
                 "error_code": error_code or "GRAPH_EXECUTION_FAILED",
                 "error_message": error_message or "工单流程执行失败。",
             }
+        elif workflow_status == "rejected":
+            done_data = {"status": "rejected"}
         else:
             done_data = {"status": "completed"}
 
@@ -185,6 +189,8 @@ class GraphEventAdapter:
         status = output.get("status")
         if status == "failed":
             workflow_status = "failed"
+        elif status == "rejected" and workflow_status != "failed":
+            workflow_status = "rejected"
         elif status == "completed" and workflow_status != "failed":
             workflow_status = "completed"
 

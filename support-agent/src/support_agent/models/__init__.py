@@ -4,6 +4,8 @@ from .events import AgentEvent, AgentEventName
 from .routing import RouteDecision, RouteName, RoutingState
 from .ticket import TicketClassification
 from .workflow import (
+    ApprovalDecision,
+    ApprovalResume,
     EvidenceRef,
     RiskAssessment,
     RiskLevel,
@@ -19,6 +21,8 @@ from .workflow import (
 __all__ = [
     "AgentEvent",
     "AgentEventName",
+    "ApprovalDecision",
+    "ApprovalResume",
     "RouteDecision",
     "RouteName",
     "RoutingState",

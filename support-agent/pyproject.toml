@@ -20,6 +20,7 @@ support-ticket-workflow = "support_agent.ticket_workflow_cli:main"
 support-ticket-events = "support_agent.ticket_event_cli:main"
 support-ticket-acceptance = "support_agent.ticket_acceptance_cli:main"
 support-ticket-checkpoint = "support_agent.ticket_checkpoint_cli:main"
+support-ticket-store = "support_agent.ticket_store_cli:main"
 
 [dependency-groups]
 dev = [

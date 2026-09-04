@@ -37,6 +37,8 @@ class TaskCase:
     objective: str
     expected_complexity: TaskComplexity
     planning_recommended: bool
+    constraints: tuple[str, ...] = ()
+    available_tools: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         case_id = self.case_id.strip()
@@ -49,8 +51,18 @@ class TaskCase:
             raise ValueError("expected_complexity 必须是 simple 或 complex。")
         if not isinstance(self.planning_recommended, bool):
             raise ValueError("planning_recommended 必须是布尔值。")
+        constraints = tuple(
+            constraint.strip()
+            for constraint in self.constraints
+            if constraint.strip()
+        )
+        available_tools = tuple(
+            tool.strip() for tool in self.available_tools if tool.strip()
+        )
         object.__setattr__(self, "case_id", case_id)
         object.__setattr__(self, "objective", objective)
+        object.__setattr__(self, "constraints", constraints)
+        object.__setattr__(self, "available_tools", available_tools)
 
     def matches(self, classification: TaskClassification) -> bool:
         """Return whether the deterministic classifier matches the fixture."""
@@ -66,6 +78,8 @@ class TaskCase:
             "objective": self.objective,
             "expected_complexity": self.expected_complexity,
             "planning_recommended": self.planning_recommended,
+            "constraints": list(self.constraints),
+            "available_tools": list(self.available_tools),
         }
 
 

@@ -1,0 +1,117 @@
+[
+  {
+    "id": "simple_find_config",
+    "objective": "查找仓库中的配置文件",
+    "expected_complexity": "simple",
+    "planning_recommended": false
+  },
+  {
+    "id": "simple_explain_function",
+    "objective": "解释 src/app.py 中的 main 函数",
+    "expected_complexity": "simple",
+    "planning_recommended": false
+  },
+  {
+    "id": "simple_list_python_files",
+    "objective": "列出 src 目录下的 Python 文件",
+    "expected_complexity": "simple",
+    "planning_recommended": false
+  },
+  {
+    "id": "simple_read_start_command",
+    "objective": "查看 README 中的启动命令",
+    "expected_complexity": "simple",
+    "planning_recommended": false
+  },
+  {
+    "id": "complex_login_failure",
+    "objective": "定位并修复用户登录失败的 bug",
+    "expected_complexity": "complex",
+    "planning_recommended": true,
+    "constraints": [
+      "只修改认证模块",
+      "不要改变数据库 schema"
+    ],
+    "available_tools": [
+      "list_repository",
+      "search_text",
+      "read_file",
+      "run_tests"
+    ]
+  },
+  {
+    "id": "complex_payment_validation",
+    "objective": "修改支付校验逻辑并运行测试",
+    "expected_complexity": "complex",
+    "planning_recommended": true,
+    "constraints": [
+      "保留现有支付接口"
+    ],
+    "available_tools": [
+      "search_text",
+      "read_file",
+      "edit_file",
+      "run_tests"
+    ]
+  },
+  {
+    "id": "complex_cache_failure",
+    "objective": "排查缓存失效问题并修改实现",
+    "expected_complexity": "complex",
+    "planning_recommended": true,
+    "constraints": [
+      "先确认缓存键和失效策略"
+    ],
+    "available_tools": [
+      "search_text",
+      "read_file",
+      "edit_file",
+      "run_tests"
+    ]
+  },
+  {
+    "id": "complex_order_state",
+    "objective": "定位订单状态错乱的根因并修复",
+    "expected_complexity": "complex",
+    "planning_recommended": true,
+    "constraints": [
+      "保留订单状态枚举"
+    ],
+    "available_tools": [
+      "list_repository",
+      "search_text",
+      "read_file",
+      "edit_file",
+      "run_tests"
+    ]
+  },
+  {
+    "id": "complex_import_errors",
+    "objective": "实现批量导入功能并测试错误处理",
+    "expected_complexity": "complex",
+    "planning_recommended": true,
+    "constraints": [
+      "错误记录不能覆盖原始行号"
+    ],
+    "available_tools": [
+      "read_file",
+      "edit_file",
+      "run_tests"
+    ]
+  },
+  {
+    "id": "complex_api_timeout",
+    "objective": "调查 API 超时问题、修改调用链并验证",
+    "expected_complexity": "complex",
+    "planning_recommended": true,
+    "constraints": [
+      "不能无限增加重试次数"
+    ],
+    "available_tools": [
+      "search_text",
+      "read_file",
+      "edit_file",
+      "run_tests"
+    ]
+  }
+]

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .contracts import TaskCase, TaskSpec
+from .planning import DeterministicPlanner, PlanningRequest
 from .runtime import ReactiveBaseline
 
 
@@ -27,9 +28,40 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--case-file",
         type=Path,
-        help="按 JSON 固定 case 批量运行 Reactive baseline。",
+        help="按 JSON 固定 case 批量运行当前模式。",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("reactive", "planning"),
+        default="reactive",
+        help="选择 Session 1 Reactive 或 Session 2 structured planning。",
+    )
+    parser.add_argument(
+        "--constraint",
+        action="append",
+        default=[],
+        help="Planner 约束，可重复传入。",
+    )
+    parser.add_argument(
+        "--tool",
+        action="append",
+        default=[],
+        help="Planner 可用工具，可重复传入。",
     )
     return parser
+
+
+def _load_case_texts(
+    item: dict[str, object],
+    field_name: str,
+    index: int,
+) -> tuple[str, ...]:
+    values = item.get(field_name, [])
+    if not isinstance(values, list):
+        raise ValueError(f"case[{index}].{field_name} 必须是字符串数组。")
+    if any(not isinstance(value, str) for value in values):
+        raise ValueError(f"case[{index}].{field_name} 必须只包含字符串。")
+    return tuple(value.strip() for value in values if value.strip())
 
 
 def load_cases(path: Path) -> tuple[TaskCase, ...]:
@@ -54,6 +86,8 @@ def load_cases(path: Path) -> tuple[TaskCase, ...]:
                     objective=str(item["objective"]),
                     expected_complexity=item["expected_complexity"],
                     planning_recommended=item["planning_recommended"],
+                    constraints=_load_case_texts(item, "constraints", index),
+                    available_tools=_load_case_texts(item, "available_tools", index),
                 )
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -70,21 +104,47 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    baseline = ReactiveBaseline()
-    if args.case_file is not None:
-        try:
-            cases = load_cases(args.case_file)
-        except ValueError as exc:
-            parser.error(str(exc))
-        result = baseline.run_cases(cases, workdir=args.workdir)
-        exit_code = 0 if all(
-            case_run.result.status == "completed"
-            for case_run in result.case_runs
-        ) else 1
+    if args.mode == "planning":
+        planner = DeterministicPlanner()
+        if args.case_file is not None:
+            if args.constraint or args.tool:
+                parser.error(
+                    "批量 planning case 的 constraints 和 available_tools 必须写在 JSON 中。"
+                )
+            try:
+                cases = load_cases(args.case_file)
+            except ValueError as exc:
+                parser.error(str(exc))
+            result = planner.plan_cases(cases)
+            exit_code = 0 if all(
+                case_result.matches_expectation
+                for case_result in result.case_results
+            ) else 1
+        else:
+            result = planner.plan(
+                PlanningRequest(
+                    goal=args.objective,
+                    constraints=tuple(args.constraint),
+                    available_tools=tuple(args.tool),
+                )
+            )
+            exit_code = 0
     else:
-        task = TaskSpec(objective=args.objective, workdir=args.workdir)
-        result = baseline.run(task)
-        exit_code = 0 if result.status == "completed" else 1
+        baseline = ReactiveBaseline()
+        if args.case_file is not None:
+            try:
+                cases = load_cases(args.case_file)
+            except ValueError as exc:
+                parser.error(str(exc))
+            result = baseline.run_cases(cases, workdir=args.workdir)
+            exit_code = 0 if all(
+                case_run.result.status == "completed"
+                for case_run in result.case_runs
+            ) else 1
+        else:
+            task = TaskSpec(objective=args.objective, workdir=args.workdir)
+            result = baseline.run(task)
+            exit_code = 0 if result.status == "completed" else 1
 
     print(
         json.dumps(

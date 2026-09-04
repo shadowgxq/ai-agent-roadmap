@@ -1,0 +1,26 @@
+[
+  {
+    "id": "simple_find_file",
+    "objective": "查找仓库中的配置文件",
+    "expected_complexity": "simple",
+    "planning_recommended": false
+  },
+  {
+    "id": "simple_explain_function",
+    "objective": "解释 src/app.py 中的 main 函数",
+    "expected_complexity": "simple",
+    "planning_recommended": false
+  },
+  {
+    "id": "complex_fix_bug",
+    "objective": "定位并修复用户登录失败的 bug",
+    "expected_complexity": "complex",
+    "planning_recommended": true
+  },
+  {
+    "id": "complex_fix_and_test",
+    "objective": "修改支付校验逻辑并运行测试",
+    "expected_complexity": "complex",
+    "planning_recommended": true
+  }
+]

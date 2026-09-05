@@ -86,12 +86,13 @@
     ]
   },
   {
-    "id": "complex_import_errors",
-    "objective": "实现批量导入功能并测试错误处理",
+    "id": "complex_verification_failure",
+    "objective": "修改批量导入功能并运行一个预期失败的测试",
     "expected_complexity": "complex",
     "planning_recommended": true,
+    "scenario": "verification_failure",
     "constraints": [
-      "错误记录不能覆盖原始行号"
+      "失败时不能标记任务已完成"
     ],
     "available_tools": [
       "read_file",
@@ -100,12 +101,13 @@
     ]
   },
   {
-    "id": "complex_api_timeout",
-    "objective": "调查 API 超时问题、修改调用链并验证",
+    "id": "complex_replan_root_cause",
+    "objective": "调查根因不在原计划文件并重新规划",
     "expected_complexity": "complex",
     "planning_recommended": true,
+    "scenario": "replan",
     "constraints": [
-      "不能无限增加重试次数"
+      "保留已完成步骤的 evidence"
     ],
     "available_tools": [
       "search_text",

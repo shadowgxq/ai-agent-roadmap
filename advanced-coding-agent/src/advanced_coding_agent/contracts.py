@@ -11,6 +11,7 @@ from .classification import TaskClassification, TaskComplexity
 
 ToolStatus = Literal["succeeded", "failed"]
 RunStatus = Literal["completed", "failed"]
+CaseScenario = Literal["normal", "verification_failure", "replan"]
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ class TaskCase:
     planning_recommended: bool
     constraints: tuple[str, ...] = ()
     available_tools: tuple[str, ...] = ()
+    scenario: CaseScenario = "normal"
 
     def __post_init__(self) -> None:
         case_id = self.case_id.strip()
@@ -51,6 +53,10 @@ class TaskCase:
             raise ValueError("expected_complexity 必须是 simple 或 complex。")
         if not isinstance(self.planning_recommended, bool):
             raise ValueError("planning_recommended 必须是布尔值。")
+        if self.scenario not in ("normal", "verification_failure", "replan"):
+            raise ValueError(
+                "scenario 必须是 normal、verification_failure 或 replan。"
+            )
         constraints = tuple(
             constraint.strip()
             for constraint in self.constraints
@@ -80,6 +86,7 @@ class TaskCase:
             "planning_recommended": self.planning_recommended,
             "constraints": list(self.constraints),
             "available_tools": list(self.available_tools),
+            "scenario": self.scenario,
         }
 
 

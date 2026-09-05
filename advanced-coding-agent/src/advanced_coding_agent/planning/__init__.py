@@ -1,5 +1,6 @@
 """Explicit Plan and Planner implementations introduced in W16."""
 
+from ..contracts import CaseScenario
 from .plan import AgentPlan, PlanStep, PlanStepStatus, PlanValidationError
 from .execution import (
     ExecutionStateError,
@@ -18,6 +19,12 @@ from .replan import (
     ReplanState,
     ReplanStateStatus,
 )
+from .strategies import (
+    StrategyComparisonReport,
+    StrategyName,
+    StrategyRunResult,
+    compare_strategies,
+)
 from .planner import (
     DeterministicPlanner,
     PlanningBatchResult,
@@ -29,6 +36,7 @@ from .planner import (
 
 __all__ = [
     "AgentPlan",
+    "CaseScenario",
     "DeterministicPlanner",
     "ExecutionStateError",
     "PlanStep",
@@ -49,6 +57,10 @@ __all__ = [
     "ReplanResult",
     "ReplanState",
     "ReplanStateStatus",
+    "StrategyComparisonReport",
+    "StrategyName",
+    "StrategyRunResult",
     "StepExecution",
     "StepResult",
+    "compare_strategies",
 ]

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .contracts import TaskCase, TaskSpec
-from .planning import DeterministicPlanner, PlanningRequest
+from .planning import DeterministicPlanner, PlanningRequest, compare_strategies
 from .runtime import ReactiveBaseline
 
 
@@ -32,9 +32,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=("reactive", "planning"),
+        choices=("reactive", "planning", "compare"),
         default="reactive",
-        help="选择 Session 1 Reactive 或 Session 2 structured planning。",
+        help="选择 Reactive、structured planning 或策略对照。",
     )
     parser.add_argument(
         "--constraint",
@@ -88,6 +88,7 @@ def load_cases(path: Path) -> tuple[TaskCase, ...]:
                     planning_recommended=item["planning_recommended"],
                     constraints=_load_case_texts(item, "constraints", index),
                     available_tools=_load_case_texts(item, "available_tools", index),
+                    scenario=item.get("scenario", "normal"),  # type: ignore[arg-type]
                 )
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -104,7 +105,18 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    if args.mode == "planning":
+    if args.mode == "compare":
+        if args.case_file is None:
+            parser.error("compare 模式必须提供 --case-file。")
+        if args.constraint or args.tool:
+            parser.error("compare 模式的约束和工具必须写在 JSON case 中。")
+        try:
+            cases = load_cases(args.case_file)
+        except ValueError as exc:
+            parser.error(str(exc))
+        result = compare_strategies(cases)
+        exit_code = 0 if all(run.success for run in result.runs) else 1
+    elif args.mode == "planning":
         planner = DeterministicPlanner()
         if args.case_file is not None:
             if args.constraint or args.tool:

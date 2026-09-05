@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
+from ..verification import VerificationResult, VerificationStatus
 from .plan import AgentPlan, PlanStep, PlanValidationError
 
 
@@ -57,6 +58,8 @@ class StepResult:
     status: StepExecutionStatus
     summary: str
     evidence_refs: tuple[str, ...] = ()
+    verification_status: VerificationStatus | None = None
+    verification_summary: str | None = None
 
     def __post_init__(self) -> None:
         if not self.step_id.strip():
@@ -69,6 +72,15 @@ class StepResult:
             raise ExecutionStateError(
                 f"步骤 {self.step_id} 的最终结果必须包含 evidence reference。"
             )
+        if self.verification_status not in (None, "pass", "fail", "needs_review"):
+            raise ExecutionStateError("verification_status 不合法。")
+        if self.verification_status is not None and (
+            self.verification_summary is None
+            or not self.verification_summary.strip()
+        ):
+            raise ExecutionStateError(
+                "存在 verification_status 时必须保存 verification_summary。"
+            )
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, object]) -> "StepResult":
@@ -80,6 +92,8 @@ class StepResult:
             status=status,  # type: ignore[arg-type]
             summary=_required_text(payload, "summary"),
             evidence_refs=_text_refs(payload.get("evidence_refs", []), "evidence_refs"),
+            verification_status=payload.get("verification_status"),  # type: ignore[arg-type]
+            verification_summary=payload.get("verification_summary"),  # type: ignore[arg-type]
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -88,6 +102,8 @@ class StepResult:
             "status": self.status,
             "summary": self.summary,
             "evidence_refs": list(self.evidence_refs),
+            "verification_status": self.verification_status,
+            "verification_summary": self.verification_summary,
         }
 
 
@@ -173,6 +189,8 @@ class PlanExecutionState:
         status: Literal["completed", "failed"],
         summary: str,
         evidence_refs: Iterable[str],
+        verification_status: VerificationStatus | None = None,
+        verification_summary: str | None = None,
     ) -> None:
         """Record one step outcome and let code advance the state."""
 
@@ -185,6 +203,8 @@ class PlanExecutionState:
             status=status,
             summary=summary,
             evidence_refs=tuple(evidence_refs),
+            verification_status=verification_status,
+            verification_summary=verification_summary,
         )
         self.step_results[step_id] = result
         self.plan = _update_plan_step(
@@ -247,13 +267,19 @@ class PlanExecutionState:
 
 
 StepRunner = Callable[[PlanStep, PlanExecutionState], StepExecution]
+StepVerifier = Callable[[PlanStep, StepExecution], VerificationResult]
 
 
 class PlanExecutor:
     """Execute at most one plan step per call."""
 
-    def __init__(self, step_runner: StepRunner | None = None) -> None:
+    def __init__(
+        self,
+        step_runner: StepRunner | None = None,
+        verifier: StepVerifier | None = None,
+    ) -> None:
         self._step_runner = step_runner or self._default_step_runner
+        self._verifier = verifier
 
     def run_next(self, state: PlanExecutionState) -> StepExecution | None:
         """Claim, execute, and record one step; return None at a terminal state."""
@@ -263,13 +289,6 @@ class PlanExecutor:
             return None
         try:
             execution = self._step_runner(step, state)
-            state.record_step_result(
-                step.id,
-                status="completed",
-                summary=execution.summary,
-                evidence_refs=execution.evidence_refs,
-            )
-            return execution
         except Exception as exc:  # noqa: BLE001 - persist runner failure in state.
             state.record_step_result(
                 step.id,
@@ -278,6 +297,51 @@ class PlanExecutor:
                 evidence_refs=(f"runner-error:{step.id}",),
             )
             return None
+
+        if self._verifier is None:
+            state.record_step_result(
+                step.id,
+                status="completed",
+                summary=execution.summary,
+                evidence_refs=execution.evidence_refs,
+            )
+            return execution
+
+        try:
+            verification = self._verifier(step, execution)
+        except Exception as exc:  # noqa: BLE001 - verifier failure needs recovery.
+            state.record_step_result(
+                step.id,
+                status="failed",
+                summary=f"验证器执行失败：{type(exc).__name__}: {exc}",
+                evidence_refs=(f"verifier-error:{step.id}",),
+                verification_status="needs_review",
+                verification_summary="验证器本身发生异常，需要人工复核。",
+            )
+            return execution
+
+        evidence_refs = tuple(
+            dict.fromkeys(execution.evidence_refs + verification.evidence_refs)
+        )
+        if verification.status == "pass":
+            state.record_step_result(
+                step.id,
+                status="completed",
+                summary=execution.summary,
+                evidence_refs=evidence_refs,
+                verification_status=verification.status,
+                verification_summary=verification.summary,
+            )
+        else:
+            state.record_step_result(
+                step.id,
+                status="failed",
+                summary=f"{execution.summary}；验证未通过。",
+                evidence_refs=evidence_refs or (f"verification:{step.id}",),
+                verification_status=verification.status,
+                verification_summary=verification.summary,
+            )
+        return execution
 
     def run_until_finished(self, state: PlanExecutionState) -> PlanExecutionState:
         """Convenience loop for the deterministic Session 3 demonstration."""

@@ -8,6 +8,16 @@ from .execution import (
     StepExecution,
     StepResult,
 )
+from .replan import (
+    PlanRevision,
+    ReplanBudget,
+    ReplanController,
+    ReplanDecision,
+    ReplanObservation,
+    ReplanResult,
+    ReplanState,
+    ReplanStateStatus,
+)
 from .planner import (
     DeterministicPlanner,
     PlanningBatchResult,
@@ -25,12 +35,20 @@ __all__ = [
     "PlanStepStatus",
     "PlanExecutionState",
     "PlanExecutor",
+    "PlanRevision",
     "PlanValidationError",
     "PlanningBatchResult",
     "PlanningCaseResult",
     "PlanningDecision",
     "PlanningRequest",
     "PlanningResult",
+    "ReplanBudget",
+    "ReplanController",
+    "ReplanDecision",
+    "ReplanObservation",
+    "ReplanResult",
+    "ReplanState",
+    "ReplanStateStatus",
     "StepExecution",
     "StepResult",
 ]

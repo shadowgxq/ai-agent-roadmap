@@ -2,6 +2,11 @@
 
 from ..contracts import CaseScenario
 from .plan import AgentPlan, PlanStep, PlanStepStatus, PlanValidationError
+from .model import (
+    OpenAICompatibleChatModel,
+    PlannerModelError,
+    StructuredPlanModel,
+)
 from .execution import (
     ExecutionStateError,
     PlanExecutionState,
@@ -27,18 +32,23 @@ from .strategies import (
 )
 from .planner import (
     DeterministicPlanner,
+    LLMPlanner,
     PlanningBatchResult,
     PlanningCaseResult,
     PlanningDecision,
     PlanningRequest,
     PlanningResult,
+    Planner,
+    PlannerOutputError,
 )
 
 __all__ = [
     "AgentPlan",
     "CaseScenario",
     "DeterministicPlanner",
+    "LLMPlanner",
     "ExecutionStateError",
+    "OpenAICompatibleChatModel",
     "PlanStep",
     "PlanStepStatus",
     "PlanExecutionState",
@@ -50,6 +60,9 @@ __all__ = [
     "PlanningDecision",
     "PlanningRequest",
     "PlanningResult",
+    "Planner",
+    "PlannerModelError",
+    "PlannerOutputError",
     "ReplanBudget",
     "ReplanController",
     "ReplanDecision",
@@ -62,5 +75,6 @@ __all__ = [
     "StrategyRunResult",
     "StepExecution",
     "StepResult",
+    "StructuredPlanModel",
     "compare_strategies",
 ]

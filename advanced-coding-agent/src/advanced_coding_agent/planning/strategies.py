@@ -8,7 +8,7 @@ from typing import Literal
 
 from ..contracts import TaskCase
 from .execution import PlanExecutionState, PlanExecutor
-from .planner import DeterministicPlanner, PlanningRequest
+from .planner import DeterministicPlanner, Planner, PlanningRequest
 
 
 StrategyName = Literal["one-shot", "stepwise", "planner-executor"]
@@ -97,7 +97,7 @@ class StrategyComparisonReport:
 
 def compare_strategies(
     cases: Iterable[TaskCase],
-    planner: DeterministicPlanner | None = None,
+    planner: Planner | None = None,
 ) -> StrategyComparisonReport:
     """Run all three deterministic strategies against the same fixed cases."""
 
@@ -120,7 +120,7 @@ def compare_strategies(
 
 def _run_case_strategies(
     case: TaskCase,
-    planner: DeterministicPlanner,
+    planner: Planner,
 ) -> tuple[StrategyRunResult, ...]:
     request = PlanningRequest(
         goal=case.objective,
@@ -137,7 +137,7 @@ def _run_case_strategies(
 def _run_one_shot(
     case: TaskCase,
     request: PlanningRequest,
-    planner: DeterministicPlanner,
+    planner: Planner,
 ) -> StrategyRunResult:
     result = planner.plan(request)
     if result.plan is None:
@@ -157,7 +157,7 @@ def _run_one_shot(
 def _run_stepwise(
     case: TaskCase,
     request: PlanningRequest,
-    planner: DeterministicPlanner,
+    planner: Planner,
 ) -> StrategyRunResult:
     initial = planner.plan(request)
     if initial.plan is None:
@@ -184,7 +184,7 @@ def _run_stepwise(
 def _run_planner_executor(
     case: TaskCase,
     request: PlanningRequest,
-    planner: DeterministicPlanner,
+    planner: Planner,
 ) -> StrategyRunResult:
     result = planner.plan(request)
     if result.plan is None:

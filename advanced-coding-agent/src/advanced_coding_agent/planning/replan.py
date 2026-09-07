@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from typing import Literal
 
 from .plan import AgentPlan, PlanStep
-from .planner import DeterministicPlanner, PlanningRequest
+from .planner import DeterministicPlanner, Planner, PlanningRequest
 
 
 ReplanDecision = Literal["unchanged", "replanned", "blocked"]
@@ -181,7 +181,7 @@ class ReplanResult:
 class ReplanController:
     """Re-plan only when evidence invalidates the current task assumptions."""
 
-    def __init__(self, planner: DeterministicPlanner | None = None) -> None:
+    def __init__(self, planner: Planner | None = None) -> None:
         self._planner = planner or DeterministicPlanner()
 
     def consider(

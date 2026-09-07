@@ -1,14 +1,16 @@
-"""Deterministic structured Planner for W16 Session 2."""
+"""Deterministic and LLM-backed structured Planners for W16 Session 2."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import json
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Protocol
 
 from ..classification import TaskClassification, classify_task
 from ..contracts import TaskCase
-from .plan import AgentPlan, PlanStep
+from .model import PlannerModelResponse, StructuredPlanModel
+from .plan import AgentPlan, PlanStep, PlanValidationError
 
 
 PlanningDecision = Literal["planned", "skipped"]
@@ -82,6 +84,16 @@ class PlanningResult:
         }
 
 
+class Planner(Protocol):
+    """Common interface implemented by deterministic and LLM planners."""
+
+    def plan(self, request: PlanningRequest) -> PlanningResult:
+        """Create a structured plan or explicitly skip planning."""
+
+    def plan_cases(self, cases: Iterable[TaskCase]) -> PlanningBatchResult:
+        """Plan a batch of fixed cases through the same planner boundary."""
+
+
 @dataclass(frozen=True)
 class PlanningCaseResult:
     """One fixed case paired with the Planner decision."""
@@ -139,6 +151,26 @@ class PlanningBatchResult:
         }
 
 
+def _plan_cases(
+    planner: Planner,
+    cases: Iterable[TaskCase],
+) -> PlanningBatchResult:
+    case_results = tuple(
+        PlanningCaseResult(
+            case=case,
+            result=planner.plan(
+                PlanningRequest(
+                    goal=case.objective,
+                    constraints=case.constraints,
+                    available_tools=case.available_tools,
+                )
+            ),
+        )
+        for case in cases
+    )
+    return PlanningBatchResult(case_results=case_results)
+
+
 class DeterministicPlanner:
     """Create a validated four-step plan without making a model call."""
 
@@ -167,20 +199,7 @@ class DeterministicPlanner:
         )
 
     def plan_cases(self, cases: Iterable[TaskCase]) -> PlanningBatchResult:
-        case_results = tuple(
-            PlanningCaseResult(
-                case=case,
-                result=self.plan(
-                    PlanningRequest(
-                        goal=case.objective,
-                        constraints=case.constraints,
-                        available_tools=case.available_tools,
-                    )
-                ),
-            )
-            for case in cases
-        )
-        return PlanningBatchResult(case_results=case_results)
+        return _plan_cases(self, cases)
 
     @staticmethod
     def _build_steps(goal: str) -> tuple[PlanStep, ...]:
@@ -209,3 +228,159 @@ class DeterministicPlanner:
                 dependencies=("change-root-cause",),
             ),
         )
+
+
+class PlannerOutputError(ValueError):
+    """Raised when an LLM response is not a safe structured AgentPlan."""
+
+
+class LLMPlanner:
+    """Generate a plan with an LLM, then enforce the plan contract in code."""
+
+    def __init__(
+        self,
+        model: StructuredPlanModel,
+        *,
+        max_steps: int = 8,
+    ) -> None:
+        if max_steps <= 0:
+            raise ValueError("max_steps 必须大于 0。")
+        self._model = model
+        self._max_steps = max_steps
+
+    def plan(self, request: PlanningRequest) -> PlanningResult:
+        classification = classify_task(request.goal)
+        if not classification.planning_recommended:
+            return PlanningResult(
+                request=request,
+                classification=classification,
+                decision="skipped",
+                reason="任务主要是一次只读或解释动作，跳过 Planning。",
+            )
+
+        response = self._model.complete(
+            system_prompt=self._system_prompt(),
+            user_prompt=self._user_prompt(request),
+        )
+        try:
+            candidate = AgentPlan.from_dict(self._parse_response(response))
+        except PlanValidationError as exc:
+            raise PlannerOutputError(
+                f"LLM Planner 输出未通过 Plan 校验：{exc}"
+            ) from exc
+        self._validate_candidate(candidate, request)
+        plan = AgentPlan(
+            goal=request.goal,
+            constraints=request.constraints,
+            available_tools=request.available_tools,
+            steps=candidate.steps,
+            version=1,
+        )
+        return PlanningResult(
+            request=request,
+            classification=classification,
+            decision="planned",
+            reason="LLM 根据任务输入生成结构化计划，代码已完成契约校验。",
+            plan=plan,
+        )
+
+    def plan_cases(self, cases: Iterable[TaskCase]) -> PlanningBatchResult:
+        return _plan_cases(self, cases)
+
+    def _system_prompt(self) -> str:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["goal", "constraints", "available_tools", "steps", "version"],
+            "properties": {
+                "goal": {"type": "string"},
+                "constraints": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "available_tools": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "version": {"type": "integer", "const": 1},
+                "steps": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": self._max_steps,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "id",
+                            "description",
+                            "completion_criteria",
+                            "dependencies",
+                        ],
+                        "properties": {
+                            "id": {"type": "string"},
+                            "description": {"type": "string"},
+                            "completion_criteria": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "minItems": 1,
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        },
+                    },
+                },
+            },
+        }
+        return (
+            "你是 coding agent 的 Planner，只负责把复杂目标拆解成最小可执行步骤。"
+            "不要调用工具，不要修改文件，不要声称任何步骤已经完成。"
+            "每个步骤必须有稳定 id、可观察的 completion_criteria 和依赖。"
+            "只输出一个 JSON 对象，不要输出 Markdown 或解释文字。"
+            f"输出必须符合以下 schema：{json.dumps(schema, ensure_ascii=False)}"
+        )
+
+    @staticmethod
+    def _user_prompt(request: PlanningRequest) -> str:
+        payload = {
+            "goal": request.goal,
+            "constraints": list(request.constraints),
+            "available_tools": list(request.available_tools),
+        }
+        return "请为以下任务生成结构化 AgentPlan：\n" + json.dumps(
+            payload,
+            ensure_ascii=False,
+        )
+
+    @staticmethod
+    def _parse_response(response: PlannerModelResponse) -> Mapping[str, object]:
+        if isinstance(response, Mapping):
+            return response
+        if not isinstance(response, str):
+            raise PlannerOutputError("LLM Planner 返回值必须是 JSON 对象或 JSON 字符串。")
+        try:
+            payload = json.loads(response)
+        except json.JSONDecodeError as exc:
+            raise PlannerOutputError("LLM Planner 返回的内容不是合法 JSON。") from exc
+        if not isinstance(payload, Mapping):
+            raise PlannerOutputError("LLM Planner 返回的 JSON 顶层必须是对象。")
+        return payload
+
+    def _validate_candidate(
+        self,
+        candidate: AgentPlan,
+        request: PlanningRequest,
+    ) -> None:
+        if candidate.goal != request.goal:
+            raise PlannerOutputError("LLM Planner 不能修改原始 goal。")
+        if candidate.version != 1:
+            raise PlannerOutputError("初次规划的 version 必须为 1。")
+        if len(candidate.steps) > self._max_steps:
+            raise PlannerOutputError(
+                f"LLM Planner 生成了 {len(candidate.steps)} 个步骤，超过上限 {self._max_steps}。"
+            )
+        if any(step.status != "pending" for step in candidate.steps):
+            raise PlannerOutputError("初次规划的所有步骤必须是 pending。")
+        if any(step.evidence_refs for step in candidate.steps):
+            raise PlannerOutputError("初次规划不能伪造 evidence_refs。")

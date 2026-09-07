@@ -5,7 +5,16 @@ import json
 from pathlib import Path
 
 from .contracts import TaskCase, TaskSpec
-from .planning import DeterministicPlanner, PlanningRequest, compare_strategies
+from .planning import (
+    DeterministicPlanner,
+    LLMPlanner,
+    OpenAICompatibleChatModel,
+    Planner,
+    PlannerModelError,
+    PlannerOutputError,
+    PlanningRequest,
+    compare_strategies,
+)
 from .runtime import ReactiveBaseline
 
 
@@ -47,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="Planner 可用工具，可重复传入。",
+    )
+    parser.add_argument(
+        "--planner-backend",
+        choices=("llm", "deterministic"),
+        default=None,
+        help="Planning 模式的 Planner；默认使用 LLM，deterministic 仅用于基线。",
     )
     return parser
 
@@ -96,6 +111,12 @@ def load_cases(path: Path) -> tuple[TaskCase, ...]:
     return tuple(cases)
 
 
+def _build_planner(backend: str) -> Planner:
+    if backend == "deterministic":
+        return DeterministicPlanner()
+    return LLMPlanner(OpenAICompatibleChatModel.from_env())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -117,7 +138,10 @@ def main(argv: list[str] | None = None) -> int:
         result = compare_strategies(cases)
         exit_code = 0 if all(run.success for run in result.runs) else 1
     elif args.mode == "planning":
-        planner = DeterministicPlanner()
+        try:
+            planner = _build_planner(args.planner_backend or "llm")
+        except PlannerModelError as exc:
+            parser.error(str(exc))
         if args.case_file is not None:
             if args.constraint or args.tool:
                 parser.error(
@@ -127,19 +151,25 @@ def main(argv: list[str] | None = None) -> int:
                 cases = load_cases(args.case_file)
             except ValueError as exc:
                 parser.error(str(exc))
-            result = planner.plan_cases(cases)
+            try:
+                result = planner.plan_cases(cases)
+            except (PlannerModelError, PlannerOutputError) as exc:
+                parser.error(str(exc))
             exit_code = 0 if all(
                 case_result.matches_expectation
                 for case_result in result.case_results
             ) else 1
         else:
-            result = planner.plan(
-                PlanningRequest(
-                    goal=args.objective,
-                    constraints=tuple(args.constraint),
-                    available_tools=tuple(args.tool),
+            try:
+                result = planner.plan(
+                    PlanningRequest(
+                        goal=args.objective,
+                        constraints=tuple(args.constraint),
+                        available_tools=tuple(args.tool),
+                    )
                 )
-            )
+            except (PlannerModelError, PlannerOutputError) as exc:
+                parser.error(str(exc))
             exit_code = 0
     else:
         baseline = ReactiveBaseline()

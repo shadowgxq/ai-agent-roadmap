@@ -2,7 +2,7 @@
 
 W16–W18 的独立 Coding Agent 实验项目，不复用 `agent-mini` 的运行时代码。
 
-当前已完成 W16 Session 1 的 Reactive baseline：先分类任务，再读取仓库根目录、执行一个工具并输出结构化结果；不创建 Planner，也不执行多步循环。
+项目同时保留 Reactive baseline 和 Planning 模式：复杂任务默认交给 LLM Planner 生成结构化计划，`--planner-backend deterministic` 可运行确定性基线。
 
 ## 目录边界
 
@@ -18,7 +18,7 @@ advanced-coding-agent/
 └── evals/cases/           # 固定任务与对照样例
 ```
 
-Session 1 基线不调用真实模型；模型配置在后续需要时再接入。
+LLM Planning 使用 `AGENT_MODEL`、`AGENT_API_KEY` 和 `AGENT_BASE_URL` 配置；模型只生成计划，不执行工具，计划仍由代码校验。
 
 ## 本地运行
 

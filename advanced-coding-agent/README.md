@@ -2,7 +2,17 @@
 
 W16–W18 的独立 Coding Agent 实验项目，不复用 `agent-mini` 的运行时代码。
 
-项目同时保留 Reactive baseline 和 Planning 模式：复杂任务默认进入 LangGraph，Planner 通过 LangChain structured output 生成计划；`--planner-backend deterministic` 可运行确定性基线。
+路线固定按下列顺序递进：
+
+```text
+W16  v1  Planning：Plan → Executor → Verifier → Re-plan
+  ↓
+W17  v2  Long-horizon：Goal + Progress + Context + Recovery
+  ↓
+W18  v3  Multi-Agent：Manager + Researcher/Coder/Tester
+```
+
+项目保留同一套 Reactive baseline，并在其上逐版增加复杂度：W16 先完成 Planning 闭环；W17 在 v1 上加入 Long-horizon 的目标、进度、上下文与恢复；W18 再在 v2 上引入 Multi-Agent 协作。复杂任务默认进入 LangGraph，Planner 通过 LangChain structured output 生成计划；`--planner-backend deterministic` 可运行确定性基线。
 
 ## 目录边界
 

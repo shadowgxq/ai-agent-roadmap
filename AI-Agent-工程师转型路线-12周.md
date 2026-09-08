@@ -4,7 +4,7 @@
 > 假设业余投入每周 10–15 小时（每天 1.5–2 小时），总周期 **12 周**；全职学习所有周期减半。
 > 本文档既是**学习计划**，也是**进度追踪表**——直接在文中的 checklist 上打勾。
 >
-> W1–W12 是原理与产品化主线；完成后继续执行 [W13–W23 企业级强化路线](AI-Agent-工程师企业强化路线-W13-W23.md)，补齐 LangGraph、Planning、Long-horizon、Multi-Agent、企业 RAG、持久化、异步任务、权限与多租户。
+> W1–W12 是原理与产品化主线；完成后继续执行 [W13–W23 企业级强化路线](AI-Agent-工程师企业强化路线-W13-W23.md)，按 **W16 Planning → W17 Long-horizon → W18 Multi-Agent** 递进，再补齐企业 RAG、持久化、异步任务、权限与多租户。
 
 ---
 
@@ -866,4 +866,4 @@ evals/
 > **现在就开始第 1 周第一个动手任务**：`uv init` 一个项目，发出你的第一次 API 调用，打印 token 和费用。
 > 十二周后，你手里会有一个能公开访问的 agent、一个开源 MCP server、一套 evals 和一篇有数据的博客——这套组合拳，比任何证书都有说服力。
 >
-> W12 验收通过后，从 [W13｜LangChain / LangGraph 框架映射](weeks/W13.md) 开始企业级强化，不再另起一套前端；W16–W18 的高级 Agent 实验单独使用 `advanced-coding-agent`。
+> W12 验收通过后，从 [W13｜LangChain / LangGraph 框架映射](weeks/W13.md) 开始企业级强化，不再另起一套前端；W16–W18 的高级 Agent 实验单独使用 `advanced-coding-agent`，并按 Planning → Long-horizon → Multi-Agent 递进。

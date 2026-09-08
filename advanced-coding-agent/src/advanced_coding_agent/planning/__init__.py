@@ -7,6 +7,11 @@ from .model import (
     PlannerModelError,
     StructuredPlanModel,
 )
+from .langchain_planner import (
+    LangChainPlanner,
+    StructuredAgentPlan,
+    StructuredPlanStep,
+)
 from .execution import (
     ExecutionStateError,
     PlanExecutionState,
@@ -41,12 +46,20 @@ from .planner import (
     Planner,
     PlannerOutputError,
 )
+from .graph import (
+    PlanningGraphError,
+    PlanningGraphState,
+    create_planning_graph,
+    initial_planning_state,
+    invoke_planning_graph,
+)
 
 __all__ = [
     "AgentPlan",
     "CaseScenario",
     "DeterministicPlanner",
     "LLMPlanner",
+    "LangChainPlanner",
     "ExecutionStateError",
     "OpenAICompatibleChatModel",
     "PlanStep",
@@ -60,6 +73,8 @@ __all__ = [
     "PlanningDecision",
     "PlanningRequest",
     "PlanningResult",
+    "PlanningGraphError",
+    "PlanningGraphState",
     "Planner",
     "PlannerModelError",
     "PlannerOutputError",
@@ -75,6 +90,11 @@ __all__ = [
     "StrategyRunResult",
     "StepExecution",
     "StepResult",
+    "StructuredAgentPlan",
+    "StructuredPlanStep",
     "StructuredPlanModel",
+    "create_planning_graph",
     "compare_strategies",
+    "initial_planning_state",
+    "invoke_planning_graph",
 ]

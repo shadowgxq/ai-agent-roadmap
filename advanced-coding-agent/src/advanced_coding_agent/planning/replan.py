@@ -229,6 +229,14 @@ class ReplanController:
                 goal=state.plan.goal,
                 constraints=state.plan.constraints,
                 available_tools=state.plan.available_tools,
+                observations=(
+                    observation.summary,
+                    *observation.evidence_refs,
+                    *(
+                        f"受影响步骤：{step_id}"
+                        for step_id in observation.affected_step_ids
+                    ),
+                ),
             )
         )
         if planning_result.plan is None:

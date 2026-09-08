@@ -2,11 +2,13 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from .contracts import TaskCase, TaskSpec
 from .planning import (
     DeterministicPlanner,
+    LangChainPlanner,
     LLMPlanner,
     OpenAICompatibleChatModel,
     Planner,
@@ -14,6 +16,8 @@ from .planning import (
     PlannerOutputError,
     PlanningRequest,
     compare_strategies,
+    create_planning_graph,
+    invoke_planning_graph,
 )
 from .runtime import ReactiveBaseline
 
@@ -59,9 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--planner-backend",
-        choices=("llm", "deterministic"),
+        choices=("langgraph", "llm", "deterministic"),
         default=None,
-        help="Planning 模式的 Planner；默认使用 LLM，deterministic 仅用于基线。",
+        help=(
+            "Planning 后端；默认使用 LangGraph + LangChain，"
+            "llm 为旧版直接 Planner，deterministic 仅用于基线。"
+        ),
     )
     return parser
 
@@ -117,6 +124,99 @@ def _build_planner(backend: str) -> Planner:
     return LLMPlanner(OpenAICompatibleChatModel.from_env())
 
 
+def _build_langgraph_graph(workdir: Path):
+    """Build the LangGraph runtime with LangChain structured Planner output."""
+
+    try:
+        from langchain_openai import ChatOpenAI
+        from langgraph.checkpoint.memory import InMemorySaver
+    except ImportError as exc:
+        raise ValueError(
+            "LangGraph 后端依赖未安装，请在 advanced-coding-agent 中执行 uv sync。"
+        ) from exc
+
+    model_name = os.environ.get("AGENT_MODEL", "").strip()
+    api_key = os.environ.get("AGENT_API_KEY", "").strip()
+    if not model_name:
+        raise ValueError("LangGraph Planner 需要设置 AGENT_MODEL。")
+    if not api_key:
+        raise ValueError("LangGraph Planner 需要设置 AGENT_API_KEY。")
+
+    base_url = os.environ.get("AGENT_BASE_URL", "").strip().rstrip("/")
+    if base_url.endswith("/chat/completions"):
+        base_url = base_url[: -len("/chat/completions")]
+
+    model = ChatOpenAI(
+        model=model_name,
+        api_key=api_key,
+        base_url=base_url or None,
+        temperature=0,
+    )
+    planner = LangChainPlanner(model)
+    return create_planning_graph(
+        planner=planner,
+        workdir=workdir,
+        checkpointer=InMemorySaver(),
+    )
+
+
+def _run_langgraph_planning(
+    args: argparse.Namespace,
+) -> tuple[dict[str, object], int]:
+    graph = _build_langgraph_graph(args.workdir)
+    if args.case_file is None:
+        result = invoke_planning_graph(
+            graph,
+            goal=args.objective,
+            workdir=args.workdir,
+            constraints=tuple(args.constraint),
+            available_tools=tuple(args.tool),
+        )
+        return result, 0 if result.get("graph_status") == "completed" else 1
+
+    if args.constraint or args.tool:
+        raise ValueError(
+            "批量 planning case 的 constraints 和 available_tools 必须写在 JSON 中。"
+        )
+    cases = load_cases(args.case_file)
+    case_results: list[dict[str, object]] = []
+    for case in cases:
+        graph_result = invoke_planning_graph(
+            graph,
+            goal=case.objective,
+            workdir=args.workdir,
+            constraints=case.constraints,
+            available_tools=case.available_tools,
+            thread_id=f"case:{case.case_id}",
+        )
+        classification = graph_result.get("classification", {})
+        matches_expectation = (
+            isinstance(classification, dict)
+            and classification.get("planning_recommended")
+            == case.planning_recommended
+        )
+        case_results.append(
+            {
+                "case": case.as_dict(),
+                "result": graph_result,
+                "matches_expectation": matches_expectation,
+            }
+        )
+    report = {
+        "mode": "langgraph-planning",
+        "case_count": len(case_results),
+        "expectation_match_count": sum(
+            result["matches_expectation"] for result in case_results
+        ),
+        "cases": case_results,
+    }
+    return report, 0 if all(
+        result["matches_expectation"]
+        and result["result"].get("graph_status") == "completed"
+        for result in case_results
+    ) else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -138,39 +238,38 @@ def main(argv: list[str] | None = None) -> int:
         result = compare_strategies(cases)
         exit_code = 0 if all(run.success for run in result.runs) else 1
     elif args.mode == "planning":
-        try:
-            planner = _build_planner(args.planner_backend or "llm")
-        except PlannerModelError as exc:
-            parser.error(str(exc))
-        if args.case_file is not None:
-            if args.constraint or args.tool:
-                parser.error(
-                    "批量 planning case 的 constraints 和 available_tools 必须写在 JSON 中。"
-                )
+        backend = args.planner_backend or "langgraph"
+        if backend == "langgraph":
             try:
-                cases = load_cases(args.case_file)
-            except ValueError as exc:
+                result, exit_code = _run_langgraph_planning(args)
+            except (PlannerModelError, PlannerOutputError, ValueError) as exc:
                 parser.error(str(exc))
-            try:
-                result = planner.plan_cases(cases)
-            except (PlannerModelError, PlannerOutputError) as exc:
-                parser.error(str(exc))
-            exit_code = 0 if all(
-                case_result.matches_expectation
-                for case_result in result.case_results
-            ) else 1
         else:
             try:
-                result = planner.plan(
-                    PlanningRequest(
-                        goal=args.objective,
-                        constraints=tuple(args.constraint),
-                        available_tools=tuple(args.tool),
+                planner = _build_planner(backend)
+                if args.case_file is not None:
+                    if args.constraint or args.tool:
+                        parser.error(
+                            "批量 planning case 的 constraints 和 available_tools "
+                            "必须写在 JSON 中。"
+                        )
+                    cases = load_cases(args.case_file)
+                    result = planner.plan_cases(cases)
+                    exit_code = 0 if all(
+                        case_result.matches_expectation
+                        for case_result in result.case_results
+                    ) else 1
+                else:
+                    result = planner.plan(
+                        PlanningRequest(
+                            goal=args.objective,
+                            constraints=tuple(args.constraint),
+                            available_tools=tuple(args.tool),
+                        )
                     )
-                )
-            except (PlannerModelError, PlannerOutputError) as exc:
+                    exit_code = 0
+            except (PlannerModelError, PlannerOutputError, ValueError) as exc:
                 parser.error(str(exc))
-            exit_code = 0
     else:
         baseline = ReactiveBaseline()
         if args.case_file is not None:
@@ -188,11 +287,6 @@ def main(argv: list[str] | None = None) -> int:
             result = baseline.run(task)
             exit_code = 0 if result.status == "completed" else 1
 
-    print(
-        json.dumps(
-            result.as_dict(),
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    payload = result if isinstance(result, dict) else result.as_dict()
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
     return exit_code

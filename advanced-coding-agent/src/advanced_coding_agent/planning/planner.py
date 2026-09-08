@@ -34,6 +34,7 @@ class PlanningRequest:
     goal: str
     constraints: tuple[str, ...] = ()
     available_tools: tuple[str, ...] = ()
+    observations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         goal = self.goal.strip()
@@ -49,6 +50,11 @@ class PlanningRequest:
             self,
             "available_tools",
             _normalize_context(self.available_tools, "available_tools"),
+        )
+        object.__setattr__(
+            self,
+            "observations",
+            _normalize_context(self.observations, "observations"),
         )
 
 
@@ -78,6 +84,7 @@ class PlanningResult:
                 "goal": self.request.goal,
                 "constraints": list(self.request.constraints),
                 "available_tools": list(self.request.available_tools),
+                "observations": list(self.request.observations),
             },
             "classification": self.classification.as_dict(),
             "plan": self.plan.as_dict() if self.plan is not None else None,
@@ -347,6 +354,7 @@ class LLMPlanner:
             "goal": request.goal,
             "constraints": list(request.constraints),
             "available_tools": list(request.available_tools),
+            "observations": list(request.observations),
         }
         return "请为以下任务生成结构化 AgentPlan：\n" + json.dumps(
             payload,

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-
 VerificationStatus = Literal["pass", "fail", "needs_review"]
 
 
@@ -136,9 +135,7 @@ class DeterministicVerifier:
                     detail = f"目标文件读取失败：{type(exc).__name__}。"
                 else:
                     passed = requirement.expected_text in content
-                    detail = (
-                        "目标条件满足。" if passed else "目标条件未满足。"
-                    )
+                    detail = "目标条件满足。" if passed else "目标条件未满足。"
             checks.append(
                 VerificationCheck(
                     name=f"content:{requirement.path}",
@@ -246,10 +243,6 @@ class EvidenceBackedSemanticVerifier:
         return VerificationResult(
             status=status,
             summary=f"语义验证结果：{status}。",
-            evidence_refs=tuple(
-                dict.fromkeys(evidence_refs + (f"semantic:{status}",))
-            ),
-            failed_checks=()
-            if status == "pass"
-            else (f"semantic:{status}",),
+            evidence_refs=tuple(dict.fromkeys(evidence_refs + (f"semantic:{status}",))),
+            failed_checks=() if status == "pass" else (f"semantic:{status}",),
         )

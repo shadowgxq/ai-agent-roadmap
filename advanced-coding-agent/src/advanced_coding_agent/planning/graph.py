@@ -29,7 +29,6 @@ from .replan import (
     ReplanState,
 )
 
-
 GraphStatus = Literal[
     "pending",
     "classified",
@@ -136,9 +135,9 @@ class _PlanningGraphRuntime:
         }
 
     @staticmethod
-    def route_after_classify(state: PlanningGraphState) -> Literal[
-        "planning", "reactive"
-    ]:
+    def route_after_classify(
+        state: PlanningGraphState,
+    ) -> Literal["planning", "reactive"]:
         classification = state.get("classification", {})
         return (
             "planning"
@@ -191,9 +190,9 @@ class _PlanningGraphRuntime:
         return updates
 
     @staticmethod
-    def route_after_select(state: PlanningGraphState) -> Literal[
-        "execute", "done", "blocked"
-    ]:
+    def route_after_select(
+        state: PlanningGraphState,
+    ) -> Literal["execute", "done", "blocked"]:
         execution_status = state.get("execution_status")
         if execution_status == "completed":
             return "done"
@@ -286,9 +285,9 @@ class _PlanningGraphRuntime:
         return updates
 
     @staticmethod
-    def route_after_verify(state: PlanningGraphState) -> Literal[
-        "next", "replan", "done", "blocked"
-    ]:
+    def route_after_verify(
+        state: PlanningGraphState,
+    ) -> Literal["next", "replan", "done", "blocked"]:
         if state.get("execution_status") == "completed":
             return "done"
         if state.get("execution_status") == "pending":
@@ -394,9 +393,7 @@ class _PlanningGraphRuntime:
         for step in domain_state.plan.steps:
             if step.id == domain_state.current_step:
                 return step
-        raise PlanningGraphError(
-            f"当前步骤不存在：{domain_state.current_step}。"
-        )
+        raise PlanningGraphError(f"当前步骤不存在：{domain_state.current_step}。")
 
     def _budget_from_state(self, state: PlanningGraphState) -> ReplanBudget:
         raw_budget = state.get("budget")
@@ -488,9 +485,7 @@ def create_planning_graph(
     runtime = _PlanningGraphRuntime(
         planner=planner,
         workdir=workdir,
-        checkpointer=(
-            checkpointer if checkpointer is not None else InMemorySaver()
-        ),
+        checkpointer=(checkpointer if checkpointer is not None else InMemorySaver()),
         step_runner=step_runner,
         verifier=verifier,
         replan_observer=replan_observer,
@@ -550,9 +545,7 @@ def invoke_planning_graph(
 ) -> PlanningGraphState:
     """Invoke one graph thread and persist every node transition."""
 
-    config = {
-        "configurable": {"thread_id": thread_id or uuid4().hex}
-    }
+    config = {"configurable": {"thread_id": thread_id or uuid4().hex}}
     return graph.invoke(
         initial_planning_state(
             goal=goal,

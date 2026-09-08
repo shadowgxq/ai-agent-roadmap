@@ -4,15 +4,12 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-
 TaskComplexity = Literal["simple", "complex"]
 
 # Session 1 的候选门槛：预计至少需要两个有依赖的动作，或需要修改后验证、
 # 根因调查等中间状态时，建议进入 Planning。后续用 eval 数据校准，而不是把
 # 这个启发式规则当成最终的 Planner。
-PLANNING_THRESHOLD = (
-    "预计至少两个有依赖动作，或包含根因调查、代码修改和后续验证"
-)
+PLANNING_THRESHOLD = "预计至少两个有依赖动作，或包含根因调查、代码修改和后续验证"
 
 _COMPLEX_SIGNALS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("修复", "bug", "fix", "debug"), "需要定位或修复问题"),

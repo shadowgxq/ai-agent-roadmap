@@ -10,7 +10,6 @@ from typing import Protocol
 from urllib import error as url_error
 from urllib import request as url_request
 
-
 PlannerModelResponse = str | Mapping[str, object]
 
 
@@ -59,7 +58,7 @@ class OpenAICompatibleChatModel:
     def from_env(
         cls,
         environ: Mapping[str, str] | None = None,
-    ) -> "OpenAICompatibleChatModel":
+    ) -> OpenAICompatibleChatModel:
         """Build the adapter from AGENT_* environment variables."""
 
         values = os.environ if environ is None else environ
@@ -116,9 +115,7 @@ class OpenAICompatibleChatModel:
             ) as response:
                 response_body = response.read()
         except url_error.HTTPError as exc:
-            raise PlannerModelError(
-                f"LLM 请求失败：HTTP {exc.code}。"
-            ) from exc
+            raise PlannerModelError(f"LLM 请求失败：HTTP {exc.code}。") from exc
         except url_error.URLError as exc:
             raise PlannerModelError("LLM 请求无法连接。") from exc
         except TimeoutError as exc:

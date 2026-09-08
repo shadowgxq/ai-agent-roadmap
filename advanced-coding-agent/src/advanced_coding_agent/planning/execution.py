@@ -9,7 +9,6 @@ from typing import Literal
 from ..verification import VerificationResult, VerificationStatus
 from .plan import AgentPlan, PlanStep, PlanValidationError
 
-
 ExecutionStatus = Literal["pending", "running", "completed", "failed"]
 StepExecutionStatus = Literal["running", "completed", "failed"]
 
@@ -75,15 +74,14 @@ class StepResult:
         if self.verification_status not in (None, "pass", "fail", "needs_review"):
             raise ExecutionStateError("verification_status 不合法。")
         if self.verification_status is not None and (
-            self.verification_summary is None
-            or not self.verification_summary.strip()
+            self.verification_summary is None or not self.verification_summary.strip()
         ):
             raise ExecutionStateError(
                 "存在 verification_status 时必须保存 verification_summary。"
             )
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "StepResult":
+    def from_dict(cls, payload: Mapping[str, object]) -> StepResult:
         status = payload.get("status")
         if not isinstance(status, str):
             raise ExecutionStateError("步骤结果 status 必须是字符串。")
@@ -135,7 +133,7 @@ class PlanExecutionState:
                 )
 
     @classmethod
-    def create(cls, plan: AgentPlan) -> "PlanExecutionState":
+    def create(cls, plan: AgentPlan) -> PlanExecutionState:
         plan.validate()
         return cls(plan=plan)
 
@@ -215,7 +213,9 @@ class PlanExecutionState:
         )
         self.current_step = None
         self.status = "failed" if status == "failed" else "pending"
-        if status == "completed" and len(self.completed_step_ids) == len(self.plan.steps):
+        if status == "completed" and len(self.completed_step_ids) == len(
+            self.plan.steps
+        ):
             self.status = "completed"
 
     def as_dict(self) -> dict[str, object]:
@@ -227,7 +227,7 @@ class PlanExecutionState:
         }
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "PlanExecutionState":
+    def from_dict(cls, payload: Mapping[str, object]) -> PlanExecutionState:
         raw_plan = payload.get("plan")
         raw_results = payload.get("step_results", [])
         if not isinstance(raw_plan, Mapping):

@@ -80,7 +80,7 @@ def _load_case_texts(
 ) -> tuple[str, ...]:
     values = item.get(field_name, [])
     if not isinstance(values, list):
-        raise ValueError(f"case[{index}].{field_name} 必须是字符串数组。")
+        raise TypeError(f"case[{index}].{field_name} 必须是字符串数组。")
     if any(not isinstance(value, str) for value in values):
         raise ValueError(f"case[{index}].{field_name} 必须只包含字符串。")
     return tuple(value.strip() for value in values if value.strip())
@@ -100,7 +100,7 @@ def load_cases(path: Path) -> tuple[TaskCase, ...]:
     cases: list[TaskCase] = []
     for index, item in enumerate(payload):
         if not isinstance(item, dict):
-            raise ValueError(f"case[{index}] 必须是 JSON 对象。")
+            raise TypeError(f"case[{index}] 必须是 JSON 对象。")
         try:
             cases.append(
                 TaskCase(
@@ -143,8 +143,7 @@ def _build_langgraph_graph(workdir: Path):
         raise ValueError("LangGraph Planner 需要设置 AGENT_API_KEY。")
 
     base_url = os.environ.get("AGENT_BASE_URL", "").strip().rstrip("/")
-    if base_url.endswith("/chat/completions"):
-        base_url = base_url[: -len("/chat/completions")]
+    base_url = base_url.removesuffix("/chat/completions")
 
     model = ChatOpenAI(
         model=model_name,
@@ -192,8 +191,7 @@ def _run_langgraph_planning(
         classification = graph_result.get("classification", {})
         matches_expectation = (
             isinstance(classification, dict)
-            and classification.get("planning_recommended")
-            == case.planning_recommended
+            and classification.get("planning_recommended") == case.planning_recommended
         )
         case_results.append(
             {
@@ -255,10 +253,14 @@ def main(argv: list[str] | None = None) -> int:
                         )
                     cases = load_cases(args.case_file)
                     result = planner.plan_cases(cases)
-                    exit_code = 0 if all(
-                        case_result.matches_expectation
-                        for case_result in result.case_results
-                    ) else 1
+                    exit_code = (
+                        0
+                        if all(
+                            case_result.matches_expectation
+                            for case_result in result.case_results
+                        )
+                        else 1
+                    )
                 else:
                     result = planner.plan(
                         PlanningRequest(
@@ -278,10 +280,14 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as exc:
                 parser.error(str(exc))
             result = baseline.run_cases(cases, workdir=args.workdir)
-            exit_code = 0 if all(
-                case_run.result.status == "completed"
-                for case_run in result.case_runs
-            ) else 1
+            exit_code = (
+                0
+                if all(
+                    case_run.result.status == "completed"
+                    for case_run in result.case_runs
+                )
+                else 1
+            )
         else:
             task = TaskSpec(objective=args.objective, workdir=args.workdir)
             result = baseline.run(task)

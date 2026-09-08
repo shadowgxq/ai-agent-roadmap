@@ -12,7 +12,6 @@ from ..contracts import TaskCase
 from .model import PlannerModelResponse, StructuredPlanModel
 from .plan import AgentPlan, PlanStep, PlanValidationError
 
-
 PlanningDecision = Literal["planned", "skipped"]
 
 
@@ -20,7 +19,7 @@ def _normalize_context(values: Iterable[str], field_name: str) -> tuple[str, ...
     normalized: list[str] = []
     for value in values:
         if not isinstance(value, str):
-            raise ValueError(f"{field_name} 必须只包含字符串。")
+            raise TypeError(f"{field_name} 必须只包含字符串。")
         value = value.strip()
         if value:
             normalized.append(value)
@@ -130,9 +129,7 @@ class PlanningBatchResult:
 
     @property
     def match_count(self) -> int:
-        return sum(
-            case_result.matches_expectation for case_result in self.case_results
-        )
+        return sum(case_result.matches_expectation for case_result in self.case_results)
 
     @property
     def accuracy(self) -> float:
@@ -145,12 +142,10 @@ class PlanningBatchResult:
             "mode": "structured-planning",
             "case_count": len(self.case_results),
             "planned_case_count": sum(
-                result.result.decision == "planned"
-                for result in self.case_results
+                result.result.decision == "planned" for result in self.case_results
             ),
             "skipped_case_count": sum(
-                result.result.decision == "skipped"
-                for result in self.case_results
+                result.result.decision == "skipped" for result in self.case_results
             ),
             "expectation_match_count": self.match_count,
             "expectation_accuracy": self.accuracy,
@@ -366,7 +361,9 @@ class LLMPlanner:
         if isinstance(response, Mapping):
             return response
         if not isinstance(response, str):
-            raise PlannerOutputError("LLM Planner 返回值必须是 JSON 对象或 JSON 字符串。")
+            raise PlannerOutputError(
+                "LLM Planner 返回值必须是 JSON 对象或 JSON 字符串。"
+            )
         try:
             payload = json.loads(response)
         except json.JSONDecodeError as exc:

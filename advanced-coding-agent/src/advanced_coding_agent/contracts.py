@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from .classification import TaskClassification, TaskComplexity
 
-
 ToolStatus = Literal["succeeded", "failed"]
 RunStatus = Literal["completed", "failed"]
 CaseScenario = Literal["normal", "verification_failure", "replan"]
@@ -52,15 +51,11 @@ class TaskCase:
         if self.expected_complexity not in ("simple", "complex"):
             raise ValueError("expected_complexity 必须是 simple 或 complex。")
         if not isinstance(self.planning_recommended, bool):
-            raise ValueError("planning_recommended 必须是布尔值。")
+            raise TypeError("planning_recommended 必须是布尔值。")
         if self.scenario not in ("normal", "verification_failure", "replan"):
-            raise ValueError(
-                "scenario 必须是 normal、verification_failure 或 replan。"
-            )
+            raise ValueError("scenario 必须是 normal、verification_failure 或 replan。")
         constraints = tuple(
-            constraint.strip()
-            for constraint in self.constraints
-            if constraint.strip()
+            constraint.strip() for constraint in self.constraints if constraint.strip()
         )
         available_tools = tuple(
             tool.strip() for tool in self.available_tools if tool.strip()
@@ -143,9 +138,7 @@ class RunMetrics:
         aggregate = cls()
         for metric in metrics:
             aggregate.tool_call_count += metric.tool_call_count
-            aggregate.successful_tool_call_count += (
-                metric.successful_tool_call_count
-            )
+            aggregate.successful_tool_call_count += metric.successful_tool_call_count
             aggregate.failed_tool_call_count += metric.failed_tool_call_count
             aggregate.repeated_work_count += metric.repeated_work_count
         return aggregate

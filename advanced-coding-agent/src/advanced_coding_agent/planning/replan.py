@@ -9,7 +9,6 @@ from typing import Literal
 from .plan import AgentPlan, PlanStep
 from .planner import DeterministicPlanner, Planner, PlanningRequest
 
-
 ReplanDecision = Literal["unchanged", "replanned", "blocked"]
 ReplanStateStatus = Literal["active", "blocked"]
 
@@ -132,7 +131,7 @@ class ReplanState:
         cls,
         plan: AgentPlan,
         budget: ReplanBudget | None = None,
-    ) -> "ReplanState":
+    ) -> ReplanState:
         return cls(plan=plan, budget=budget or ReplanBudget())
 
     def record_usage(self, *, tool_calls: int, runtime_seconds: float) -> None:
@@ -311,7 +310,11 @@ def _carry_forward_facts(
     steps: list[PlanStep] = []
     for step in candidate_plan.steps:
         previous = previous_steps.get(step.id)
-        if previous is not None and previous.status == "completed" and step.id not in affected:
+        if (
+            previous is not None
+            and previous.status == "completed"
+            and step.id not in affected
+        ):
             steps.append(
                 replace(
                     step,

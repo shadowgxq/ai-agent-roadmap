@@ -10,7 +10,6 @@ from ..contracts import TaskCase
 from .execution import PlanExecutionState, PlanExecutor
 from .planner import DeterministicPlanner, Planner, PlanningRequest
 
-
 StrategyName = Literal["one-shot", "stepwise", "planner-executor"]
 _STRATEGIES: tuple[StrategyName, ...] = (
     "one-shot",
@@ -63,9 +62,7 @@ class StrategyComparisonReport:
             result[strategy] = {
                 "case_count": len(runs),
                 "success_count": success_count,
-                "success_rate": round(success_count / len(runs), 3)
-                if runs
-                else 0.0,
+                "success_rate": round(success_count / len(runs), 3) if runs else 0.0,
                 "avg_plan_generation_count": _average(
                     run.plan_generation_count for run in runs
                 ),
@@ -78,9 +75,7 @@ class StrategyComparisonReport:
                 )
                 if runs
                 else 0.0,
-                "total_evidence_ref_count": sum(
-                    run.evidence_ref_count for run in runs
-                ),
+                "total_evidence_ref_count": sum(run.evidence_ref_count for run in runs),
             }
         return result
 
@@ -104,9 +99,7 @@ def compare_strategies(
     planner = planner or DeterministicPlanner()
     case_list = tuple(cases)
     runs = tuple(
-        run
-        for case in case_list
-        for run in _run_case_strategies(case, planner)
+        run for case in case_list for run in _run_case_strategies(case, planner)
     )
     return StrategyComparisonReport(
         runs=runs,

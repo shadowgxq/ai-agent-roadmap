@@ -16,7 +16,6 @@ from ..contracts import (
 )
 from ..tools.repository import list_repository
 
-
 RepositoryTool = Callable[[Path], ToolResult]
 
 

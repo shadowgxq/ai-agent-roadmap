@@ -6,7 +6,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-
 PlanStepStatus = Literal["pending", "running", "completed", "failed"]
 _VALID_STEP_STATUSES = frozenset({"pending", "running", "completed", "failed"})
 
@@ -61,9 +60,7 @@ class PlanStep:
             f"step[{step_id}].completion_criteria",
         )
         if not completion_criteria:
-            raise PlanValidationError(
-                f"step[{step_id}].completion_criteria 不能为空。"
-            )
+            raise PlanValidationError(f"step[{step_id}].completion_criteria 不能为空。")
         dependencies = _normalize_texts(
             self.dependencies,
             f"step[{step_id}].dependencies",
@@ -72,10 +69,7 @@ class PlanStep:
             self.evidence_refs,
             f"step[{step_id}].evidence_refs",
         )
-        if (
-            not isinstance(self.status, str)
-            or self.status not in _VALID_STEP_STATUSES
-        ):
+        if not isinstance(self.status, str) or self.status not in _VALID_STEP_STATUSES:
             raise PlanValidationError(
                 f"step[{step_id}].status 必须是 {_VALID_STEP_STATUSES} 之一。"
             )
@@ -90,7 +84,7 @@ class PlanStep:
         object.__setattr__(self, "evidence_refs", evidence_refs)
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "PlanStep":
+    def from_dict(cls, payload: Mapping[str, object]) -> PlanStep:
         """Build one step from structured data and reject malformed fields."""
 
         return cls(
@@ -149,7 +143,7 @@ class AgentPlan:
         object.__setattr__(self, "available_tools", available_tools)
         self.validate()
 
-    def validate(self) -> "AgentPlan":
+    def validate(self) -> AgentPlan:
         """Validate IDs, dependency references, and dependency cycles."""
 
         if any(not isinstance(step, PlanStep) for step in self.steps):
@@ -190,7 +184,7 @@ class AgentPlan:
         return self
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "AgentPlan":
+    def from_dict(cls, payload: Mapping[str, object]) -> AgentPlan:
         """Rehydrate a plan from structured data instead of Markdown text."""
 
         raw_steps = payload.get("steps")

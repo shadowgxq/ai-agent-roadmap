@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 from uuid import uuid4
@@ -16,7 +17,9 @@ from ..long_horizon import (
     Goal,
     GoalRunProjection,
     GoalRunStatus,
+    ProgressSnapshot,
     SuccessCriterion,
+    utc_now_iso,
 )
 from ..runtime import ReactiveBaseline
 from ..verification import VerificationResult
@@ -70,6 +73,8 @@ class PlanningGraphState(TypedDict, total=False):
     current_step: str | None
     step_results: list[dict[str, object]]
     execution_status: str
+    blocked_reason: str | None
+    progress_snapshot: dict[str, object]
     graph_status: GraphStatus
     last_execution: dict[str, object]
     last_verification: dict[str, object]
@@ -137,6 +142,10 @@ def initial_planning_state(
         "replan_history": [],
         "tool_call_count": 0,
         "runtime_seconds": 0.0,
+        "progress_snapshot": ProgressSnapshot.empty(
+            goal_id=goal_spec.goal_id,
+            goal_version=goal_spec.version,
+        ).as_dict(),
     }
 
 
@@ -272,6 +281,10 @@ class _PlanningGraphRuntime:
             "current_step": snapshot["current_step"],
             "step_results": snapshot["step_results"],
             "execution_status": snapshot["status"],
+            "blocked_reason": snapshot["blocked_reason"],
+            "progress_snapshot": domain_state.progress_snapshot(
+                remaining_budget=self._remaining_budget(state, domain_state)
+            ).as_dict(),
             "graph_status": "planned",
             "budget": self.budget.as_dict(),
         }
@@ -288,6 +301,9 @@ class _PlanningGraphRuntime:
         domain_state = self._restore_domain_state(state)
         domain_state.claim_next_step()
         updates = self._domain_updates(domain_state)
+        updates["progress_snapshot"] = domain_state.progress_snapshot(
+            remaining_budget=self._remaining_budget(state, domain_state)
+        ).as_dict()
         updates["graph_status"] = "selected"
         updates.update(
             _projection_updates(
@@ -311,6 +327,8 @@ class _PlanningGraphRuntime:
             return "done"
         if execution_status == "failed":
             return "blocked"
+        if execution_status == "blocked":
+            return "blocked"
         return "execute"
 
     def execute(self, state: PlanningGraphState) -> dict[str, object]:
@@ -321,9 +339,11 @@ class _PlanningGraphRuntime:
         except Exception as exc:  # noqa: BLE001 - persist execution failure.
             updates: dict[str, object] = {
                 "last_execution": {
+                    "step_id": step.id,
                     "status": "failed",
                     "summary": f"步骤执行失败：{type(exc).__name__}: {exc}",
                     "evidence_refs": [f"runner-error:{step.id}"],
+                    "tool_call_ids": [],
                 },
                 "graph_status": "executed",
             }
@@ -337,10 +357,14 @@ class _PlanningGraphRuntime:
             return updates
         updates = {
             "last_execution": {
+                "step_id": step.id,
                 "status": "completed",
                 "summary": execution.summary,
                 "evidence_refs": list(execution.evidence_refs),
+                "tool_call_ids": list(execution.tool_call_ids),
             },
+            "tool_call_count": int(state.get("tool_call_count", 0))
+            + len(execution.tool_call_ids),
             "graph_status": "executed",
         }
         updates.update(
@@ -358,12 +382,22 @@ class _PlanningGraphRuntime:
         raw_execution = state.get("last_execution")
         if not isinstance(raw_execution, Mapping):
             raise PlanningGraphError("verify 节点缺少 last_execution。")
+        raw_step_id = raw_execution.get("step_id")
+        if raw_step_id is not None and raw_step_id != step.id:
+            raise PlanningGraphError(
+                f"last_execution 属于步骤 {raw_step_id}，当前步骤是 {step.id}。"
+            )
 
         execution = StepExecution(
             summary=str(raw_execution.get("summary", "步骤没有执行摘要。")),
             evidence_refs=tuple(
                 value
                 for value in raw_execution.get("evidence_refs", [])
+                if isinstance(value, str) and value.strip()
+            ),
+            tool_call_ids=tuple(
+                value
+                for value in raw_execution.get("tool_call_ids", [])
                 if isinstance(value, str) and value.strip()
             ),
         )
@@ -399,8 +433,17 @@ class _PlanningGraphRuntime:
             evidence_refs=evidence_refs,
             verification_status=verification.status,
             verification_summary=verification.summary,
+            tool_call_ids=execution.tool_call_ids,
+            failure_reason=(
+                None
+                if step_status == "completed"
+                else verification.summary
+            ),
         )
         updates = self._domain_updates(domain_state)
+        updates["progress_snapshot"] = domain_state.progress_snapshot(
+            remaining_budget=self._remaining_budget(state, domain_state)
+        ).as_dict()
         updates["last_verification"] = verification.as_dict()
         updates["graph_status"] = "verified"
         updates["plan_invalidated"] = False
@@ -441,9 +484,12 @@ class _PlanningGraphRuntime:
     def replan(self, state: PlanningGraphState) -> dict[str, object]:
         raw_observation = state.get("replan_observation")
         if not isinstance(raw_observation, Mapping):
+            reason = "缺少 evidence-backed replan observation。"
             updates: dict[str, object] = {
                 "graph_status": "blocked",
-                "error": "缺少 evidence-backed replan observation。",
+                "error": reason,
+                "execution_status": "blocked",
+                "blocked_reason": reason,
             }
             updates.update(_projection_updates(state, status="blocked"))
             return updates
@@ -464,6 +510,8 @@ class _PlanningGraphRuntime:
             updates = {
                 "graph_status": "blocked",
                 "error": result.reason,
+                "execution_status": "blocked",
+                "blocked_reason": result.reason,
                 "replan_count": result.replan_count,
             }
             updates.update(_projection_updates(state, status="blocked"))
@@ -486,6 +534,7 @@ class _PlanningGraphRuntime:
             "current_step": None,
             "step_results": carried_results,
             "execution_status": "pending",
+            "blocked_reason": None,
             "graph_status": "replanned",
             "replan_count": result.replan_count,
             "replan_history": history,
@@ -494,6 +543,17 @@ class _PlanningGraphRuntime:
             "plan_invalidated": False,
             "replan_observation": None,
         }
+        replanned_state = PlanExecutionState.from_dict(
+            {
+                "plan": result.plan.as_dict(),
+                "current_step": None,
+                "step_results": carried_results,
+                "status": "pending",
+            }
+        )
+        updates["progress_snapshot"] = replanned_state.progress_snapshot(
+            remaining_budget=self._remaining_budget(state, replanned_state)
+        ).as_dict()
         updates.update(
             _projection_updates(
                 state,
@@ -509,7 +569,28 @@ class _PlanningGraphRuntime:
 
     @staticmethod
     def blocked(state: PlanningGraphState) -> dict[str, object]:
-        updates: dict[str, object] = {"graph_status": "blocked"}
+        reason = (
+            state.get("blocked_reason")
+            or state.get("error")
+            or "执行状态进入 blocked，等待人工介入。"
+        )
+        updates: dict[str, object] = {
+            "graph_status": "blocked",
+            "execution_status": "blocked",
+            "blocked_reason": reason,
+        }
+        raw_snapshot = state.get("progress_snapshot")
+        if isinstance(raw_snapshot, Mapping):
+            try:
+                snapshot = ProgressSnapshot.from_dict(raw_snapshot)
+                updates["progress_snapshot"] = replace(
+                    snapshot,
+                    status="blocked",
+                    blocked_reason=reason,
+                    updated_at=utc_now_iso(),
+                ).as_dict()
+            except Exception:  # noqa: BLE001 - keep blocked transition recoverable.
+                pass
         updates.update(_projection_updates(state, status="blocked"))
         return updates
 
@@ -529,6 +610,7 @@ class _PlanningGraphRuntime:
                 "current_step": state.get("current_step"),
                 "step_results": raw_results,
                 "status": state.get("execution_status", "pending"),
+                "blocked_reason": state.get("blocked_reason"),
             }
         )
 
@@ -540,6 +622,36 @@ class _PlanningGraphRuntime:
             "current_step": snapshot["current_step"],
             "step_results": snapshot["step_results"],
             "execution_status": snapshot["status"],
+            "blocked_reason": snapshot["blocked_reason"],
+            "progress_snapshot": snapshot["progress_snapshot"],
+        }
+
+    def _remaining_budget(
+        self,
+        state: PlanningGraphState,
+        domain_state: PlanExecutionState,
+    ) -> dict[str, object]:
+        """Expose budget headroom without leaking the full runtime state."""
+
+        budget = self._budget_from_state(state)
+        return {
+            "replans": max(
+                0,
+                budget.max_replans - int(state.get("replan_count", 0)),
+            ),
+            "steps": max(
+                0,
+                budget.max_steps - len(domain_state.completed_step_ids),
+            ),
+            "tool_calls": max(
+                0,
+                budget.max_tool_calls - int(state.get("tool_call_count", 0)),
+            ),
+            "runtime_seconds": max(
+                0.0,
+                budget.max_runtime_seconds
+                - float(state.get("runtime_seconds", 0.0)),
+            ),
         }
 
     @staticmethod

@@ -6,8 +6,17 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-PlanStepStatus = Literal["pending", "running", "completed", "failed"]
-_VALID_STEP_STATUSES = frozenset({"pending", "running", "completed", "failed"})
+PlanStepStatus = Literal[
+    "pending",
+    "running",
+    "in_progress",
+    "completed",
+    "blocked",
+    "failed",
+]
+_VALID_STEP_STATUSES = frozenset(
+    {"pending", "running", "in_progress", "completed", "blocked", "failed"}
+)
 
 
 class PlanValidationError(ValueError):
@@ -50,6 +59,8 @@ class PlanStep:
     evidence_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if self.status == "in_progress":  # type: ignore[comparison-overlap]
+            object.__setattr__(self, "status", "running")
         step_id = _normalize_text(self.id, "step.id")
         description = _normalize_text(
             self.description,

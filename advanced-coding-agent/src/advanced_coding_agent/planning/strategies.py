@@ -157,7 +157,7 @@ def _run_stepwise(
         return _skipped_result(case, "stepwise", initial.decision == "skipped")
     state = PlanExecutionState.create(initial.plan)
     plan_generation_count = 0
-    while state.status not in ("completed", "failed"):
+    while state.status not in ("completed", "failed", "blocked"):
         next_plan = planner.plan(request)
         plan_generation_count += 1
         if next_plan.plan is None:

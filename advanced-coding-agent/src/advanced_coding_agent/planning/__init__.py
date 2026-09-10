@@ -1,6 +1,12 @@
 """Explicit Plan and Planner implementations introduced in W16."""
 
 from ..contracts import CaseScenario
+from ..long_horizon import (
+    ProgressSnapshot,
+    ProgressStatus,
+    ProgressValidationError,
+    StepProgress,
+)
 from .execution import (
     ExecutionStateError,
     PlanExecutionState,
@@ -68,6 +74,9 @@ __all__ = [
     "PlanStep",
     "PlanStepStatus",
     "PlanValidationError",
+    "ProgressSnapshot",
+    "ProgressStatus",
+    "ProgressValidationError",
     "Planner",
     "PlannerModelError",
     "PlannerOutputError",
@@ -87,6 +96,7 @@ __all__ = [
     "ReplanStateStatus",
     "StepExecution",
     "StepResult",
+    "StepProgress",
     "StrategyComparisonReport",
     "StrategyName",
     "StrategyRunResult",

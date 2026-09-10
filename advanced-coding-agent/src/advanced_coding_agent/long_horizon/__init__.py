@@ -8,12 +8,24 @@ from .goal import (
     SuccessCriterion,
     SuccessCriterionKind,
 )
+from .progress import (
+    ProgressSnapshot,
+    ProgressStatus,
+    ProgressValidationError,
+    StepProgress,
+    utc_now_iso,
+)
 
 __all__ = [
     "Goal",
     "GoalRunProjection",
     "GoalRunStatus",
     "GoalValidationError",
+    "ProgressSnapshot",
+    "ProgressStatus",
+    "ProgressValidationError",
     "SuccessCriterion",
     "SuccessCriterionKind",
+    "StepProgress",
+    "utc_now_iso",
 ]

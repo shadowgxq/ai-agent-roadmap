@@ -1,4 +1,4 @@
-"""Serializable plan contracts and validation rules for W16 Session 2."""
+"""Serializable plan contracts and validation rules for W16-W17."""
 
 from __future__ import annotations
 
@@ -60,7 +60,8 @@ class PlanStep:
             f"step[{step_id}].completion_criteria",
         )
         if not completion_criteria:
-            raise PlanValidationError(f"step[{step_id}].completion_criteria 不能为空。")
+            raise PlanValidationError(
+                f"step[{step_id}].completion_criteria 不能为空。")
         dependencies = _normalize_texts(
             self.dependencies,
             f"step[{step_id}].dependencies",
@@ -125,6 +126,8 @@ class AgentPlan:
     version: int = 1
     constraints: tuple[str, ...] = ()
     available_tools: tuple[str, ...] = ()
+    goal_id: str | None = None
+    goal_version: int | None = None
 
     def __post_init__(self) -> None:
         goal = _normalize_text(self.goal, "goal")
@@ -136,11 +139,28 @@ class AgentPlan:
         if self.version <= 0:
             raise PlanValidationError("version 必须大于 0。")
         constraints = _normalize_texts(self.constraints, "constraints")
-        available_tools = _normalize_texts(self.available_tools, "available_tools")
+        available_tools = _normalize_texts(
+            self.available_tools, "available_tools")
+        goal_id = (
+            _normalize_text(self.goal_id, "goal_id")
+            if self.goal_id is not None
+            else None
+        )
+        if self.goal_version is not None and (
+            not isinstance(self.goal_version, int)
+            or isinstance(self.goal_version, bool)
+            or self.goal_version <= 0
+        ):
+            raise PlanValidationError("goal_version 必须是正整数或 null。")
+        if (goal_id is None) != (self.goal_version is None):
+            raise PlanValidationError(
+                "goal_id 和 goal_version 必须同时存在或同时为空。"
+            )
         object.__setattr__(self, "goal", goal)
         object.__setattr__(self, "steps", steps)
         object.__setattr__(self, "constraints", constraints)
         object.__setattr__(self, "available_tools", available_tools)
+        object.__setattr__(self, "goal_id", goal_id)
         self.validate()
 
     def validate(self) -> AgentPlan:
@@ -207,6 +227,25 @@ class AgentPlan:
                 payload.get("available_tools", ()),
                 "available_tools",
             ),
+            goal_id=(
+                _normalize_text(payload["goal_id"], "goal_id")
+                if payload.get("goal_id") is not None
+                else None
+            ),
+            goal_version=payload.get("goal_version"),  # type: ignore[arg-type]
+        )
+
+    def bind_goal(self, *, goal_id: str, goal_version: int) -> "AgentPlan":
+        """Bind this plan to the immutable Goal version it is executing."""
+
+        return AgentPlan(
+            goal=self.goal,
+            steps=self.steps,
+            version=self.version,
+            constraints=self.constraints,
+            available_tools=self.available_tools,
+            goal_id=goal_id,
+            goal_version=goal_version,
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -216,4 +255,6 @@ class AgentPlan:
             "available_tools": list(self.available_tools),
             "steps": [step.as_dict() for step in self.steps],
             "version": self.version,
+            "goal_id": self.goal_id,
+            "goal_version": self.goal_version,
         }

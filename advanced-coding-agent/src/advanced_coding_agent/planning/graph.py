@@ -1,4 +1,4 @@
-"""LangGraph orchestration for the W16 Planning Agent."""
+"""LangGraph orchestration for the W16 Planning and W17 Goal layers."""
 
 from __future__ import annotations
 
@@ -12,6 +12,12 @@ from langgraph.graph import END, START, StateGraph
 
 from ..classification import classify_task
 from ..contracts import TaskSpec
+from ..long_horizon import (
+    Goal,
+    GoalRunProjection,
+    GoalRunStatus,
+    SuccessCriterion,
+)
 from ..runtime import ReactiveBaseline
 from ..verification import VerificationResult
 from .execution import (
@@ -48,7 +54,13 @@ GraphStatus = Literal[
 class PlanningGraphState(TypedDict, total=False):
     """Serializable state shared by every LangGraph Planning node."""
 
+    # ``goal`` remains as the W16 objective string for backwards compatibility.
     goal: str
+    goal_contract: dict[str, object]
+    goal_id: str
+    goal_version: int
+    run_id: str
+    run_projection: dict[str, object]
     workdir: str
     constraints: list[str]
     available_tools: list[str]
@@ -88,13 +100,36 @@ def initial_planning_state(
     workdir: Path,
     constraints: tuple[str, ...] = (),
     available_tools: tuple[str, ...] = (),
+    success_criteria: tuple[SuccessCriterion, ...] = (),
+    goal_spec: Goal | None = None,
+    run_id: str | None = None,
 ) -> PlanningGraphState:
-    """Build the serializable input state for one graph thread."""
+    """Build serializable input state without copying conversation messages."""
+
+    if goal_spec is None:
+        goal_spec = Goal.create(
+            objective=goal,
+            constraints=constraints,
+            success_criteria=success_criteria,
+        )
+    elif goal.strip() != goal_spec.objective:
+        raise PlanningGraphError("goal 与 goal_spec.objective 不一致。")
+
+    resolved_run_id = run_id or uuid4().hex
+    projection = GoalRunProjection.from_goal(
+        goal_spec,
+        run_id=resolved_run_id,
+    )
 
     return {
-        "goal": goal,
+        "goal": goal_spec.objective,
+        "goal_contract": goal_spec.as_dict(),
+        "goal_id": goal_spec.goal_id,
+        "goal_version": goal_spec.version,
+        "run_id": resolved_run_id,
+        "run_projection": projection.as_dict(),
         "workdir": str(Path(workdir).resolve()),
-        "constraints": list(constraints),
+        "constraints": list(goal_spec.constraints),
         "available_tools": list(available_tools),
         "graph_status": "pending",
         "execution_status": "pending",
@@ -102,6 +137,47 @@ def initial_planning_state(
         "replan_history": [],
         "tool_call_count": 0,
         "runtime_seconds": 0.0,
+    }
+
+
+def _goal_from_state(state: PlanningGraphState) -> Goal:
+    """Restore a Goal from state, with a safe fallback for old W16 checkpoints."""
+
+    raw_goal = state.get("goal_contract")
+    if isinstance(raw_goal, Mapping):
+        return Goal.from_dict(raw_goal)
+    return Goal.create(
+        objective=state["goal"],
+        constraints=tuple(state.get("constraints", [])),
+    )
+
+
+def _projection_updates(
+    state: PlanningGraphState,
+    *,
+    status: GoalRunStatus,
+    plan_version: int | None = None,
+) -> dict[str, object]:
+    """Synchronize the full Goal snapshot and its small query projection."""
+
+    goal_spec = _goal_from_state(state)
+    raw_projection = state.get("run_projection")
+    if isinstance(raw_projection, Mapping):
+        projection = GoalRunProjection.from_dict(raw_projection)
+    else:
+        projection = GoalRunProjection.from_goal(
+            goal_spec,
+            run_id=str(state.get("run_id") or uuid4().hex),
+        )
+    return {
+        "goal_contract": goal_spec.as_dict(),
+        "goal_id": goal_spec.goal_id,
+        "goal_version": goal_spec.version,
+        "run_id": projection.run_id,
+        "run_projection": projection.with_status(
+            status,
+            plan_version=plan_version,
+        ).as_dict()
     }
 
 
@@ -129,10 +205,12 @@ class _PlanningGraphRuntime:
 
     def classify(self, state: PlanningGraphState) -> dict[str, object]:
         classification = classify_task(state["goal"])
-        return {
+        updates: dict[str, object] = {
             "classification": classification.as_dict(),
             "graph_status": "classified",
         }
+        updates.update(_projection_updates(state, status="running"))
+        return updates
 
     @staticmethod
     def route_after_classify(
@@ -151,11 +229,18 @@ class _PlanningGraphRuntime:
             workdir=Path(state.get("workdir", str(self.workdir))),
         )
         result = ReactiveBaseline().run(task)
-        return {
+        updates: dict[str, object] = {
             "reactive_result": result.as_dict(),
             "execution_status": result.status,
             "graph_status": "completed" if result.status == "completed" else "blocked",
         }
+        updates.update(
+            _projection_updates(
+                state,
+                status="completed" if result.status == "completed" else "blocked",
+            )
+        )
+        return updates
 
     def planner(self, state: PlanningGraphState) -> dict[str, object]:
         request = PlanningRequest(
@@ -165,15 +250,24 @@ class _PlanningGraphRuntime:
         )
         result = self.planner.plan(request)
         if result.plan is None:
-            return {
+            updates: dict[str, object] = {
                 "planner_result": result.as_dict(),
                 "graph_status": "completed",
             }
+            updates.update(_projection_updates(state, status="completed"))
+            return updates
 
-        domain_state = PlanExecutionState.create(result.plan)
+        goal_spec = _goal_from_state(state)
+        plan = result.plan.bind_goal(
+            goal_id=goal_spec.goal_id,
+            goal_version=goal_spec.version,
+        )
+        domain_state = PlanExecutionState.create(plan)
         snapshot = domain_state.as_dict()
-        return {
-            "planner_result": result.as_dict(),
+        planner_result = result.as_dict()
+        planner_result["plan"] = plan.as_dict()
+        updates = {
+            "planner_result": planner_result,
             "plan": snapshot["plan"],
             "current_step": snapshot["current_step"],
             "step_results": snapshot["step_results"],
@@ -181,12 +275,31 @@ class _PlanningGraphRuntime:
             "graph_status": "planned",
             "budget": self.budget.as_dict(),
         }
+        updates.update(
+            _projection_updates(
+                state,
+                status="running",
+                plan_version=plan.version,
+            )
+        )
+        return updates
 
     def select_step(self, state: PlanningGraphState) -> dict[str, object]:
         domain_state = self._restore_domain_state(state)
         domain_state.claim_next_step()
         updates = self._domain_updates(domain_state)
         updates["graph_status"] = "selected"
+        updates.update(
+            _projection_updates(
+                state,
+                status=(
+                    "completed"
+                    if domain_state.status == "completed"
+                    else "running"
+                ),
+                plan_version=domain_state.plan.version,
+            )
+        )
         return updates
 
     @staticmethod
@@ -206,7 +319,7 @@ class _PlanningGraphRuntime:
         try:
             execution = self.step_runner(step, domain_state)
         except Exception as exc:  # noqa: BLE001 - persist execution failure.
-            return {
+            updates: dict[str, object] = {
                 "last_execution": {
                     "status": "failed",
                     "summary": f"步骤执行失败：{type(exc).__name__}: {exc}",
@@ -214,7 +327,15 @@ class _PlanningGraphRuntime:
                 },
                 "graph_status": "executed",
             }
-        return {
+            updates.update(
+                _projection_updates(
+                    state,
+                    status="running",
+                    plan_version=domain_state.plan.version,
+                )
+            )
+            return updates
+        updates = {
             "last_execution": {
                 "status": "completed",
                 "summary": execution.summary,
@@ -222,6 +343,14 @@ class _PlanningGraphRuntime:
             },
             "graph_status": "executed",
         }
+        updates.update(
+            _projection_updates(
+                state,
+                status="running",
+                plan_version=domain_state.plan.version,
+            )
+        )
+        return updates
 
     def verify(self, state: PlanningGraphState) -> dict[str, object]:
         domain_state = self._restore_domain_state(state)
@@ -276,6 +405,19 @@ class _PlanningGraphRuntime:
         updates["graph_status"] = "verified"
         updates["plan_invalidated"] = False
         updates["replan_observation"] = None
+        updates.update(
+            _projection_updates(
+                state,
+                status=(
+                    "completed"
+                    if domain_state.status == "completed"
+                    else "failed"
+                    if domain_state.status == "failed"
+                    else "running"
+                ),
+                plan_version=domain_state.plan.version,
+            )
+        )
 
         if self.replan_observer is not None:
             observation = self.replan_observer(step, execution, verification)
@@ -299,10 +441,12 @@ class _PlanningGraphRuntime:
     def replan(self, state: PlanningGraphState) -> dict[str, object]:
         raw_observation = state.get("replan_observation")
         if not isinstance(raw_observation, Mapping):
-            return {
+            updates: dict[str, object] = {
                 "graph_status": "blocked",
                 "error": "缺少 evidence-backed replan observation。",
             }
+            updates.update(_projection_updates(state, status="blocked"))
+            return updates
 
         current_plan = self._restore_domain_state(state).plan
         observation = self._observation_from_dict(raw_observation)
@@ -317,11 +461,13 @@ class _PlanningGraphRuntime:
             observation,
         )
         if result.decision != "replanned":
-            return {
+            updates = {
                 "graph_status": "blocked",
                 "error": result.reason,
                 "replan_count": result.replan_count,
             }
+            updates.update(_projection_updates(state, status="blocked"))
+            return updates
 
         history = list(state.get("replan_history", []))
         history.append(
@@ -335,7 +481,7 @@ class _PlanningGraphRuntime:
             state.get("step_results", []),
             result.plan,
         )
-        return {
+        updates = {
             "plan": result.plan.as_dict(),
             "current_step": None,
             "step_results": carried_results,
@@ -348,6 +494,14 @@ class _PlanningGraphRuntime:
             "plan_invalidated": False,
             "replan_observation": None,
         }
+        updates.update(
+            _projection_updates(
+                state,
+                status="running",
+                plan_version=result.plan.version,
+            )
+        )
+        return updates
 
     @staticmethod
     def route_after_replan(state: PlanningGraphState) -> Literal["next", "blocked"]:
@@ -355,7 +509,9 @@ class _PlanningGraphRuntime:
 
     @staticmethod
     def blocked(state: PlanningGraphState) -> dict[str, object]:
-        return {"graph_status": "blocked"}
+        updates: dict[str, object] = {"graph_status": "blocked"}
+        updates.update(_projection_updates(state, status="blocked"))
+        return updates
 
     def _restore_domain_state(
         self,
@@ -400,7 +556,8 @@ class _PlanningGraphRuntime:
         if not isinstance(raw_budget, Mapping):
             return self.budget
         return ReplanBudget(
-            max_replans=int(raw_budget.get("max_replans", self.budget.max_replans)),
+            max_replans=int(raw_budget.get(
+                "max_replans", self.budget.max_replans)),
             max_steps=int(raw_budget.get("max_steps", self.budget.max_steps)),
             max_tool_calls=int(
                 raw_budget.get("max_tool_calls", self.budget.max_tool_calls)
@@ -429,7 +586,8 @@ class _PlanningGraphRuntime:
             evidence_refs=tuple(str(value) for value in evidence_refs),
             affected_step_ids=tuple(str(value) for value in affected_step_ids),
             tool_calls_delta=int(payload.get("tool_calls_delta", 0)),
-            runtime_seconds_delta=float(payload.get("runtime_seconds_delta", 0.0)),
+            runtime_seconds_delta=float(
+                payload.get("runtime_seconds_delta", 0.0)),
         )
 
     @staticmethod
@@ -485,7 +643,8 @@ def create_planning_graph(
     runtime = _PlanningGraphRuntime(
         planner=planner,
         workdir=workdir,
-        checkpointer=(checkpointer if checkpointer is not None else InMemorySaver()),
+        checkpointer=(
+            checkpointer if checkpointer is not None else InMemorySaver()),
         step_runner=step_runner,
         verifier=verifier,
         replan_observer=replan_observer,
@@ -541,17 +700,23 @@ def invoke_planning_graph(
     workdir: Path,
     constraints: tuple[str, ...] = (),
     available_tools: tuple[str, ...] = (),
+    success_criteria: tuple[SuccessCriterion, ...] = (),
+    goal_spec: Goal | None = None,
     thread_id: str | None = None,
 ) -> PlanningGraphState:
     """Invoke one graph thread and persist every node transition."""
 
-    config = {"configurable": {"thread_id": thread_id or uuid4().hex}}
+    resolved_thread_id = thread_id or uuid4().hex
+    config = {"configurable": {"thread_id": resolved_thread_id}}
     return graph.invoke(
         initial_planning_state(
             goal=goal,
             workdir=workdir,
             constraints=constraints,
             available_tools=available_tools,
+            success_criteria=success_criteria,
+            goal_spec=goal_spec,
+            run_id=resolved_thread_id,
         ),
         config=config,
     )

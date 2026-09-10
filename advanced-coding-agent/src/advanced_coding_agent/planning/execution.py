@@ -89,9 +89,12 @@ class StepResult:
             step_id=_required_text(payload, "step_id"),
             status=status,  # type: ignore[arg-type]
             summary=_required_text(payload, "summary"),
-            evidence_refs=_text_refs(payload.get("evidence_refs", []), "evidence_refs"),
-            verification_status=payload.get("verification_status"),  # type: ignore[arg-type]
-            verification_summary=payload.get("verification_summary"),  # type: ignore[arg-type]
+            evidence_refs=_text_refs(payload.get(
+                "evidence_refs", []), "evidence_refs"),
+            verification_status=payload.get(
+                "verification_status"),  # type: ignore[arg-type]
+            verification_summary=payload.get(
+                "verification_summary"),  # type: ignore[arg-type]
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -241,10 +244,12 @@ class PlanExecutionState:
         results: dict[str, StepResult] = {}
         for index, raw_result in enumerate(raw_results):
             if not isinstance(raw_result, Mapping):
-                raise ExecutionStateError(f"step_results[{index}] 必须是 JSON 对象。")
+                raise ExecutionStateError(
+                    f"step_results[{index}] 必须是 JSON 对象。")
             result = StepResult.from_dict(raw_result)
             if result.step_id in results:
-                raise ExecutionStateError(f"step_results 不能重复：{result.step_id}。")
+                raise ExecutionStateError(
+                    f"step_results 不能重复：{result.step_id}。")
             results[result.step_id] = result
         current_step = payload.get("current_step")
         if current_step is not None and not isinstance(current_step, str):
@@ -391,4 +396,6 @@ def _update_plan_step(
         version=plan.version,
         constraints=plan.constraints,
         available_tools=plan.available_tools,
+        goal_id=plan.goal_id,
+        goal_version=plan.goal_version,
     )

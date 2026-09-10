@@ -270,6 +270,8 @@ class ReplanController:
             version=state.plan.version + 1,
             constraints=new_plan.constraints,
             available_tools=new_plan.available_tools,
+            goal_id=state.plan.goal_id,
+            goal_version=state.plan.goal_version,
         )
         state.history = state.history + (
             PlanRevision(
@@ -330,4 +332,6 @@ def _carry_forward_facts(
         version=candidate_plan.version,
         constraints=candidate_plan.constraints,
         available_tools=candidate_plan.available_tools,
+        goal_id=previous_plan.goal_id,
+        goal_version=previous_plan.goal_version,
     )

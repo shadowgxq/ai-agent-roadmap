@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -18,11 +19,18 @@ from ..long_horizon import (
     ContextBudget,
     ContextManager,
     ContextSummarizer,
+    FailureEvent,
     Goal,
     GoalRunProjection,
     GoalRunStatus,
     ProgressSnapshot,
+    RecoveryDecision,
+    RecoveryPolicy,
+    RecoverySource,
+    RecoveryConsistencyError,
     SuccessCriterion,
+    assert_recovery_consistency,
+    failure_event_from_exception,
     utc_now_iso,
 )
 from ..runtime import ReactiveBaseline
@@ -82,6 +90,8 @@ class PlanningGraphState(TypedDict, total=False):
     blocked_reason: str | None
     progress_snapshot: dict[str, object]
     context_snapshot: dict[str, object]
+    recovery: dict[str, object]
+    recovery_history: list[dict[str, object]]
     graph_status: GraphStatus
     last_execution: dict[str, object]
     last_verification: dict[str, object]
@@ -165,6 +175,8 @@ def initial_planning_state(
             goal_version=goal_spec.version,
         ).as_dict(),
         "context_snapshot": context_manager.as_dict(),
+        "recovery": {},
+        "recovery_history": [],
     }
 
 
@@ -223,6 +235,8 @@ class _PlanningGraphRuntime:
         replan_observer: ReplanObserver | None = None,
         budget: ReplanBudget | None = None,
         context_summarizer: ContextSummarizer | None = None,
+        recovery_policy: RecoveryPolicy | None = None,
+        recovery_sleep: Callable[[float], None] | None = None,
     ) -> None:
         self.planner = planner
         self.workdir = Path(workdir).resolve()
@@ -232,6 +246,8 @@ class _PlanningGraphRuntime:
         self.replan_observer = replan_observer
         self.budget = budget or ReplanBudget(max_steps=8)
         self.context_summarizer = context_summarizer
+        self.recovery_policy = recovery_policy
+        self.recovery_sleep = recovery_sleep or time.sleep
 
     def classify(self, state: PlanningGraphState) -> dict[str, object]:
         classification = classify_task(state["goal"])
@@ -365,16 +381,26 @@ class _PlanningGraphRuntime:
         domain_state = self._restore_domain_state(state)
         step = self._current_step(domain_state)
         context_manager = self._restore_context(state)
-        try:
-            execution = self.step_runner(step, domain_state)
-        except Exception as exc:  # noqa: BLE001 - persist execution failure.
-            error_summary = f"步骤执行失败：{type(exc).__name__}: {exc}"
+        execution, failure_event, recovery_records = (
+            self._run_step_with_recovery(step, domain_state)
+        )
+        recovery, recovery_history = self._recovery_updates(
+            state,
+            recovery_records,
+        )
+        if execution is None:
+            if failure_event is None:
+                raise PlanningGraphError(
+                    "步骤执行失败但没有 recovery failure event。"
+                )
+            error_summary = f"步骤执行失败：{failure_event.message}"
             context_manager.add_text(
                 item_id=f"execution-error:{step.id}",
                 layer="compressible",
                 content=error_summary,
                 source=f"step:{step.id}",
-                evidence_refs=(f"runner-error:{step.id}",),
+                evidence_refs=failure_event.evidence_refs
+                or (f"runner-error:{step.id}",),
                 metadata={"step_id": step.id},
                 replace_existing=True,
             )
@@ -383,13 +409,28 @@ class _PlanningGraphRuntime:
                 "last_execution": {
                     "step_id": step.id,
                     "status": "failed",
-                    "summary": f"步骤执行失败：{type(exc).__name__}: {exc}",
-                    "evidence_refs": [f"runner-error:{step.id}"],
+                    "summary": error_summary,
+                    "evidence_refs": list(
+                        failure_event.evidence_refs
+                        or (f"runner-error:{step.id}",)
+                    ),
                     "tool_call_ids": [],
                 },
                 "context_snapshot": context_manager.as_dict(),
                 "graph_status": "executed",
+                "recovery": recovery,
+                "recovery_history": recovery_history,
             }
+            if failure_event.kind == "plan_invalidated":
+                observation = ReplanObservation(
+                    summary=failure_event.message,
+                    plan_invalidated=True,
+                    evidence_refs=failure_event.evidence_refs
+                    or (f"runner-error:{step.id}",),
+                    affected_step_ids=(step.id,),
+                )
+                updates["plan_invalidated"] = True
+                updates["replan_observation"] = observation.as_dict()
             updates.update(
                 _projection_updates(
                     state,
@@ -409,6 +450,8 @@ class _PlanningGraphRuntime:
             "tool_call_count": int(state.get("tool_call_count", 0))
             + len(execution.tool_call_ids),
             "graph_status": "executed",
+            "recovery": recovery,
+            "recovery_history": recovery_history,
         }
         self._record_execution_context(context_manager, step, execution)
         self._compact_context(context_manager)
@@ -467,6 +510,20 @@ class _PlanningGraphRuntime:
         evidence_refs = tuple(
             dict.fromkeys(execution.evidence_refs + verification.evidence_refs)
         )
+        recovery_records: list[tuple[FailureEvent, RecoveryDecision]] = []
+        if verification.status != "pass" and self.recovery_policy is not None:
+            verification_failure = FailureEvent(
+                kind="verification_failure",
+                message=verification.summary,
+                step_id=step.id,
+                evidence_refs=verification.evidence_refs,
+            )
+            recovery_records.append(
+                (
+                    verification_failure,
+                    self.recovery_policy.decide(verification_failure),
+                )
+            )
         step_status = "completed" if verification.status == "pass" else "failed"
         summary = (
             execution.summary
@@ -504,8 +561,33 @@ class _PlanningGraphRuntime:
         updates["context_snapshot"] = context_manager.as_dict()
         updates["last_verification"] = verification.as_dict()
         updates["graph_status"] = "verified"
-        updates["plan_invalidated"] = False
-        updates["replan_observation"] = None
+        existing_observation = state.get("replan_observation")
+        updates["plan_invalidated"] = bool(
+            state.get("plan_invalidated", False))
+        updates["replan_observation"] = (
+            existing_observation
+            if isinstance(existing_observation, Mapping)
+            else None
+        )
+        recovery, recovery_history = self._recovery_updates(
+            state,
+            recovery_records,
+        )
+        updates["recovery"] = recovery
+        updates["recovery_history"] = recovery_history
+        if recovery_records:
+            failure_event, decision = recovery_records[-1]
+            if (
+                failure_event.kind == "verification_failure"
+                and decision.action == "replan"
+            ):
+                updates["plan_invalidated"] = True
+                updates["replan_observation"] = ReplanObservation(
+                    summary=failure_event.message,
+                    plan_invalidated=True,
+                    evidence_refs=failure_event.evidence_refs,
+                    affected_step_ids=(step.id,),
+                ).as_dict()
         updates.update(
             _projection_updates(
                 state,
@@ -525,6 +607,28 @@ class _PlanningGraphRuntime:
             if observation is not None:
                 updates["plan_invalidated"] = observation.plan_invalidated
                 updates["replan_observation"] = observation.as_dict()
+                if (
+                    observation.plan_invalidated
+                    and self.recovery_policy is not None
+                ):
+                    plan_failure = FailureEvent(
+                        kind="plan_invalidated",
+                        message=observation.summary,
+                        step_id=step.id,
+                        evidence_refs=observation.evidence_refs,
+                    )
+                    recovery_records.append(
+                        (
+                            plan_failure,
+                            self.recovery_policy.decide(plan_failure),
+                        )
+                    )
+                    recovery, recovery_history = self._recovery_updates(
+                        state,
+                        recovery_records,
+                    )
+                    updates["recovery"] = recovery
+                    updates["recovery_history"] = recovery_history
         return updates
 
     @staticmethod
@@ -533,10 +637,10 @@ class _PlanningGraphRuntime:
     ) -> Literal["next", "replan", "done", "blocked"]:
         if state.get("execution_status") == "completed":
             return "done"
-        if state.get("execution_status") == "pending":
-            return "next"
         if state.get("plan_invalidated") and state.get("replan_observation"):
             return "replan"
+        if state.get("execution_status") == "pending":
+            return "next"
         return "blocked"
 
     def replan(self, state: PlanningGraphState) -> dict[str, object]:
@@ -675,9 +779,20 @@ class _PlanningGraphRuntime:
         raw_plan = state.get("plan")
         if not isinstance(raw_plan, Mapping):
             raise PlanningGraphError("graph state 缺少结构化 plan。")
+        self._assert_recovery_consistency(state, raw_plan)
         raw_results = state.get("step_results", [])
         if not isinstance(raw_results, list):
             raise PlanningGraphError("graph state 的 step_results 必须是数组。")
+        raw_recovery = state.get("recovery")
+        if raw_recovery is not None and not isinstance(raw_recovery, Mapping):
+            raise PlanningGraphError("graph state 的 recovery 必须是对象或 null。")
+        if isinstance(raw_recovery, Mapping) and isinstance(
+            raw_recovery.get("decision"),
+            Mapping,
+        ):
+            raw_recovery = raw_recovery["decision"]
+        if isinstance(raw_recovery, Mapping) and not raw_recovery:
+            raw_recovery = None
         return PlanExecutionState.from_dict(
             {
                 "plan": raw_plan,
@@ -685,8 +800,71 @@ class _PlanningGraphRuntime:
                 "step_results": raw_results,
                 "status": state.get("execution_status", "pending"),
                 "blocked_reason": state.get("blocked_reason"),
+                "recovery": raw_recovery,
             }
         )
+
+    @staticmethod
+    def _assert_recovery_consistency(
+        state: PlanningGraphState,
+        raw_plan: Mapping[str, object],
+    ) -> None:
+        """Stop resume when checkpoint, run projection, and progress disagree."""
+
+        raw_projection = state.get("run_projection")
+        raw_progress = state.get("progress_snapshot")
+        required_top_level = (
+            state.get("run_id"),
+            state.get("goal_id"),
+            state.get("goal_version"),
+        )
+        if not isinstance(raw_projection, Mapping) or not isinstance(
+            raw_progress,
+            Mapping,
+        ):
+            return
+        if any(value is None for value in required_top_level):
+            return
+
+        raw_plan_version = raw_plan.get("version")
+        try:
+            sources = (
+                RecoverySource(
+                    source="checkpoint",
+                    run_id=state["run_id"],
+                    goal_id=state["goal_id"],
+                    goal_version=state["goal_version"],
+                    plan_version=raw_plan_version,  # type: ignore[arg-type]
+                ),
+                RecoverySource(
+                    source="run",
+                    # type: ignore[arg-type]
+                    run_id=raw_projection.get("run_id"),
+                    # type: ignore[arg-type]
+                    goal_id=raw_projection.get("goal_id"),
+                    goal_version=raw_projection.get(
+                        "goal_version"
+                    ),  # type: ignore[arg-type]
+                    plan_version=raw_projection.get(
+                        "plan_version"
+                    ),  # type: ignore[arg-type]
+                ),
+                RecoverySource(
+                    source="evidence",
+                    run_id=state["run_id"],
+                    # type: ignore[arg-type]
+                    goal_id=raw_progress.get("goal_id"),
+                    goal_version=raw_progress.get(
+                        "goal_version"
+                    ),  # type: ignore[arg-type]
+                    plan_version=raw_progress.get(
+                        "plan_version"
+                    ),  # type: ignore[arg-type]
+                ),
+            )
+            assert_recovery_consistency(sources)
+        except (RecoveryConsistencyError, ValueError, TypeError) as exc:
+            raise PlanningGraphError(f"恢复版本一致性检查失败：{exc}") from exc
 
     @staticmethod
     def _domain_updates(domain_state: PlanExecutionState) -> dict[str, object]:
@@ -698,6 +876,7 @@ class _PlanningGraphRuntime:
             "execution_status": snapshot["status"],
             "blocked_reason": snapshot["blocked_reason"],
             "progress_snapshot": snapshot["progress_snapshot"],
+            "recovery": snapshot.get("recovery"),
         }
 
     def _restore_context(self, state: PlanningGraphState) -> ContextManager:
@@ -747,6 +926,59 @@ class _PlanningGraphRuntime:
             metadata={"step_id": step.id},
             replace_existing=True,
         )
+
+    def _run_step_with_recovery(
+        self,
+        step: PlanStep,
+        domain_state: PlanExecutionState,
+    ) -> tuple[
+        StepExecution | None,
+        FailureEvent | None,
+        list[tuple[FailureEvent, RecoveryDecision]],
+    ]:
+        """Retry only transient failures and expose every recovery decision."""
+
+        attempt = 1
+        records: list[tuple[FailureEvent, RecoveryDecision]] = []
+        while True:
+            try:
+                return self.step_runner(step, domain_state), None, records
+            except Exception as exc:  # noqa: BLE001 - classify at the recovery edge.
+                failure_event = failure_event_from_exception(
+                    exc,
+                    step_id=step.id,
+                    attempt=attempt,
+                    evidence_refs=(f"runner-error:{step.id}",),
+                )
+                if self.recovery_policy is None:
+                    return None, failure_event, records
+                decision = self.recovery_policy.decide(failure_event)
+                records.append((failure_event, decision))
+                if decision.action != "retry":
+                    return None, failure_event, records
+                if decision.delay_seconds > 0:
+                    self.recovery_sleep(decision.delay_seconds)
+                attempt += 1
+
+    @staticmethod
+    def _recovery_updates(
+        state: PlanningGraphState,
+        records: list[tuple[FailureEvent, RecoveryDecision]],
+    ) -> tuple[dict[str, object], list[dict[str, object]]]:
+        history = list(state.get("recovery_history", []))
+        latest = state.get("recovery", {})
+        if not isinstance(latest, dict):
+            latest = {}
+        elif isinstance(latest.get("decision"), Mapping):
+            latest = dict(latest["decision"])
+        for event, decision in records:
+            record = {
+                "event": event.as_dict(),
+                "decision": decision.as_dict(),
+            }
+            history.append(record)
+            latest = decision.as_dict()
+        return latest, history
 
     def _compact_context(self, context: ContextManager) -> None:
         """Compact with the injected LLM and retain a deterministic fallback."""
@@ -888,8 +1120,10 @@ def create_planning_graph(
     replan_observer: ReplanObserver | None = None,
     budget: ReplanBudget | None = None,
     context_summarizer: ContextSummarizer | None = None,
+    recovery_policy: RecoveryPolicy | None = None,
+    recovery_sleep: Callable[[float], None] | None = None,
 ):
-    """Compile the graph and optionally inject an LLM context summarizer."""
+    """Compile the graph with optional context summarization and recovery policy."""
 
     runtime = _PlanningGraphRuntime(
         planner=planner,
@@ -901,6 +1135,8 @@ def create_planning_graph(
         replan_observer=replan_observer,
         budget=budget,
         context_summarizer=context_summarizer,
+        recovery_policy=recovery_policy,
+        recovery_sleep=recovery_sleep,
     )
     builder = StateGraph(PlanningGraphState)
     builder.add_node("classify", runtime.classify)

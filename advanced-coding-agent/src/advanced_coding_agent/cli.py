@@ -15,6 +15,7 @@ from .planning import (
     PlannerModelError,
     PlannerOutputError,
     PlanningRequest,
+    RecoveryPolicy,
     compare_strategies,
     create_planning_graph,
     invoke_planning_graph,
@@ -158,6 +159,7 @@ def _build_langgraph_graph(workdir: Path):
         planner=planner,
         workdir=workdir,
         checkpointer=InMemorySaver(),
+        recovery_policy=RecoveryPolicy(),
     )
 
 

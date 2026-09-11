@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Literal
@@ -10,6 +11,12 @@ from ..long_horizon.progress import (
     ProgressSnapshot,
     StepProgress,
     utc_now_iso,
+)
+from ..long_horizon.recovery import (
+    FailureEvent,
+    RecoveryDecision,
+    RecoveryPolicy,
+    failure_event_from_exception,
 )
 from ..verification import VerificationResult, VerificationStatus
 from .plan import AgentPlan, PlanStep, PlanValidationError
@@ -189,6 +196,7 @@ class PlanExecutionState:
     step_results: dict[str, StepResult] = field(default_factory=dict)
     status: ExecutionStatus = "pending"
     blocked_reason: str | None = None
+    last_recovery: RecoveryDecision | None = None
 
     def __post_init__(self) -> None:
         if self.status == "in_progress":  # type: ignore[comparison-overlap]
@@ -208,6 +216,12 @@ class PlanExecutionState:
             raise ExecutionStateError("blocked_reason 必须是非空字符串或 null。")
         if self.status == "blocked" and self.blocked_reason is None:
             raise ExecutionStateError("blocked 状态必须包含 blocked_reason。")
+        if self.last_recovery is not None and not isinstance(
+            self.last_recovery,
+            RecoveryDecision,
+        ):
+            raise ExecutionStateError(
+                "last_recovery 必须是 RecoveryDecision 或 null。")
         known_ids = {step.id for step in self.plan.steps}
         unknown_results = set(self.step_results) - known_ids
         if unknown_results:
@@ -319,11 +333,32 @@ class PlanExecutionState:
         self.blocked_reason = "当前没有满足依赖的可执行步骤，等待依赖恢复或人工介入。"
         return None
 
-    def resume_blocked_step(self, step_id: str | None = None) -> PlanStep:
-        """Explicitly resume a blocked step without replaying completed steps."""
+    def resume_blocked_step(
+        self,
+        step_id: str | None = None,
+        *,
+        recovery_acknowledged: bool = False,
+    ) -> PlanStep:
+        """Resume a blocked step only after any unsafe result is acknowledged."""
 
         if self.status != "blocked":
             raise ExecutionStateError("只有 blocked 状态才能显式恢复步骤。")
+        if (
+            self.last_recovery is not None
+            and self.last_recovery.action
+            in ("reconcile", "manual_review", "resume_checkpoint")
+            and not recovery_acknowledged
+        ):
+            raise ExecutionStateError(
+                "当前 recovery 尚未确认，必须显式 recovery_acknowledged 后才能恢复。"
+            )
+        if (
+            self.last_recovery is not None
+            and self.last_recovery.action
+            in ("reconcile", "manual_review", "resume_checkpoint")
+            and recovery_acknowledged
+        ):
+            self.last_recovery = None
         candidates = [
             step.id
             for step in self.plan.steps
@@ -354,7 +389,7 @@ class PlanExecutionState:
         self.plan = _update_plan_step(self.plan, selected_id, "running")
         return step
 
-    def resume(self) -> PlanStep | None:
+    def resume(self, *, recovery_acknowledged: bool = False) -> PlanStep | None:
         """Clear a dependency/budget block and claim only a currently runnable step."""
 
         if self.status != "blocked":
@@ -362,7 +397,9 @@ class PlanExecutionState:
         if any(
             result.status == "blocked" for result in self.step_results.values()
         ):
-            return self.resume_blocked_step()
+            return self.resume_blocked_step(
+                recovery_acknowledged=recovery_acknowledged,
+            )
         self.status = "pending"
         self.blocked_reason = None
         return self.claim_next_step()
@@ -430,6 +467,11 @@ class PlanExecutionState:
             "step_results": [result.as_dict() for result in self.step_results.values()],
             "status": self.status,
             "blocked_reason": self.blocked_reason,
+            "recovery": (
+                self.last_recovery.as_dict()
+                if self.last_recovery is not None
+                else None
+            ),
             "progress_snapshot": self.progress_snapshot().as_dict(),
         }
 
@@ -466,12 +508,22 @@ class PlanExecutionState:
         blocked_reason = payload.get("blocked_reason")
         if status == "blocked" and blocked_reason is None:
             blocked_reason = "从旧 checkpoint 恢复的 blocked 状态，等待人工介入。"
+        raw_recovery = payload.get("recovery")
+        last_recovery = None
+        if raw_recovery is not None:
+            if not isinstance(raw_recovery, Mapping):
+                raise ExecutionStateError("recovery 必须是 JSON 对象或 null。")
+            try:
+                last_recovery = RecoveryDecision.from_dict(raw_recovery)
+            except Exception as exc:  # noqa: BLE001 - normalize checkpoint errors.
+                raise ExecutionStateError(f"recovery 恢复失败：{exc}") from exc
         return cls(
             plan=plan,
             current_step=current_step,
             step_results=results,
             status=status,  # type: ignore[arg-type]
             blocked_reason=blocked_reason,  # type: ignore[arg-type]
+            last_recovery=last_recovery,
         )
 
     def _get_step(self, step_id: str) -> PlanStep:
@@ -492,9 +544,14 @@ class PlanExecutor:
         self,
         step_runner: StepRunner | None = None,
         verifier: StepVerifier | None = None,
+        recovery_policy: RecoveryPolicy | None = None,
+        sleep: Callable[[float], None] | None = None,
     ) -> None:
         self._step_runner = step_runner or self._default_step_runner
         self._verifier = verifier
+        self._recovery_policy = recovery_policy
+        self._sleep = sleep or time.sleep
+        self.last_recovery: RecoveryDecision | None = None
 
     def run_next(self, state: PlanExecutionState) -> StepExecution | None:
         """Claim, execute, and record one step; return None at a terminal state."""
@@ -502,15 +559,34 @@ class PlanExecutor:
         step = state.claim_next_step()
         if step is None:
             return None
-        try:
-            execution = self._step_runner(step, state)
-        except Exception as exc:  # noqa: BLE001 - persist runner failure in state.
+        self.last_recovery = None
+        execution, failure_event = self._run_step_with_recovery(step, state)
+        if execution is None:
+            if failure_event is None:
+                raise ExecutionStateError("执行失败但没有 recovery failure event。")
+            decision = self.last_recovery
+            reason = decision.reason if decision is not None else failure_event.message
+            terminal_status = (
+                "blocked"
+                if decision is not None
+                and decision.action
+                in {
+                    "blocked",
+                    "manual_review",
+                    "reconcile",
+                    "resume_checkpoint",
+                    "replan",
+                }
+                else "failed"
+            )
             state.record_step_result(
                 step.id,
-                status="failed",
-                summary=f"步骤执行失败：{type(exc).__name__}: {exc}",
-                evidence_refs=(f"runner-error:{step.id}",),
-                failure_reason=f"{type(exc).__name__}: {exc}",
+                status=terminal_status,
+                summary=f"步骤执行失败：{failure_event.message}；{reason}",
+                evidence_refs=failure_event.evidence_refs
+                or (f"runner-error:{step.id}",),
+                blocked_reason=reason if terminal_status == "blocked" else None,
+                failure_reason=reason,
             )
             return None
 
@@ -527,6 +603,17 @@ class PlanExecutor:
         try:
             verification = self._verifier(step, execution)
         except Exception as exc:  # noqa: BLE001 - verifier failure needs recovery.
+            if self._recovery_policy is not None:
+                failure_event = FailureEvent(
+                    kind="verification_failure",
+                    message=f"验证器执行失败：{type(exc).__name__}: {exc}",
+                    step_id=step.id,
+                    attempt=1,
+                    evidence_refs=(f"verifier-error:{step.id}",),
+                )
+                self.last_recovery = self._recovery_policy.decide(
+                    failure_event)
+                state.last_recovery = self.last_recovery
             state.record_step_result(
                 step.id,
                 status="failed",
@@ -553,6 +640,17 @@ class PlanExecutor:
                 tool_call_ids=execution.tool_call_ids,
             )
         else:
+            if self._recovery_policy is not None:
+                failure_event = FailureEvent(
+                    kind="verification_failure",
+                    message=verification.summary,
+                    step_id=step.id,
+                    attempt=1,
+                    evidence_refs=verification.evidence_refs,
+                )
+                self.last_recovery = self._recovery_policy.decide(
+                    failure_event)
+                state.last_recovery = self.last_recovery
             state.record_step_result(
                 step.id,
                 status="failed",
@@ -564,6 +662,35 @@ class PlanExecutor:
                 failure_reason=verification.summary,
             )
         return execution
+
+    def _run_step_with_recovery(
+        self,
+        step: PlanStep,
+        state: PlanExecutionState,
+    ) -> tuple[StepExecution | None, FailureEvent | None]:
+        """Retry only bounded transient failures; return other failures to state."""
+
+        attempt = 1
+        while True:
+            try:
+                return self._step_runner(step, state), None
+            except Exception as exc:  # noqa: BLE001 - classify at the recovery edge.
+                failure_event = failure_event_from_exception(
+                    exc,
+                    step_id=step.id,
+                    attempt=attempt,
+                    evidence_refs=(f"runner-error:{step.id}",),
+                )
+                if self._recovery_policy is None:
+                    return None, failure_event
+                decision = self._recovery_policy.decide(failure_event)
+                self.last_recovery = decision
+                state.last_recovery = decision
+                if decision.action != "retry":
+                    return None, failure_event
+                if decision.delay_seconds > 0:
+                    self._sleep(decision.delay_seconds)
+                attempt += 1
 
     def run_until_finished(self, state: PlanExecutionState) -> PlanExecutionState:
         """Convenience loop for the deterministic Session 3 demonstration."""

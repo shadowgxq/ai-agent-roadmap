@@ -109,8 +109,10 @@ def load_cases(path: Path) -> tuple[TaskCase, ...]:
                     expected_complexity=item["expected_complexity"],
                     planning_recommended=item["planning_recommended"],
                     constraints=_load_case_texts(item, "constraints", index),
-                    available_tools=_load_case_texts(item, "available_tools", index),
-                    scenario=item.get("scenario", "normal"),  # type: ignore[arg-type]
+                    available_tools=_load_case_texts(
+                        item, "available_tools", index),
+                    # type: ignore[arg-type]
+                    scenario=item.get("scenario", "normal"),
                 )
             )
         except (KeyError, TypeError, ValueError) as exc:

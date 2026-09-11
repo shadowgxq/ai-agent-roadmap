@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -14,6 +15,9 @@ from langgraph.graph import END, START, StateGraph
 from ..classification import classify_task
 from ..contracts import TaskSpec
 from ..long_horizon import (
+    ContextBudget,
+    ContextManager,
+    ContextSummarizer,
     Goal,
     GoalRunProjection,
     GoalRunStatus,
@@ -37,6 +41,8 @@ from .replan import (
     ReplanObservation,
     ReplanState,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 GraphStatus = Literal[
     "pending",
@@ -75,6 +81,7 @@ class PlanningGraphState(TypedDict, total=False):
     execution_status: str
     blocked_reason: str | None
     progress_snapshot: dict[str, object]
+    context_snapshot: dict[str, object]
     graph_status: GraphStatus
     last_execution: dict[str, object]
     last_verification: dict[str, object]
@@ -108,6 +115,7 @@ def initial_planning_state(
     success_criteria: tuple[SuccessCriterion, ...] = (),
     goal_spec: Goal | None = None,
     run_id: str | None = None,
+    context_budget: ContextBudget | None = None,
 ) -> PlanningGraphState:
     """Build serializable input state without copying conversation messages."""
 
@@ -124,6 +132,16 @@ def initial_planning_state(
     projection = GoalRunProjection.from_goal(
         goal_spec,
         run_id=resolved_run_id,
+    )
+    context_manager = ContextManager.for_goal(
+        goal_id=goal_spec.goal_id,
+        objective=goal_spec.objective,
+        constraints=goal_spec.constraints,
+        success_criteria=tuple(
+            f"{criterion.id}: {criterion.description}"
+            for criterion in goal_spec.success_criteria
+        ),
+        budget=context_budget,
     )
 
     return {
@@ -146,6 +164,7 @@ def initial_planning_state(
             goal_id=goal_spec.goal_id,
             goal_version=goal_spec.version,
         ).as_dict(),
+        "context_snapshot": context_manager.as_dict(),
     }
 
 
@@ -203,6 +222,7 @@ class _PlanningGraphRuntime:
         verifier: StepVerifier | None = None,
         replan_observer: ReplanObserver | None = None,
         budget: ReplanBudget | None = None,
+        context_summarizer: ContextSummarizer | None = None,
     ) -> None:
         self.planner = planner
         self.workdir = Path(workdir).resolve()
@@ -211,6 +231,7 @@ class _PlanningGraphRuntime:
         self.verifier = verifier or self._default_verifier
         self.replan_observer = replan_observer
         self.budget = budget or ReplanBudget(max_steps=8)
+        self.context_summarizer = context_summarizer
 
     def classify(self, state: PlanningGraphState) -> dict[str, object]:
         classification = classify_task(state["goal"])
@@ -275,6 +296,14 @@ class _PlanningGraphRuntime:
         snapshot = domain_state.as_dict()
         planner_result = result.as_dict()
         planner_result["plan"] = plan.as_dict()
+        context_manager = self._restore_context(state)
+        context_manager.add_text(
+            item_id=f"plan:{plan.version}",
+            layer="permanent",
+            content=self._plan_context_content(plan),
+            source="plan",
+            evidence_refs=(f"plan:{plan.version}",),
+        )
         updates = {
             "planner_result": planner_result,
             "plan": snapshot["plan"],
@@ -285,6 +314,7 @@ class _PlanningGraphRuntime:
             "progress_snapshot": domain_state.progress_snapshot(
                 remaining_budget=self._remaining_budget(state, domain_state)
             ).as_dict(),
+            "context_snapshot": context_manager.as_dict(),
             "graph_status": "planned",
             "budget": self.budget.as_dict(),
         }
@@ -334,9 +364,21 @@ class _PlanningGraphRuntime:
     def execute(self, state: PlanningGraphState) -> dict[str, object]:
         domain_state = self._restore_domain_state(state)
         step = self._current_step(domain_state)
+        context_manager = self._restore_context(state)
         try:
             execution = self.step_runner(step, domain_state)
         except Exception as exc:  # noqa: BLE001 - persist execution failure.
+            error_summary = f"步骤执行失败：{type(exc).__name__}: {exc}"
+            context_manager.add_text(
+                item_id=f"execution-error:{step.id}",
+                layer="compressible",
+                content=error_summary,
+                source=f"step:{step.id}",
+                evidence_refs=(f"runner-error:{step.id}",),
+                metadata={"step_id": step.id},
+                replace_existing=True,
+            )
+            self._compact_context(context_manager)
             updates: dict[str, object] = {
                 "last_execution": {
                     "step_id": step.id,
@@ -345,6 +387,7 @@ class _PlanningGraphRuntime:
                     "evidence_refs": [f"runner-error:{step.id}"],
                     "tool_call_ids": [],
                 },
+                "context_snapshot": context_manager.as_dict(),
                 "graph_status": "executed",
             }
             updates.update(
@@ -367,6 +410,9 @@ class _PlanningGraphRuntime:
             + len(execution.tool_call_ids),
             "graph_status": "executed",
         }
+        self._record_execution_context(context_manager, step, execution)
+        self._compact_context(context_manager)
+        updates["context_snapshot"] = context_manager.as_dict()
         updates.update(
             _projection_updates(
                 state,
@@ -379,6 +425,7 @@ class _PlanningGraphRuntime:
     def verify(self, state: PlanningGraphState) -> dict[str, object]:
         domain_state = self._restore_domain_state(state)
         step = self._current_step(domain_state)
+        context_manager = self._restore_context(state)
         raw_execution = state.get("last_execution")
         if not isinstance(raw_execution, Mapping):
             raise PlanningGraphError("verify 节点缺少 last_execution。")
@@ -426,6 +473,16 @@ class _PlanningGraphRuntime:
             if step_status == "completed"
             else f"{execution.summary}；验证未通过。"
         )
+        context_manager.add_text(
+            item_id=f"verification:{step.id}",
+            layer="compressible",
+            content=verification.summary,
+            source=f"step:{step.id}:verification",
+            evidence_refs=verification.evidence_refs,
+            metadata={"step_id": step.id, "status": verification.status},
+            replace_existing=True,
+        )
+        self._compact_context(context_manager)
         domain_state.record_step_result(
             step.id,
             status=step_status,
@@ -444,6 +501,7 @@ class _PlanningGraphRuntime:
         updates["progress_snapshot"] = domain_state.progress_snapshot(
             remaining_budget=self._remaining_budget(state, domain_state)
         ).as_dict()
+        updates["context_snapshot"] = context_manager.as_dict()
         updates["last_verification"] = verification.as_dict()
         updates["graph_status"] = "verified"
         updates["plan_invalidated"] = False
@@ -529,6 +587,18 @@ class _PlanningGraphRuntime:
             state.get("step_results", []),
             result.plan,
         )
+        context_manager = self._restore_context(state)
+        previous_plan_item_id = f"plan:{current_plan.version}"
+        if previous_plan_item_id in context_manager.items:
+            context_manager.deactivate(previous_plan_item_id)
+        context_manager.add_text(
+            item_id=f"plan:{result.plan.version}",
+            layer="permanent",
+            content=self._plan_context_content(result.plan),
+            source="replan",
+            evidence_refs=(f"plan:{result.plan.version}",),
+        )
+        self._compact_context(context_manager)
         updates = {
             "plan": result.plan.as_dict(),
             "current_step": None,
@@ -542,6 +612,7 @@ class _PlanningGraphRuntime:
             "runtime_seconds": replan_state.runtime_seconds,
             "plan_invalidated": False,
             "replan_observation": None,
+            "context_snapshot": context_manager.as_dict(),
         }
         replanned_state = PlanExecutionState.from_dict(
             {
@@ -589,8 +660,11 @@ class _PlanningGraphRuntime:
                     blocked_reason=reason,
                     updated_at=utc_now_iso(),
                 ).as_dict()
-            except Exception:  # noqa: BLE001 - keep blocked transition recoverable.
-                pass
+            except Exception:
+                LOGGER.debug(
+                    "无法将无效 progress snapshot 标记为 blocked，保留原状态。",
+                    exc_info=True,
+                )
         updates.update(_projection_updates(state, status="blocked"))
         return updates
 
@@ -625,6 +699,70 @@ class _PlanningGraphRuntime:
             "blocked_reason": snapshot["blocked_reason"],
             "progress_snapshot": snapshot["progress_snapshot"],
         }
+
+    def _restore_context(self, state: PlanningGraphState) -> ContextManager:
+        raw_context = state.get("context_snapshot")
+        if isinstance(raw_context, Mapping):
+            return ContextManager.from_dict(raw_context)
+        goal_spec = _goal_from_state(state)
+        return ContextManager.for_goal(
+            goal_id=goal_spec.goal_id,
+            objective=goal_spec.objective,
+            constraints=goal_spec.constraints,
+            success_criteria=tuple(
+                f"{criterion.id}: {criterion.description}"
+                for criterion in goal_spec.success_criteria
+            ),
+        )
+
+    @staticmethod
+    def _plan_context_content(plan: AgentPlan) -> str:
+        steps = "\n".join(
+            f"- {step.id}: {step.description}"
+            for step in plan.steps
+        )
+        return f"Plan v{plan.version} for {plan.goal}\n{steps}"
+
+    @staticmethod
+    def _record_execution_context(
+        context: ContextManager,
+        step: PlanStep,
+        execution: StepExecution,
+    ) -> None:
+        if execution.tool_call_ids:
+            for tool_call_id in execution.tool_call_ids:
+                context.record_tool_result(
+                    step_id=step.id,
+                    tool_call_id=tool_call_id,
+                    summary=execution.summary,
+                    evidence_refs=execution.evidence_refs,
+                )
+            return
+        context.add_text(
+            item_id=f"execution:{step.id}",
+            layer="compressible",
+            content=execution.summary,
+            source=f"step:{step.id}",
+            evidence_refs=execution.evidence_refs,
+            metadata={"step_id": step.id},
+            replace_existing=True,
+        )
+
+    def _compact_context(self, context: ContextManager) -> None:
+        """Compact with the injected LLM and retain a deterministic fallback."""
+
+        if self.context_summarizer is None:
+            context.compact_if_needed()
+            return
+        try:
+            context.compact_if_needed(summarizer=self.context_summarizer)
+        except Exception as exc:  # noqa: BLE001 - fallback keeps the run resumable.
+            context.compact_if_needed(
+                information_loss_feedback=(
+                    "LLM context summarizer failed; deterministic fallback "
+                    f"used ({type(exc).__name__})."
+                )
+            )
 
     def _remaining_budget(
         self,
@@ -749,8 +887,9 @@ def create_planning_graph(
     verifier: StepVerifier | None = None,
     replan_observer: ReplanObserver | None = None,
     budget: ReplanBudget | None = None,
+    context_summarizer: ContextSummarizer | None = None,
 ):
-    """Compile the full classify -> plan -> execute -> verify graph."""
+    """Compile the graph and optionally inject an LLM context summarizer."""
 
     runtime = _PlanningGraphRuntime(
         planner=planner,
@@ -761,6 +900,7 @@ def create_planning_graph(
         verifier=verifier,
         replan_observer=replan_observer,
         budget=budget,
+        context_summarizer=context_summarizer,
     )
     builder = StateGraph(PlanningGraphState)
     builder.add_node("classify", runtime.classify)
@@ -815,6 +955,7 @@ def invoke_planning_graph(
     success_criteria: tuple[SuccessCriterion, ...] = (),
     goal_spec: Goal | None = None,
     thread_id: str | None = None,
+    context_budget: ContextBudget | None = None,
 ) -> PlanningGraphState:
     """Invoke one graph thread and persist every node transition."""
 
@@ -829,6 +970,7 @@ def invoke_planning_graph(
             success_criteria=success_criteria,
             goal_spec=goal_spec,
             run_id=resolved_thread_id,
+            context_budget=context_budget,
         ),
         config=config,
     )

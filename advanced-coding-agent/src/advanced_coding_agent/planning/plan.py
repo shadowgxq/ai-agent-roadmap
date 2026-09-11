@@ -246,7 +246,7 @@ class AgentPlan:
             goal_version=payload.get("goal_version"),  # type: ignore[arg-type]
         )
 
-    def bind_goal(self, *, goal_id: str, goal_version: int) -> "AgentPlan":
+    def bind_goal(self, *, goal_id: str, goal_version: int) -> AgentPlan:
         """Bind this plan to the immutable Goal version it is executing."""
 
         return AgentPlan(

@@ -115,7 +115,7 @@ class SuccessCriterion:
         object.__setattr__(self, "expected_text", expected_text)
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "SuccessCriterion":
+    def from_dict(cls, payload: Mapping[str, object]) -> SuccessCriterion:
         """Rehydrate a criterion from checkpoint-safe JSON data."""
 
         if not isinstance(payload, Mapping):
@@ -198,7 +198,7 @@ class Goal:
         goal_id: str | None = None,
         created_at: str | None = None,
         version: int = 1,
-    ) -> "Goal":
+    ) -> Goal:
         """Create a normalized Goal, retaining an explicit manual fallback."""
 
         criteria = tuple(success_criteria)
@@ -220,7 +220,7 @@ class Goal:
         )
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "Goal":
+    def from_dict(cls, payload: Mapping[str, object]) -> Goal:
         """Rehydrate a Goal without consulting conversation history."""
 
         if not isinstance(payload, Mapping):
@@ -253,7 +253,7 @@ class Goal:
         objective: str | None = None,
         constraints: Sequence[str] | None = None,
         success_criteria: Sequence[SuccessCriterion] | None = None,
-    ) -> "Goal":
+    ) -> Goal:
         """Return the next immutable Goal version with the same identity."""
 
         return replace(
@@ -341,7 +341,7 @@ class GoalRunProjection:
         run_id: str,
         status: GoalRunStatus = "pending",
         plan_version: int | None = None,
-    ) -> "GoalRunProjection":
+    ) -> GoalRunProjection:
         return cls(
             run_id=run_id,
             goal_id=goal.goal_id,
@@ -352,7 +352,7 @@ class GoalRunProjection:
         )
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "GoalRunProjection":
+    def from_dict(cls, payload: Mapping[str, object]) -> GoalRunProjection:
         if not isinstance(payload, Mapping):
             raise GoalValidationError("run_projection 必须是对象。")
         return cls(
@@ -377,7 +377,7 @@ class GoalRunProjection:
         status: GoalRunStatus,
         *,
         plan_version: int | None = None,
-    ) -> "GoalRunProjection":
+    ) -> GoalRunProjection:
         return replace(
             self,
             status=status,

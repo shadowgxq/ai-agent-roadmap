@@ -27,6 +27,15 @@ from .completion import (
     SemanticCriterionEvaluator,
     SemanticCriterionVerifier,
 )
+from .eval import (
+    EvalEvent,
+    EvalEventKind,
+    EvalFinalStatus,
+    LongHorizonEvalRecorder,
+    LongHorizonEvalReport,
+    LongHorizonEvalValidationError,
+    build_reference_long_horizon_eval,
+)
 from .goal import (
     Goal,
     GoalRunProjection,
@@ -72,6 +81,9 @@ __all__ = [
     "CompletionResult",
     "CompletionStatus",
     "CompletionValidationError",
+    "EvalEvent",
+    "EvalEventKind",
+    "EvalFinalStatus",
     "ContextBudget",
     "ContextItem",
     "ContextLayer",
@@ -90,6 +102,9 @@ __all__ = [
     "GoalRunStatus",
     "GoalValidationError",
     "LLMContextSummarizer",
+    "LongHorizonEvalRecorder",
+    "LongHorizonEvalReport",
+    "LongHorizonEvalValidationError",
     "ProgressSnapshot",
     "ProgressStatus",
     "ProgressValidationError",
@@ -111,6 +126,7 @@ __all__ = [
     "UnknownExternalResultError",
     "WorkerRestartError",
     "assert_recovery_consistency",
+    "build_reference_long_horizon_eval",
     "estimate_tokens",
     "failure_event_from_exception",
     "utc_now_iso",

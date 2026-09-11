@@ -19,6 +19,7 @@ from ..long_horizon import (
     ContextBudget,
     ContextManager,
     ContextSummarizer,
+    CompletionGate,
     FailureEvent,
     Goal,
     GoalRunProjection,
@@ -90,6 +91,9 @@ class PlanningGraphState(TypedDict, total=False):
     blocked_reason: str | None
     progress_snapshot: dict[str, object]
     context_snapshot: dict[str, object]
+    changed_paths: list[str]
+    completion: dict[str, object]
+    completion_history: list[dict[str, object]]
     recovery: dict[str, object]
     recovery_history: list[dict[str, object]]
     graph_status: GraphStatus
@@ -175,6 +179,9 @@ def initial_planning_state(
             goal_version=goal_spec.version,
         ).as_dict(),
         "context_snapshot": context_manager.as_dict(),
+        "changed_paths": [],
+        "completion": {},
+        "completion_history": [],
         "recovery": {},
         "recovery_history": [],
     }
@@ -237,6 +244,7 @@ class _PlanningGraphRuntime:
         context_summarizer: ContextSummarizer | None = None,
         recovery_policy: RecoveryPolicy | None = None,
         recovery_sleep: Callable[[float], None] | None = None,
+        completion_gate: CompletionGate | None = None,
     ) -> None:
         self.planner = planner
         self.workdir = Path(workdir).resolve()
@@ -248,6 +256,7 @@ class _PlanningGraphRuntime:
         self.context_summarizer = context_summarizer
         self.recovery_policy = recovery_policy
         self.recovery_sleep = recovery_sleep or time.sleep
+        self.completion_gate = completion_gate or CompletionGate()
 
     def classify(self, state: PlanningGraphState) -> dict[str, object]:
         classification = classify_task(state["goal"])
@@ -298,9 +307,10 @@ class _PlanningGraphRuntime:
         if result.plan is None:
             updates: dict[str, object] = {
                 "planner_result": result.as_dict(),
-                "graph_status": "completed",
+                "execution_status": "completed",
+                "graph_status": "verified",
             }
-            updates.update(_projection_updates(state, status="completed"))
+            updates.update(_projection_updates(state, status="running"))
             return updates
 
         goal_spec = _goal_from_state(state)
@@ -343,6 +353,155 @@ class _PlanningGraphRuntime:
         )
         return updates
 
+    @staticmethod
+    def route_after_planner(
+        state: PlanningGraphState,
+    ) -> Literal["select_step", "completion"]:
+        """A plan-less planning result still has to pass the completion gate."""
+
+        return "select_step" if isinstance(state.get("plan"), Mapping) else "completion"
+
+    def completion(self, state: PlanningGraphState) -> dict[str, object]:
+        """Evaluate the frozen Goal criteria before writing a terminal status."""
+
+        goal = _goal_from_state(state)
+        raw_results = state.get("step_results", [])
+        evidence_refs: list[str] = []
+        if isinstance(raw_results, list):
+            for raw_result in raw_results:
+                if not isinstance(raw_result, Mapping):
+                    continue
+                raw_refs = raw_result.get("evidence_refs", [])
+                if isinstance(raw_refs, list):
+                    evidence_refs.extend(
+                        value
+                        for value in raw_refs
+                        if isinstance(value, str) and value.strip()
+                    )
+        changed_paths = state.get("changed_paths", [])
+        if not isinstance(changed_paths, list):
+            raise PlanningGraphError("changed_paths 必须是字符串数组。")
+        report = self.completion_gate.evaluate(
+            goal,
+            Path(state.get("workdir", str(self.workdir))),
+            evidence_refs=evidence_refs,
+            changed_paths=tuple(
+                value for value in changed_paths if isinstance(value, str)
+            ),
+        )
+        history = list(state.get("completion_history", []))
+        history.append(report.as_dict())
+        updates: dict[str, object] = {
+            "completion": report.as_dict(),
+            "completion_history": history,
+            "last_verification": report.as_dict(),
+            "graph_status": "verified",
+            "plan_invalidated": False,
+            "replan_observation": None,
+        }
+        if report.status == "succeeded":
+            updates.update(
+                {
+                    "execution_status": "completed",
+                    "blocked_reason": None,
+                    "graph_status": "completed",
+                }
+            )
+            raw_plan = state.get("plan")
+            plan_version = (
+                raw_plan.get("version")
+                if isinstance(raw_plan, Mapping)
+                else None
+            )
+            updates.update(
+                _projection_updates(
+                    state,
+                    status="completed",
+                    plan_version=plan_version,  # type: ignore[arg-type]
+                )
+            )
+            return updates
+
+        if report.status == "failed" and self.recovery_policy is not None:
+            completion_failure = FailureEvent(
+                kind="verification_failure",
+                message=report.summary,
+                evidence_refs=report.evidence_refs,
+            )
+            decision = self.recovery_policy.decide(completion_failure)
+            recovery, recovery_history = self._recovery_updates(
+                state,
+                [(completion_failure, decision)],
+            )
+            updates["recovery"] = recovery
+            updates["recovery_history"] = recovery_history
+            if decision.action == "replan":
+                updates.update(
+                    {
+                        "execution_status": "pending",
+                        "blocked_reason": None,
+                        "plan_invalidated": True,
+                        "replan_observation": ReplanObservation(
+                            summary=report.summary,
+                            plan_invalidated=True,
+                            evidence_refs=report.evidence_refs,
+                        ).as_dict(),
+                    }
+                )
+                updates.update(_projection_updates(state, status="running"))
+                return updates
+
+        if report.status == "needs_review":
+            decision = RecoveryDecision(
+                failure_kind="verification_failure",
+                action="manual_review",
+                reason=report.summary,
+                attempt=1,
+                evidence_refs=report.evidence_refs,
+                requires_manual_intervention=True,
+            )
+            recovery, recovery_history = self._recovery_updates(
+                state,
+                [
+                    (
+                        FailureEvent(
+                            kind="verification_failure",
+                            message=report.summary,
+                            evidence_refs=report.evidence_refs,
+                        ),
+                        decision,
+                    )
+                ],
+            )
+            updates["recovery"] = recovery
+            updates["recovery_history"] = recovery_history
+        updates.update(
+            {
+                "execution_status": "blocked",
+                "blocked_reason": report.summary,
+                "graph_status": "blocked",
+            }
+        )
+        updates.update(_projection_updates(state, status="blocked"))
+        return updates
+
+    @staticmethod
+    def route_after_completion(
+        state: PlanningGraphState,
+    ) -> Literal["done", "replan", "blocked"]:
+        """Route only a successful aggregate report to the terminal edge."""
+
+        if state.get("plan_invalidated") and state.get("replan_observation"):
+            return "replan"
+        completion = state.get("completion")
+        if (
+            state.get("execution_status") == "completed"
+            and isinstance(completion, Mapping)
+            and completion.get("status") == "succeeded"
+        ):
+            return "done"
+        return "blocked"
+
     def select_step(self, state: PlanningGraphState) -> dict[str, object]:
         domain_state = self._restore_domain_state(state)
         domain_state.claim_next_step()
@@ -367,10 +526,10 @@ class _PlanningGraphRuntime:
     @staticmethod
     def route_after_select(
         state: PlanningGraphState,
-    ) -> Literal["execute", "done", "blocked"]:
+    ) -> Literal["execute", "complete", "blocked"]:
         execution_status = state.get("execution_status")
         if execution_status == "completed":
-            return "done"
+            return "complete"
         if execution_status == "failed":
             return "blocked"
         if execution_status == "blocked":
@@ -634,11 +793,11 @@ class _PlanningGraphRuntime:
     @staticmethod
     def route_after_verify(
         state: PlanningGraphState,
-    ) -> Literal["next", "replan", "done", "blocked"]:
-        if state.get("execution_status") == "completed":
-            return "done"
+    ) -> Literal["next", "replan", "complete", "blocked"]:
         if state.get("plan_invalidated") and state.get("replan_observation"):
             return "replan"
+        if state.get("execution_status") == "completed":
+            return "complete"
         if state.get("execution_status") == "pending":
             return "next"
         return "blocked"
@@ -716,6 +875,7 @@ class _PlanningGraphRuntime:
             "runtime_seconds": replan_state.runtime_seconds,
             "plan_invalidated": False,
             "replan_observation": None,
+            "completion": {},
             "context_snapshot": context_manager.as_dict(),
         }
         replanned_state = PlanExecutionState.from_dict(
@@ -1122,8 +1282,9 @@ def create_planning_graph(
     context_summarizer: ContextSummarizer | None = None,
     recovery_policy: RecoveryPolicy | None = None,
     recovery_sleep: Callable[[float], None] | None = None,
+    completion_gate: CompletionGate | None = None,
 ):
-    """Compile the graph with optional context summarization and recovery policy."""
+    """Compile the graph with long-horizon gates and recovery policy."""
 
     runtime = _PlanningGraphRuntime(
         planner=planner,
@@ -1137,6 +1298,7 @@ def create_planning_graph(
         context_summarizer=context_summarizer,
         recovery_policy=recovery_policy,
         recovery_sleep=recovery_sleep,
+        completion_gate=completion_gate,
     )
     builder = StateGraph(PlanningGraphState)
     builder.add_node("classify", runtime.classify)
@@ -1145,6 +1307,7 @@ def create_planning_graph(
     builder.add_node("select_step", runtime.select_step)
     builder.add_node("execute", runtime.execute)
     builder.add_node("verify", runtime.verify)
+    builder.add_node("completion", runtime.completion)
     builder.add_node("replan", runtime.replan)
     builder.add_node("blocked", runtime.blocked)
 
@@ -1155,11 +1318,15 @@ def create_planning_graph(
         {"reactive": "reactive", "planning": "planner"},
     )
     builder.add_edge("reactive", END)
-    builder.add_edge("planner", "select_step")
+    builder.add_conditional_edges(
+        "planner",
+        runtime.route_after_planner,
+        {"select_step": "select_step", "completion": "completion"},
+    )
     builder.add_conditional_edges(
         "select_step",
         runtime.route_after_select,
-        {"execute": "execute", "done": END, "blocked": "blocked"},
+        {"execute": "execute", "complete": "completion", "blocked": "blocked"},
     )
     builder.add_edge("execute", "verify")
     builder.add_conditional_edges(
@@ -1168,9 +1335,14 @@ def create_planning_graph(
         {
             "next": "select_step",
             "replan": "replan",
-            "done": END,
+            "complete": "completion",
             "blocked": "blocked",
         },
+    )
+    builder.add_conditional_edges(
+        "completion",
+        runtime.route_after_completion,
+        {"done": END, "replan": "replan", "blocked": "blocked"},
     )
     builder.add_conditional_edges(
         "replan",

@@ -1,13 +1,12 @@
-"""W18 Session 2 Manager/Worker contracts.
+"""W18 Manager/Worker contracts and conservative recovery decisions.
 
-The Manager builds a fixed role pipeline and evaluates structured Worker
-results.  No model, tool, routing, retry loop, or parallel executor is
-started here; later sessions add those runtime behaviours around these
-contracts.
+The Manager creates research fan-out followed by Code/Test dependencies.
+Runtime scheduling and tool execution remain separate in execution.py.
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Literal
@@ -29,7 +28,8 @@ WorkerStatus = Literal[
     "blocked",
     "needs_review",
 ]
-ManagerAction = Literal["accept", "retry", "reassign", "pause"]
+SideEffectStatus = Literal["none", "applied", "unknown"]
+ManagerAction = Literal["accept", "retry", "reassign", "wait", "pause"]
 TraceEventKind = Literal["assignment", "result", "decision"]
 _WORKER_ROLES: tuple[WorkerRole, ...] = ("researcher", "coder", "tester")
 _WORKER_STATUSES = frozenset(
@@ -52,6 +52,12 @@ def _texts(value: object, name: str) -> tuple[str, ...]:
     return result
 
 
+def _optional_text(value: object, name: str) -> str | None:
+    if value is None:
+        return None
+    return _text(value, name)
+
+
 @dataclass(frozen=True)
 class RoleSpec:
     """Prompt, tools, budget, and boundary for one role."""
@@ -64,8 +70,18 @@ class RoleSpec:
 
     def __post_init__(self) -> None:
         _text(self.role_prompt, f"{self.role}.role_prompt")
-        if self.timeout_seconds <= 0 or self.max_tool_calls <= 0:
-            raise SplitDecisionValidationError(f"{self.role} budget 必须大于 0。")
+        if (
+            not isinstance(self.timeout_seconds, (int, float))
+            or isinstance(self.timeout_seconds, bool)
+            or not math.isfinite(self.timeout_seconds)
+            or self.timeout_seconds <= 0
+            or not isinstance(self.max_tool_calls, int)
+            or isinstance(self.max_tool_calls, bool)
+            or self.max_tool_calls <= 0
+        ):
+            raise SplitDecisionValidationError(
+                f"{self.role} timeout/tool budget 必须是有限正数和正整数。"
+            )
         if self.boundary.role != self.role:
             raise SplitDecisionValidationError(
                 "RoleSpec 与 WorkerBoundary 角色不一致。")
@@ -119,6 +135,12 @@ class WorkerAssignment:
     dependencies: tuple[str, ...]
     role_spec: RoleSpec
     status: WorkerStatus = "assigned"
+    # Session 4 uses these declarations to reject unsafe parallel groups.  They
+    # are optional so Session 2 callers remain source-compatible.
+    shared_resources: tuple[str, ...] = ()
+    write_targets: tuple[str, ...] = ()
+    estimated_seconds: float = 1.0
+    idempotency_key: str | None = None
 
     def __post_init__(self) -> None:
         if self.role not in _WORKER_ROLES:
@@ -133,9 +155,24 @@ class WorkerAssignment:
         _text(self.assignment_id, "assignment.assignment_id")
         _text(self.task_id, "assignment.task_id")
         _text(self.objective, "assignment.objective")
-        _texts(self.constraints, "assignment.constraints")
-        _texts(self.input_context, "assignment.input_context")
-        _texts(self.dependencies, "assignment.dependencies")
+        for name in ("constraints", "input_context", "dependencies", "shared_resources", "write_targets"):
+            object.__setattr__(self, name, _texts(getattr(self, name), f"assignment.{name}"))
+        if self.write_targets and not self.role_spec.boundary.can_write:
+            raise SplitDecisionValidationError("只读 Worker 不能声明 write_targets。")
+        if (
+            not isinstance(self.estimated_seconds, (int, float))
+            or isinstance(self.estimated_seconds, bool)
+            or not math.isfinite(self.estimated_seconds)
+            or self.estimated_seconds <= 0
+        ):
+            raise SplitDecisionValidationError(
+                "assignment.estimated_seconds 必须大于 0。"
+            )
+        object.__setattr__(
+            self,
+            "idempotency_key",
+            _optional_text(self.idempotency_key, "assignment.idempotency_key"),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -148,6 +185,10 @@ class WorkerAssignment:
             "dependencies": list(self.dependencies),
             "status": self.status,
             "role_spec": self.role_spec.as_dict(),
+            "shared_resources": list(self.shared_resources),
+            "write_targets": list(self.write_targets),
+            "estimated_seconds": self.estimated_seconds,
+            "idempotency_key": self.idempotency_key,
         }
 
 
@@ -165,6 +206,12 @@ class WorkerResult:
     tool_call_ids: tuple[str, ...] = ()
     changed_files: tuple[str, ...] = ()
     failure_reason: str | None = None
+    # Explicit attempt metadata makes aggregation independent of arrival order.
+    attempt_id: str = ""
+    attempt_number: int = 1
+    idempotency_key: str | None = None
+    side_effect_status: SideEffectStatus = "none"
+    outcome_known: bool = True
 
     def __post_init__(self) -> None:
         if self.role not in _WORKER_ROLES:
@@ -174,12 +221,40 @@ class WorkerResult:
         _text(self.assignment_id, "result.assignment_id")
         _text(self.task_id, "result.task_id")
         _text(self.summary, "result.summary")
-        _texts(self.evidence_refs, "result.evidence_refs")
-        _texts(self.tool_call_ids, "result.tool_call_ids")
-        _texts(self.changed_files, "result.changed_files")
+        for name in ("evidence_refs", "tool_call_ids", "changed_files"):
+            object.__setattr__(self, name, _texts(getattr(self, name), f"result.{name}"))
         if self.status == "failed" and not self.failure_reason:
             raise SplitDecisionValidationError(
                 "failed result 必须包含 failure_reason。")
+        if (
+            not isinstance(self.attempt_number, int)
+            or isinstance(self.attempt_number, bool)
+            or self.attempt_number <= 0
+        ):
+            raise SplitDecisionValidationError(
+                "result.attempt_number 必须是正整数。"
+            )
+        attempt_id = self.attempt_id or (
+            f"{self.task_id}:attempt:{self.attempt_number}"
+        )
+        object.__setattr__(self, "attempt_id", _text(attempt_id, "result.attempt_id"))
+        object.__setattr__(
+            self,
+            "idempotency_key",
+            _optional_text(self.idempotency_key, "result.idempotency_key"),
+        )
+        if self.side_effect_status not in ("none", "applied", "unknown"):
+            raise SplitDecisionValidationError(
+                "result.side_effect_status 不合法。"
+            )
+        if not isinstance(self.outcome_known, bool):
+            raise SplitDecisionValidationError("result.outcome_known 必须是布尔值。")
+        if self.side_effect_status == "none" and self.changed_files:
+            # A reported changed file is already evidence of a write-side
+            # effect; Manager must not treat that failure as a clean retry.
+            object.__setattr__(self, "side_effect_status", "applied")
+        if self.side_effect_status == "unknown":
+            object.__setattr__(self, "outcome_known", False)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -193,6 +268,11 @@ class WorkerResult:
             "tool_call_ids": list(self.tool_call_ids),
             "changed_files": list(self.changed_files),
             "failure_reason": self.failure_reason,
+            "attempt_id": self.attempt_id,
+            "attempt_number": self.attempt_number,
+            "idempotency_key": self.idempotency_key,
+            "side_effect_status": self.side_effect_status,
+            "outcome_known": self.outcome_known,
         }
 
 
@@ -208,10 +288,14 @@ class ManagerDecision:
     accepted_evidence_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        if self.action not in ("accept", "retry", "reassign", "pause"):
+        if self.action not in ("accept", "retry", "reassign", "wait", "pause"):
             raise SplitDecisionValidationError("ManagerDecision.action 不合法。")
-        if self.retry_count < 0:
-            raise SplitDecisionValidationError("retry_count 不能小于 0。")
+        if (
+            not isinstance(self.retry_count, int)
+            or isinstance(self.retry_count, bool)
+            or self.retry_count < 0
+        ):
+            raise SplitDecisionValidationError("retry_count 必须是非负整数。")
         if self.action == "reassign" and self.next_role not in _WORKER_ROLES:
             raise SplitDecisionValidationError("reassign 必须指定合法 next_role。")
         if self.action != "reassign" and self.next_role is not None:
@@ -349,13 +433,24 @@ class Manager:
         self._role_specs = {spec.role: spec for spec in specs}
         if "manager" not in self._role_specs:
             raise SplitDecisionValidationError("Manager spec 不能为空。")
-        if max_retries < 0:
-            raise SplitDecisionValidationError("max_retries 不能小于 0。")
+        if (
+            not isinstance(max_retries, int)
+            or isinstance(max_retries, bool)
+            or max_retries < 0
+        ):
+            raise SplitDecisionValidationError("max_retries 必须是非负整数。")
         self.max_retries = max_retries
 
     @property
     def spec(self) -> RoleSpec:
         return self._role_specs["manager"]
+
+    def role_spec(self, role: WorkerRole) -> RoleSpec:
+        """Return a role contract for safe retry/reassign orchestration."""
+
+        if role not in self._role_specs:
+            raise SplitDecisionValidationError(f"缺少 {role} RoleSpec。")
+        return self._role_specs[role]
 
     def create_plan(
         self,
@@ -365,8 +460,14 @@ class Manager:
         constraints: tuple[str, ...],
         success_criteria: tuple[str, ...],
         decision: SplitDecision,
+        research_objectives: tuple[str, ...] = (),
     ) -> CollaborationPlan:
-        """Build a fixed Research → Code → Test pipeline from Session 1's decision."""
+        """Build a Research DAG followed by serial Code → Test stages.
+
+        ``research_objectives`` creates independent read-only Researcher
+        assignments.  When omitted, Session 2's single Researcher pipeline is
+        preserved for backward compatibility.
+        """
 
         if decision.mode != "multi-agent":
             raise SplitDecisionValidationError(
@@ -374,23 +475,39 @@ class Manager:
             )
         selected = {boundary.role for boundary in decision.worker_boundaries}
         assignments: list[WorkerAssignment] = []
-        researcher_id: str | None = None
+        researcher_ids: list[str] = []
         coder_id: str | None = None
 
-        if "researcher" in selected:
-            researcher_id = f"{goal_id}:research"
-            assignments.append(
-                self._assignment(
-                    assignment_id=researcher_id,
-                    task_id=f"research:{goal_id}",
-                    role="researcher",
-                    objective=f"研究并定位：{objective}",
-                    constraints=constraints,
-                    input_context=("goal", "constraints",
-                                   "bounded_search_scope"),
-                    dependencies=(),
-                )
+        normalized_research = _texts(
+            research_objectives, "research_objectives"
+        )
+        if normalized_research and "researcher" not in selected:
+            raise SplitDecisionValidationError(
+                "research_objectives 非空时 decision 必须包含 researcher。"
             )
+        if "researcher" in selected:
+            research_items = normalized_research or (
+                f"研究并定位：{objective}",
+            )
+            for index, research_objective in enumerate(research_items, start=1):
+                suffix = "" if len(research_items) == 1 else f":{index}"
+                researcher_id = f"{goal_id}:research{suffix}"
+                researcher_ids.append(researcher_id)
+                assignments.append(
+                    self._assignment(
+                        assignment_id=researcher_id,
+                        task_id=f"research:{goal_id}{suffix}",
+                        role="researcher",
+                        objective=research_objective,
+                        constraints=constraints,
+                        input_context=(
+                            "goal",
+                            "constraints",
+                            "bounded_search_scope",
+                        ),
+                        dependencies=(),
+                    )
+                )
         if "coder" in selected:
             coder_id = f"{goal_id}:code"
             assignments.append(
@@ -402,7 +519,7 @@ class Manager:
                     constraints=constraints,
                     input_context=("goal", "constraints",
                                    "accepted_research_evidence"),
-                    dependencies=(researcher_id,) if researcher_id else (),
+                    dependencies=tuple(researcher_ids),
                 )
             )
         if "tester" in selected:
@@ -415,7 +532,7 @@ class Manager:
                     constraints=constraints,
                     input_context=("success_criteria",
                                    "changed_files", "diff"),
-                    dependencies=(coder_id,) if coder_id else (),
+                    dependencies=(coder_id,) if coder_id else tuple(researcher_ids),
                 )
             )
         return CollaborationPlan(
@@ -436,7 +553,23 @@ class Manager:
     ) -> ManagerDecision:
         """Choose a next action without executing it."""
 
+        if not isinstance(retry_count, int) or isinstance(retry_count, bool) or retry_count < 0:
+            raise SplitDecisionValidationError("retry_count 必须是非负整数。")
+        if result.role == "researcher" and result.side_effect_status != "none":
+            return ManagerDecision(
+                assignment_id=result.assignment_id,
+                action="pause",
+                reason="只读 Researcher 报告了写副作用，必须核对工作区。",
+                retry_count=retry_count,
+            )
         if result.status == "succeeded":
+            if result.side_effect_status == "unknown" or not result.outcome_known:
+                return ManagerDecision(
+                    assignment_id=result.assignment_id,
+                    action="pause",
+                    reason="Worker 声称成功但执行结果仍未知，不能解锁后续依赖。",
+                    retry_count=retry_count,
+                )
             if not result.evidence_refs:
                 return ManagerDecision(
                     assignment_id=result.assignment_id,
@@ -452,20 +585,42 @@ class Manager:
                 accepted_evidence_refs=result.evidence_refs,
             )
         if result.status == "failed":
-            if reassign_to is not None:
+            unsafe_outcome = (
+                result.side_effect_status == "unknown" or not result.outcome_known
+            )
+            if result.side_effect_status == "applied":
+                return ManagerDecision(
+                    assignment_id=result.assignment_id,
+                    action="pause",
+                    reason="失败结果已经确认产生副作用，禁止盲目重放；先核对变更。",
+                    retry_count=retry_count,
+                )
+            if unsafe_outcome:
+                return ManagerDecision(
+                    assignment_id=result.assignment_id,
+                    action="pause",
+                    reason=(
+                        "执行结果未知，先核对副作用；仅有 idempotency_key "
+                        "不能证明写入端已去重或旧 Worker 已停止。"
+                    ),
+                    retry_count=retry_count,
+                )
+            if reassign_to is not None and retry_count < self.max_retries:
                 self._assert_reassignable(result.role, reassign_to)
                 return ManagerDecision(
                     assignment_id=result.assignment_id,
                     action="reassign",
-                    reason="当前 Worker 失败，改派给明确的替代角色。",
-                    retry_count=retry_count,
+                    reason=(
+                        "当前 Worker 失败，结果可安全处理，改派给同角色替代 Worker。"
+                    ),
+                    retry_count=retry_count + 1,
                     next_role=reassign_to,
                 )
             if retry_count < self.max_retries:
                 return ManagerDecision(
                     assignment_id=result.assignment_id,
                     action="retry",
-                    reason="失败原因仍在有限重试预算内。",
+                    reason="失败仍在有限重试预算内，且没有已产生或未确认的副作用。",
                     retry_count=retry_count + 1,
                 )
         return ManagerDecision(
@@ -546,9 +701,9 @@ class Manager:
 
     @staticmethod
     def _assert_reassignable(current: WorkerRole, target: WorkerRole) -> None:
-        if target not in _WORKER_ROLES or target == current:
+        if target not in _WORKER_ROLES or target != current:
             raise SplitDecisionValidationError(
-                "reassign_to 必须是不同的 Researcher/Coder/Tester 角色。"
+                "reassign 只能更换 Worker 实例，不能跨角色绕过原 DAG 节点。"
             )
 
 
@@ -560,6 +715,7 @@ __all__ = [
     "ManagerAction",
     "ManagerDecision",
     "RoleSpec",
+    "SideEffectStatus",
     "TraceEventKind",
     "WorkerAssignment",
     "WorkerResult",

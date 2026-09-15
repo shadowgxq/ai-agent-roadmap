@@ -15,8 +15,20 @@ from .collaboration import (
     WorkerStatus,
     default_role_specs,
 )
+from .aggregation import (
+    AggregationError,
+    AggregationReport,
+    ClaimVerification,
+    EvidenceAggregator,
+    EvidenceClaim,
+    EvidenceConflict,
+    InvestigationRequest,
+    TopicConclusion,
+    build_cache_database_conflict,
+)
 from .dependency import DependencyGraph, DependencyGraphError, DependencyNode
 from .execution import (
+    BeforeWriteGate,
     ConcurrencyLimits,
     DependencyExecutor,
     ExecutionBudget,
@@ -84,6 +96,16 @@ from .routing import (
 )
 
 __all__ = [
+    "AggregationError",
+    "AggregationReport",
+    "ClaimVerification",
+    "EvidenceAggregator",
+    "EvidenceClaim",
+    "EvidenceConflict",
+    "InvestigationRequest",
+    "TopicConclusion",
+    "build_cache_database_conflict",
+    "BeforeWriteGate",
     "BaselineSpec",
     "CollaborationEvent",
     "CollaborationPlan",

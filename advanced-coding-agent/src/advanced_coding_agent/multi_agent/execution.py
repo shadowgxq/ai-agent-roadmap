@@ -230,6 +230,7 @@ ReassignSelector = (
     Mapping[str, WorkerReplacement]
     | Callable[[WorkerAssignment, WorkerResult], WorkerReplacement | None]
 )
+BeforeWriteGate = Callable[[WorkerAssignment, Mapping[str, WorkerResult]], ManagerDecision]
 
 
 @dataclass(frozen=True)
@@ -437,6 +438,7 @@ class ParallelWorkerExecutor:
         total_task_budget: int | None = None, manager: Manager | None = None,
         retry_policy: SafeRetryPolicy | None = None, trace: CollaborationTrace | None = None,
         tools: Mapping[str, WorkerTool] | None = None,
+        before_write: BeforeWriteGate | None = None,
     ) -> None:
         overrides = (max_concurrency, per_worker_timeout, per_worker_tool_budget, total_task_budget)
         if limits is not None and any(value is not None for value in overrides):
@@ -451,6 +453,9 @@ class ParallelWorkerExecutor:
             raise ExecutionError("executor 和 retry_policy 必须共享 Manager。")
         self.retry_policy = retry_policy or SafeRetryPolicy(self.manager)
         self.trace = trace
+        if before_write is not None and not callable(before_write):
+            raise ExecutionError("before_write 必须是 callable gate。")
+        self._before_write = before_write
         registered = dict(tools or {})
         if any(not isinstance(name, str) or not name.strip() or not isinstance(tool, WorkerTool)
                for name, tool in registered.items()):
@@ -597,6 +602,27 @@ class ParallelWorkerExecutor:
                                 for key in assignment.dependencies}
                 if any(value is None or value.status != "succeeded" for value in dependencies.values()):
                     raise ExecutionError("已完成依赖缺少已接受结果。")
+                if assignment.role == "coder" and self._before_write is not None:
+                    try:
+                        gate = self._before_write(assignment, MappingProxyType(dependencies))
+                        refs = {ref for result in dependencies.values() for ref in result.evidence_refs}
+                        if (not isinstance(gate, ManagerDecision)
+                                or gate.assignment_id != assignment.assignment_id):
+                            raise ExecutionError("写入 gate 返回了无效的 ManagerDecision。")
+                        if gate.action == "accept" and (
+                            not gate.accepted_evidence_refs or not set(gate.accepted_evidence_refs) <= refs
+                        ):
+                            raise ExecutionError("写入 gate 的批准缺少当前依赖证据。")
+                    except Exception as exc:
+                        gate = ManagerDecision(assignment.assignment_id, "pause",
+                                               f"写入前证据检查失败：{exc}")
+                    decisions.append(gate)
+                    if self.trace is not None:
+                        self.trace.record_decision(gate)
+                    if gate.action != "accept":
+                        blocked[assignment.assignment_id] = gate.reason
+                        pending.remove(assignment.assignment_id)
+                        continue
                 number = numbers[assignment.assignment_id] + 1
                 numbers[assignment.assignment_id] = number
                 bounded = replace(assignment, role_spec=replace(
@@ -831,7 +857,7 @@ ExecutionReport = WorkerExecutionReport
 WorkerExecutor = DependencyExecutor = ParallelWorkerExecutor
 
 __all__ = [
-    "ConcurrencyLimits", "DependencyExecutor", "ExecutionBudget", "ExecutionError",
+    "BeforeWriteGate", "ConcurrencyLimits", "DependencyExecutor", "ExecutionBudget", "ExecutionError",
     "ExecutionLimits", "ExecutionReport", "ExecutionTerminalStatus", "ParallelWorkerExecutor",
     "ReassignSelector", "ResultAggregationError", "ResultAggregator", "RetryPolicy",
     "RetrySafetyPolicy", "SafeRetryPolicy", "TaskResultAggregator", "WorkerAttempt",

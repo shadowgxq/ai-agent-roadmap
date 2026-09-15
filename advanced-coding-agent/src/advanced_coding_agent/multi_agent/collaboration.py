@@ -7,9 +7,12 @@ Runtime scheduling and tool execution remain separate in execution.py.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from .aggregation import AggregationReport, ClaimVerification, EvidenceClaim
 
 from .decision import (
     SplitDecision,
@@ -628,6 +631,24 @@ class Manager:
             action="pause",
             reason="结果被阻塞、需要 review，或已耗尽安全处理路径。",
             retry_count=retry_count,
+        )
+
+    def aggregate_results(
+        self, results: Iterable[WorkerResult], claims: Iterable[EvidenceClaim], *,
+        required_topics: tuple[str, ...], verifications: Iterable[ClaimVerification] = (),
+        investigation_round: int = 0, max_investigation_rounds: int = 1,
+        require_verification: bool = False,
+    ) -> AggregationReport:
+        """Review structured claims without starting tools or choosing a random winner.
+
+        Pass report.write_decision as executor.before_write to gate Coder work.
+        Investigation requests remain explicit Manager work, not hidden retries.
+        """
+        from .aggregation import EvidenceAggregator
+
+        return EvidenceAggregator(max_investigation_rounds=max_investigation_rounds).aggregate(
+            results, claims, required_topics=required_topics, verifications=verifications,
+            investigation_round=investigation_round, require_verification=require_verification,
         )
 
     def recover_route(

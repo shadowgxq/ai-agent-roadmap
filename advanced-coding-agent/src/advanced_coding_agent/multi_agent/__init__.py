@@ -1,5 +1,19 @@
 """W18 contracts for deciding whether Multi-Agent splitting is justified."""
 
+from .collaboration import (
+    CollaborationEvent,
+    CollaborationPlan,
+    CollaborationTrace,
+    Manager,
+    ManagerAction,
+    ManagerDecision,
+    RoleSpec,
+    TraceEventKind,
+    WorkerAssignment,
+    WorkerResult,
+    WorkerStatus,
+    default_role_specs,
+)
 from .decision import (
     BaselineSpec,
     CollaborationFlowEdge,
@@ -18,12 +32,16 @@ from .decision import (
     SplitReason,
     WorkerBoundary,
     WorkerRole,
+    default_worker_boundaries,
     evaluate_split_decisions,
     load_decision_suite,
 )
 
 __all__ = [
     "BaselineSpec",
+    "CollaborationEvent",
+    "CollaborationPlan",
+    "CollaborationTrace",
     "CollaborationFlowEdge",
     "DecisionCase",
     "DecisionCaseResult",
@@ -32,14 +50,24 @@ __all__ = [
     "DecisionSuite",
     "DeterministicSplitDecider",
     "LatencyProjection",
+    "Manager",
+    "ManagerAction",
+    "ManagerDecision",
     "ParallelTaskCandidate",
     "RiskLevel",
+    "RoleSpec",
     "SplitDecision",
     "SplitDecisionValidationError",
     "SplitProfile",
     "SplitReason",
+    "TraceEventKind",
     "WorkerBoundary",
+    "WorkerAssignment",
+    "WorkerResult",
+    "WorkerStatus",
     "WorkerRole",
+    "default_worker_boundaries",
+    "default_role_specs",
     "evaluate_split_decisions",
     "load_decision_suite",
 ]

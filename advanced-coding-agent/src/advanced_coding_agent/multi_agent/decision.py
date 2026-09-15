@@ -319,6 +319,12 @@ _BOUNDARIES: Mapping[WorkerRole, WorkerBoundary] = {
 }
 
 
+def default_worker_boundaries() -> tuple[WorkerBoundary, ...]:
+    """Return the immutable role boundaries shared by later sessions."""
+
+    return tuple(_BOUNDARIES.values())
+
+
 class DeterministicSplitDecider:
     """Use visible rules before Session 3 introduces a structured router."""
 
@@ -649,6 +655,7 @@ __all__ = [
     "SplitReason",
     "WorkerBoundary",
     "WorkerRole",
+    "default_worker_boundaries",
     "evaluate_split_decisions",
     "load_decision_suite",
 ]

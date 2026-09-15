@@ -52,3 +52,9 @@ uv run advanced-coding-agent \
 ```
 
 输出包含估算关键路径、扣除协调开销后的 latency projection、拆分理由、Worker 边界和 Manager/Worker/State/Evidence 数据流。该结果只是架构决策和估算，不代表真实并发测量；Manager/Worker 执行、路由与并行留给后续 Session。
+
+## W18 Session 2：Manager / Worker 契约
+
+`multi_agent/collaboration.py` 在 Session 1 的边界上增加固定角色 Prompt、工具白名单、超时和调用预算，并由 `Manager.create_plan()` 生成 `Researcher → Coder → Tester` 的结构化任务链。`CollaborationTrace` 记录 assignment、result 和 Manager decision；它不会启动模型或工具。
+
+Worker 结果统一使用 `WorkerResult`，Manager 通过 `Manager.evaluate_result()` 返回 `accept`、`retry`、`reassign` 或 `pause`，没有 evidence 的成功结果不会被接受。动态路由、并行执行和冲突聚合留给后续 Session。

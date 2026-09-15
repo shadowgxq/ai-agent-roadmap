@@ -24,7 +24,8 @@ advanced-coding-agent/
 │   ├── runtime/           # Reactive / Planning 运行控制流
 │   ├── tools/             # 仓库读写、搜索和命令工具适配
 │   ├── planning/          # W16 Plan 与 Planner
-│   └── verification/      # W16 Verifier 与证据判断
+│   ├── verification/      # W16 Verifier 与证据判断
+│   └── multi_agent/       # W18 拆分决策与角色边界
 └── evals/cases/           # 固定任务与对照样例
 ```
 
@@ -39,3 +40,15 @@ uv run advanced-coding-agent "修复登录失败并运行测试" --mode planning
 ```
 
 Planning 输出包含分类、Plan、当前步骤、步骤结果、验证状态、re-plan 次数和 graph status。`--planner-backend llm` 保留旧版直接 Planner，便于对照。
+
+## W18 Session 1：拆分决策
+
+Session 1 先冻结 W17 single-agent v2 的模型、工具、上下文、调用次数、超时和成功指标，再根据任务的并行收益、上下文隔离、专业工具、权限隔离和独立验证证据决定是否拆分：
+
+```bash
+uv run advanced-coding-agent \
+  --mode split-decision \
+  --case-file evals/cases/w18_session_01.json
+```
+
+输出包含估算关键路径、扣除协调开销后的 latency projection、拆分理由、Worker 边界和 Manager/Worker/State/Evidence 数据流。该结果只是架构决策和估算，不代表真实并发测量；Manager/Worker 执行、路由与并行留给后续 Session。

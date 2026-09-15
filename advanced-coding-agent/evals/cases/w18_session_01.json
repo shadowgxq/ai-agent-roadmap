@@ -1,0 +1,393 @@
+{
+  "baseline": {
+    "id": "w17-single-agent-v2",
+    "runtime_version": "advanced-coding-agent-v2",
+    "model": "w17-deterministic-baseline",
+    "temperature": 0.0,
+    "tool_allowlist": [
+      "list_repository",
+      "search_text",
+      "read_file",
+      "edit_file",
+      "run_tests"
+    ],
+    "max_tool_calls": 50,
+    "max_context_tokens": 8000,
+    "timeout_seconds": 900,
+    "success_metrics": [
+      "success_rate",
+      "wall_clock_latency",
+      "cost",
+      "tool_calls",
+      "context_tokens",
+      "failure_rate"
+    ]
+  },
+  "cases": [
+    {
+      "id": "simple_find_config",
+      "objective": "查找仓库中的配置文件",
+      "complexity": "simple",
+      "parallel_tasks": [
+        {
+          "id": "find-config",
+          "description": "查找配置文件并返回路径。",
+          "estimated_seconds": 20,
+          "context_scope": ["repository-tree"]
+        }
+      ],
+      "serial_path": ["summarize-result"],
+      "serial_duration_seconds": 10,
+      "coordination_overhead_seconds": 15,
+      "context_domains": ["repository"],
+      "specialist_tools": ["list_repository"],
+      "requires_write": false,
+      "requires_verification": false,
+      "risk_level": "low",
+      "shared_write_targets": [],
+      "constraints": [],
+      "expected": {
+        "mode": "single-agent",
+        "reasons": []
+      }
+    },
+    {
+      "id": "simple_explain_function",
+      "objective": "解释 src/app.py 中的 main 函数",
+      "complexity": "simple",
+      "parallel_tasks": [
+        {
+          "id": "read-main",
+          "description": "读取 main 函数及其直接调用。",
+          "estimated_seconds": 25,
+          "context_scope": ["src/app.py"]
+        }
+      ],
+      "serial_path": ["explain-function"],
+      "serial_duration_seconds": 15,
+      "coordination_overhead_seconds": 15,
+      "context_domains": ["application-entry"],
+      "specialist_tools": ["read_file"],
+      "requires_write": false,
+      "requires_verification": false,
+      "risk_level": "low",
+      "shared_write_targets": [],
+      "constraints": [],
+      "expected": {
+        "mode": "single-agent",
+        "reasons": []
+      }
+    },
+    {
+      "id": "simple_list_python_files",
+      "objective": "列出 src 目录下的 Python 文件",
+      "complexity": "simple",
+      "parallel_tasks": [
+        {
+          "id": "list-python",
+          "description": "枚举 src 下的 Python 文件。",
+          "estimated_seconds": 15,
+          "context_scope": ["src"]
+        }
+      ],
+      "serial_path": ["format-file-list"],
+      "serial_duration_seconds": 8,
+      "coordination_overhead_seconds": 15,
+      "context_domains": ["repository-tree"],
+      "specialist_tools": ["list_repository"],
+      "requires_write": false,
+      "requires_verification": false,
+      "risk_level": "low",
+      "shared_write_targets": [],
+      "constraints": [],
+      "expected": {
+        "mode": "single-agent",
+        "reasons": []
+      }
+    },
+    {
+      "id": "simple_read_start_command",
+      "objective": "查看 README 中的启动命令",
+      "complexity": "simple",
+      "parallel_tasks": [
+        {
+          "id": "read-readme",
+          "description": "读取 README 的运行说明。",
+          "estimated_seconds": 15,
+          "context_scope": ["README.md"]
+        }
+      ],
+      "serial_path": ["return-command"],
+      "serial_duration_seconds": 5,
+      "coordination_overhead_seconds": 15,
+      "context_domains": ["documentation"],
+      "specialist_tools": ["read_file"],
+      "requires_write": false,
+      "requires_verification": false,
+      "risk_level": "low",
+      "shared_write_targets": [],
+      "constraints": [],
+      "expected": {
+        "mode": "single-agent",
+        "reasons": []
+      }
+    },
+    {
+      "id": "complex_login_failure",
+      "objective": "定位并修复用户登录失败的 bug",
+      "complexity": "complex",
+      "parallel_tasks": [
+        {
+          "id": "research-auth-entry",
+          "description": "调查认证入口和失败分支。",
+          "estimated_seconds": 30,
+          "context_scope": ["authentication-source"]
+        },
+        {
+          "id": "research-session-state",
+          "description": "调查 session 持久化和读取路径。",
+          "estimated_seconds": 30,
+          "context_scope": ["session-storage"]
+        },
+        {
+          "id": "research-auth-tests",
+          "description": "调查现有登录测试和失败证据。",
+          "estimated_seconds": 30,
+          "context_scope": ["authentication-tests"]
+        }
+      ],
+      "serial_path": ["manager-aggregate", "coder-change", "tester-verify"],
+      "serial_duration_seconds": 90,
+      "coordination_overhead_seconds": 15,
+      "context_domains": ["authentication", "session-storage", "test-suite"],
+      "specialist_tools": ["search_text", "read_file", "run_tests"],
+      "requires_write": true,
+      "requires_verification": true,
+      "risk_level": "high",
+      "shared_write_targets": ["authentication-module"],
+      "constraints": [
+        "只修改认证模块",
+        "不要改变数据库 schema"
+      ],
+      "expected": {
+        "mode": "multi-agent",
+        "reasons": [
+          "parallelization",
+          "context_isolation",
+          "specialization",
+          "permission_isolation",
+          "independent_verification"
+        ]
+      }
+    },
+    {
+      "id": "complex_payment_validation",
+      "objective": "修改支付校验逻辑并运行测试",
+      "complexity": "complex",
+      "parallel_tasks": [
+        {
+          "id": "research-payment-rule",
+          "description": "调查支付校验规则和调用点。",
+          "estimated_seconds": 25,
+          "context_scope": ["payment-source"]
+        },
+        {
+          "id": "research-payment-tests",
+          "description": "调查支付测试和兼容性要求。",
+          "estimated_seconds": 30,
+          "context_scope": ["payment-tests"]
+        }
+      ],
+      "serial_path": ["manager-aggregate", "coder-change", "tester-verify"],
+      "serial_duration_seconds": 80,
+      "coordination_overhead_seconds": 20,
+      "context_domains": ["payment-domain", "test-suite"],
+      "specialist_tools": ["read_file", "run_tests"],
+      "requires_write": true,
+      "requires_verification": true,
+      "risk_level": "high",
+      "shared_write_targets": ["payment-validation"],
+      "constraints": ["保留现有支付接口"],
+      "expected": {
+        "mode": "multi-agent",
+        "reasons": [
+          "parallelization",
+          "context_isolation",
+          "specialization",
+          "permission_isolation",
+          "independent_verification"
+        ]
+      }
+    },
+    {
+      "id": "complex_cache_failure",
+      "objective": "排查缓存失效问题并修改实现",
+      "complexity": "complex",
+      "parallel_tasks": [
+        {
+          "id": "research-cache-key",
+          "description": "调查缓存键生成规则。",
+          "estimated_seconds": 30,
+          "context_scope": ["cache-key-source"]
+        },
+        {
+          "id": "research-invalidation",
+          "description": "调查失效策略和调用点。",
+          "estimated_seconds": 25,
+          "context_scope": ["cache-invalidation-source"]
+        },
+        {
+          "id": "research-cache-tests",
+          "description": "调查缓存相关测试和失败证据。",
+          "estimated_seconds": 20,
+          "context_scope": ["cache-tests"]
+        }
+      ],
+      "serial_path": ["manager-aggregate", "coder-change", "tester-verify"],
+      "serial_duration_seconds": 70,
+      "coordination_overhead_seconds": 18,
+      "context_domains": ["cache-key", "invalidation", "test-suite"],
+      "specialist_tools": ["search_text", "read_file", "run_tests"],
+      "requires_write": true,
+      "requires_verification": true,
+      "risk_level": "medium",
+      "shared_write_targets": ["cache-module"],
+      "constraints": ["先确认缓存键和失效策略"],
+      "expected": {
+        "mode": "multi-agent",
+        "reasons": [
+          "parallelization",
+          "context_isolation",
+          "specialization",
+          "permission_isolation",
+          "independent_verification"
+        ]
+      }
+    },
+    {
+      "id": "complex_order_state",
+      "objective": "定位订单状态错乱的根因并修复",
+      "complexity": "complex",
+      "parallel_tasks": [
+        {
+          "id": "research-state-enum",
+          "description": "调查状态枚举和合法转换。",
+          "estimated_seconds": 35,
+          "context_scope": ["order-state-model"]
+        },
+        {
+          "id": "research-state-handlers",
+          "description": "调查订单状态写入入口。",
+          "estimated_seconds": 30,
+          "context_scope": ["order-handlers"]
+        },
+        {
+          "id": "research-state-persistence",
+          "description": "调查状态持久化和读取路径。",
+          "estimated_seconds": 25,
+          "context_scope": ["order-storage"]
+        }
+      ],
+      "serial_path": ["manager-aggregate", "coder-change", "tester-verify"],
+      "serial_duration_seconds": 90,
+      "coordination_overhead_seconds": 20,
+      "context_domains": ["order-domain", "handlers", "persistence"],
+      "specialist_tools": ["search_text", "read_file", "run_tests"],
+      "requires_write": true,
+      "requires_verification": true,
+      "risk_level": "high",
+      "shared_write_targets": ["order-state-module"],
+      "constraints": ["保留订单状态枚举"],
+      "expected": {
+        "mode": "multi-agent",
+        "reasons": [
+          "parallelization",
+          "context_isolation",
+          "specialization",
+          "permission_isolation",
+          "independent_verification"
+        ]
+      }
+    },
+    {
+      "id": "complex_verification_failure",
+      "objective": "修改批量导入功能并运行一个预期失败的测试",
+      "complexity": "complex",
+      "parallel_tasks": [
+        {
+          "id": "inspect-import-flow",
+          "description": "按调用顺序调查批量导入流程。",
+          "estimated_seconds": 30,
+          "context_scope": ["batch-import-source"]
+        }
+      ],
+      "serial_path": ["coder-change", "tester-verify"],
+      "serial_duration_seconds": 80,
+      "coordination_overhead_seconds": 20,
+      "context_domains": ["batch-import"],
+      "specialist_tools": ["run_tests"],
+      "requires_write": true,
+      "requires_verification": true,
+      "risk_level": "medium",
+      "shared_write_targets": ["batch-import-module"],
+      "constraints": ["失败时不能标记任务已完成"],
+      "expected": {
+        "mode": "single-agent",
+        "reasons": [
+          "permission_isolation",
+          "independent_verification"
+        ]
+      }
+    },
+    {
+      "id": "complex_replan_root_cause",
+      "objective": "调查根因不在原计划文件并重新规划",
+      "complexity": "complex",
+      "parallel_tasks": [
+        {
+          "id": "research-original-scope",
+          "description": "复核原计划文件及其排除证据。",
+          "estimated_seconds": 30,
+          "context_scope": ["original-plan-files"]
+        },
+        {
+          "id": "research-callers",
+          "description": "调查跨模块调用方。",
+          "estimated_seconds": 35,
+          "context_scope": ["callers"]
+        },
+        {
+          "id": "research-config-entry",
+          "description": "调查可能改变行为的配置入口。",
+          "estimated_seconds": 25,
+          "context_scope": ["configuration"]
+        }
+      ],
+      "serial_path": [
+        "manager-aggregate",
+        "replan",
+        "coder-change",
+        "tester-verify"
+      ],
+      "serial_duration_seconds": 100,
+      "coordination_overhead_seconds": 22,
+      "context_domains": ["original-plan", "call-chain", "configuration"],
+      "specialist_tools": ["search_text", "read_file", "run_tests"],
+      "requires_write": true,
+      "requires_verification": true,
+      "risk_level": "medium",
+      "shared_write_targets": ["replanned-target"],
+      "constraints": ["保留已完成步骤的 evidence"],
+      "expected": {
+        "mode": "multi-agent",
+        "reasons": [
+          "parallelization",
+          "context_isolation",
+          "specialization",
+          "permission_isolation",
+          "independent_verification"
+        ]
+      }
+    }
+  ]
+}

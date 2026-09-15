@@ -6,6 +6,11 @@ import os
 from pathlib import Path
 
 from .contracts import TaskCase, TaskSpec
+from .multi_agent import (
+    SplitDecisionValidationError,
+    evaluate_split_decisions,
+    load_decision_suite,
+)
 from .planning import (
     DeterministicPlanner,
     LangChainPlanner,
@@ -46,9 +51,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=("reactive", "planning", "compare"),
+        choices=("reactive", "planning", "compare", "split-decision"),
         default="reactive",
-        help="选择 Reactive、structured planning 或策略对照。",
+        help="选择 Reactive、structured planning、策略对照或拆分决策。",
     )
     parser.add_argument(
         "--constraint",
@@ -228,7 +233,22 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    if args.mode == "compare":
+    if args.mode == "split-decision":
+        if args.case_file is None:
+            parser.error("split-decision 模式必须提供 --case-file。")
+        if args.constraint or args.tool:
+            parser.error("split-decision 的约束、工具和预算必须写在 JSON 中。")
+        try:
+            suite = load_decision_suite(args.case_file)
+            result = evaluate_split_decisions(suite)
+        except SplitDecisionValidationError as exc:
+            parser.error(str(exc))
+        exit_code = (
+            0
+            if result.expectation_match_count == len(result.results)
+            else 1
+        )
+    elif args.mode == "compare":
         if args.case_file is None:
             parser.error("compare 模式必须提供 --case-file。")
         if args.constraint or args.tool:

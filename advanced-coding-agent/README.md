@@ -58,3 +58,14 @@ uv run advanced-coding-agent \
 `multi_agent/collaboration.py` 在 Session 1 的边界上增加固定角色 Prompt、工具白名单、超时和调用预算，并由 `Manager.create_plan()` 生成 `Researcher → Coder → Tester` 的结构化任务链。`CollaborationTrace` 记录 assignment、result 和 Manager decision；它不会启动模型或工具。
 
 Worker 结果统一使用 `WorkerResult`，Manager 通过 `Manager.evaluate_result()` 返回 `accept`、`retry`、`reassign` 或 `pause`，没有 evidence 的成功结果不会被接受。动态路由、并行执行和冲突聚合留给后续 Session。
+
+## W18 Session 3：Agent Routing
+
+`multi_agent/routing.py` 将“谁来做”从 Manager 的隐式判断变成可观测契约：
+
+- `DeterministicRouter` 先按明确的 `search → Researcher`、`edit → Coder`、`verify → Tester` 规则路由。
+- `StructuredRouter` 只接收结构化的 `worker_role`、`reason`、`confidence` 和 `fallback`，非法或低置信度结果会降级到 Manager review。
+- `TaskRouter` 在确定性规则未命中且没有安全结构化结果时，返回 `manager_review`，不会把未知任务直接交给任意 Worker。
+- `RoutingTrace` 保留每次路由的方式、理由、置信度、fallback 和失败原因；`Manager.recover_route()` 负责 review、blocked 或明确改派。
+
+本 Session 只负责角色选择与失败恢复，不启动 Worker、不执行并行，也不改变 Session 2 的依赖链。

@@ -19,6 +19,7 @@ from .decision import (
     WorkerRole,
     default_worker_boundaries,
 )
+from .routing import RouteDecision, RouteRecovery
 
 WorkerStatus = Literal[
     "assigned",
@@ -66,7 +67,8 @@ class RoleSpec:
         if self.timeout_seconds <= 0 or self.max_tool_calls <= 0:
             raise SplitDecisionValidationError(f"{self.role} budget 必须大于 0。")
         if self.boundary.role != self.role:
-            raise SplitDecisionValidationError("RoleSpec 与 WorkerBoundary 角色不一致。")
+            raise SplitDecisionValidationError(
+                "RoleSpec 与 WorkerBoundary 角色不一致。")
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -124,7 +126,8 @@ class WorkerAssignment:
                 "WorkerAssignment.role 只能是 researcher、coder 或 tester。"
             )
         if self.role_spec.role != self.role:
-            raise SplitDecisionValidationError("assignment role 与 role_spec 不一致。")
+            raise SplitDecisionValidationError(
+                "assignment role 与 role_spec 不一致。")
         if self.status not in _WORKER_STATUSES:
             raise SplitDecisionValidationError("assignment status 不合法。")
         _text(self.assignment_id, "assignment.assignment_id")
@@ -175,7 +178,8 @@ class WorkerResult:
         _texts(self.tool_call_ids, "result.tool_call_ids")
         _texts(self.changed_files, "result.changed_files")
         if self.status == "failed" and not self.failure_reason:
-            raise SplitDecisionValidationError("failed result 必须包含 failure_reason。")
+            raise SplitDecisionValidationError(
+                "failed result 必须包含 failure_reason。")
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -382,7 +386,8 @@ class Manager:
                     role="researcher",
                     objective=f"研究并定位：{objective}",
                     constraints=constraints,
-                    input_context=("goal", "constraints", "bounded_search_scope"),
+                    input_context=("goal", "constraints",
+                                   "bounded_search_scope"),
                     dependencies=(),
                 )
             )
@@ -395,7 +400,8 @@ class Manager:
                     role="coder",
                     objective=f"根据已接受 evidence 修改：{objective}",
                     constraints=constraints,
-                    input_context=("goal", "constraints", "accepted_research_evidence"),
+                    input_context=("goal", "constraints",
+                                   "accepted_research_evidence"),
                     dependencies=(researcher_id,) if researcher_id else (),
                 )
             )
@@ -407,7 +413,8 @@ class Manager:
                     role="tester",
                     objective=f"验证任务是否满足成功标准：{objective}",
                     constraints=constraints,
-                    input_context=("success_criteria", "changed_files", "diff"),
+                    input_context=("success_criteria",
+                                   "changed_files", "diff"),
                     dependencies=(coder_id,) if coder_id else (),
                 )
             )
@@ -466,6 +473,45 @@ class Manager:
             action="pause",
             reason="结果被阻塞、需要 review，或已耗尽安全处理路径。",
             retry_count=retry_count,
+        )
+
+    def recover_route(
+        self,
+        decision: RouteDecision,
+        *,
+        reassign_to: WorkerRole | None = None,
+    ) -> RouteRecovery:
+        """Handle an unsafe or unknown route without choosing a Worker blindly."""
+
+        if decision.status == "routed":
+            raise SplitDecisionValidationError(
+                "只有 needs_review 或 blocked route 才需要 Manager recovery。"
+            )
+        if reassign_to is not None:
+            if reassign_to not in _WORKER_ROLES:
+                raise SplitDecisionValidationError(
+                    "route recovery 的 reassign_to 必须是 Worker 角色。"
+                )
+            if reassign_to not in self._role_specs:
+                raise SplitDecisionValidationError(
+                    f"缺少 {reassign_to} RoleSpec，不能改派。"
+                )
+            return RouteRecovery(
+                task_id=decision.task_id,
+                action="reassign",
+                reason="Manager 根据路由失败原因选择了明确的替代 Worker。",
+                next_role=reassign_to,
+            )
+        if decision.status == "blocked" or decision.fallback == "blocked":
+            return RouteRecovery(
+                task_id=decision.task_id,
+                action="blocked",
+                reason="路由失败且 fallback 禁止继续自动执行。",
+            )
+        return RouteRecovery(
+            task_id=decision.task_id,
+            action="manager_review",
+            reason="路由失败，等待 Manager 补充上下文或人工确认。",
         )
 
     def build_trace(self, plan: CollaborationPlan) -> CollaborationTrace:

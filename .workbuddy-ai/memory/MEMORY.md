@@ -8,3 +8,4 @@
 - 2026-09-15 用户确认：当前仓库新增独立 Python 模块，先支持 A 股和港股，核心使用 LangGraph + LangChain，联网优先模型原生 WebSearch。
 - 当前阶段仅技术选型文档，不实现代码；本轮范围仅 AI 分析内核，排除前端和 Web 服务建设。
 - 三种目标模式：标准公司研究、四角色并行团队研究、管理层纵深研究；方法参考 xbtlin/ai-berkshire。
+- 2026-09-15 文档拆分为两条交付线：公共 Agent Runtime 技术规范与公司研究业务接入设计。当前决策：DeepSeek 原生 WebSearch 基线、先 standard_p0、官方原文+独立复核；预算 hard/soft 尚未确定。

@@ -77,6 +77,20 @@ from .decision import (
     evaluate_split_decisions,
     load_decision_suite,
 )
+from .eval import (
+    AdoptionPolicy,
+    EvalMode,
+    EvalObservation,
+    MultiAgentComparison,
+    MultiAgentEvalError,
+    baseline_fingerprint,
+    case_fingerprint,
+    compare_multi_agent,
+    load_eval_observations,
+    load_eval_suite,
+    observation_from_long_horizon,
+    observation_from_worker_report,
+)
 from .routing import (
     DeterministicRouter,
     RouteDecision,
@@ -96,6 +110,18 @@ from .routing import (
 )
 
 __all__ = [
+    "AdoptionPolicy",
+    "EvalMode",
+    "EvalObservation",
+    "MultiAgentComparison",
+    "MultiAgentEvalError",
+    "baseline_fingerprint",
+    "case_fingerprint",
+    "compare_multi_agent",
+    "load_eval_observations",
+    "load_eval_suite",
+    "observation_from_long_horizon",
+    "observation_from_worker_report",
     "AggregationError",
     "AggregationReport",
     "ClaimVerification",

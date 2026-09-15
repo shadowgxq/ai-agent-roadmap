@@ -7,9 +7,13 @@ from pathlib import Path
 
 from .contracts import TaskCase, TaskSpec
 from .multi_agent import (
+    MultiAgentEvalError,
     SplitDecisionValidationError,
+    compare_multi_agent,
     evaluate_split_decisions,
     load_decision_suite,
+    load_eval_observations,
+    load_eval_suite,
 )
 from .planning import (
     DeterministicPlanner,
@@ -51,9 +55,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=("reactive", "planning", "compare", "split-decision"),
+        choices=("reactive", "planning", "compare", "split-decision", "multi-agent-eval"),
         default="reactive",
-        help="选择 Reactive、structured planning、策略对照或拆分决策。",
+        help="选择运行模式；multi-agent-eval 仅汇总现有观测，不执行 Agent。",
+    )
+    parser.add_argument(
+        "--observations-file",
+        type=Path,
+        help="multi-agent-eval 的 EvalObservation JSON 数组；不提供则显示数据缺口。",
+    )
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=1,
+        help="multi-agent-eval 每个冻结任务所需的配对重复次数。",
     )
     parser.add_argument(
         "--constraint",
@@ -227,13 +242,28 @@ def _run_langgraph_planning(
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.mode != "multi-agent-eval" and (args.observations_file is not None or args.repetitions != 1):
+        parser.error("--observations-file/--repetitions 仅用于 multi-agent-eval。")
+    if args.mode == "multi-agent-eval" and args.case_file is None:
+        parser.error("multi-agent-eval 必须提供冻结任务集 --case-file。")
     if args.objective is not None and args.case_file is not None:
         parser.error("objective 与 --case-file 不能同时使用。")
     if args.objective is None and args.case_file is None:
         parser.print_help()
         return 0
 
-    if args.mode == "split-decision":
+    if args.mode == "multi-agent-eval":
+        if args.constraint or args.tool or args.planner_backend:
+            parser.error("multi-agent-eval 只读取冻结基线和已记录的配对观测。")
+        try:
+            suite = load_eval_suite(args.case_file)
+            observations = load_eval_observations(args.observations_file) if args.observations_file else ()
+            result = compare_multi_agent(suite, observations, repetitions=args.repetitions)
+        except (MultiAgentEvalError, SplitDecisionValidationError) as exc:
+            parser.error(str(exc))
+        # Missing data is not a passing eval and does not fabricate any metrics.
+        exit_code = 0 if result.status == "ready" else 1
+    elif args.mode == "split-decision":
         if args.case_file is None:
             parser.error("split-decision 模式必须提供 --case-file。")
         if args.constraint or args.tool:

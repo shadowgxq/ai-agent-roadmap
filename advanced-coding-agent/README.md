@@ -57,7 +57,7 @@ uv run advanced-coding-agent \
 
 `multi_agent/collaboration.py` 在 Session 1 的边界上增加固定角色 Prompt、工具白名单、超时和调用预算，并由 `Manager.create_plan()` 生成 `Researcher → Coder → Tester` 的结构化任务链。`CollaborationTrace` 记录 assignment、result 和 Manager decision；它不会启动模型或工具。
 
-Worker 结果统一使用 `WorkerResult`，Manager 通过 `Manager.evaluate_result()` 返回 `accept`、`retry`、`reassign` 或 `pause`，没有 evidence 的成功结果不会被接受。动态路由、并行执行和冲突聚合留给后续 Session。
+Worker 结果统一使用 `WorkerResult`，Manager 通过 `Manager.evaluate_result()` 返回 `accept`、`retry`、`reassign` 或 `pause`，没有 evidence 的成功结果不会被接受。计划向 Worker 传递实际目标和验收条件；依赖结果由执行器传递。改派仅支持同角色替代 Worker。
 
 ## W18 Session 3：Agent Routing
 
@@ -69,3 +69,41 @@ Worker 结果统一使用 `WorkerResult`，Manager 通过 `Manager.evaluate_resu
 - `RoutingTrace` 保留每次路由的方式、理由、置信度、fallback 和失败原因；`Manager.recover_route()` 负责 review、blocked 或明确改派。
 
 本 Session 只负责角色选择与失败恢复，不启动 Worker、不执行并行，也不改变 Session 2 的依赖链。
+
+路由同时检查修改与独立验证需求；复合任务须先拆分。未知任务未经明确修改声明不能分配给 Coder。`recover_route(..., reassign_to=..., clarified_request=...)` 要求补充同一任务的明确类型；blocked 决策不能直接改派绕过。10 个路由输入和预期结果位于 `evals/cases/w18_session_03.json`，样例本身不代表运行通过。
+
+## W18 Session 4：依赖图与受限并发
+
+`dependency.py` 校验 DAG 并计算 ready 节点、并行安全性和估算关键路径。`execution.py` 并行调度独立的只读 Researcher，Coder/Tester 独占执行，限制 attempt 与工具预算，按 task/attempt 去重。Worker 必须通过 `WorkerContext.call_tool()` 使用宿主注册的工具。超时撤销后续调用权限；未停止线程仍占用槽位，未知写副作用会隔离工作区。该机制依赖合作式宿主适配器，不提供进程级沙箱。
+
+## W18 Session 5：证据仲裁
+
+`aggregation.py` 将 claim 与当前 attempt/evidence、独立 Tester 验证绑定。竞争结论无法排除时返回调查请求或 review；`build_cache_database_conflict()` 提供缓存/数据库冲突样例。Coder 必须配置 `before_write`，可由当前依赖结果生成聚合报告，再调用 `report.write_decision(assignment, dependencies)`；未提供审查或审查未通过时阻塞写入。
+
+## W18 Session 6：配对评估
+
+`eval.py` 复用 Session 1 的冻结任务，对配对观测比较成功率、成本、端到端耗时、工具调用、上下文和失败率，并返回采用建议。`--mode multi-agent-eval --case-file evals/cases/w18_session_01.json` 只汇总观测；缺少观测或计量时返回 `needs_data`，不会启动 Agent。缺失副作用审计或计量不完整的运行不计为已确认成功。
+
+## 当前交付边界
+
+`multi_agent/workflow.py` 已提供统一非验证流程：W17 Goal → 模型拆分 → 确定性拆分决策 → 路由 → 受控工具/Worker → 证据仲裁 → 有限追加调查 → 授权修改 → 结构化结果。`adapters.py` 复用现有 `AGENT_*` 模型客户端，提供文件读取、搜索、精确替换和宿主生成的证据引用。未选择拆分时使用一个模型 Worker 的工具循环；这不是 W17/W18 配对评估基线运行。
+
+研究阶段只有全部分支声明独立且拆分决策通过时才并发；写入等待仲裁通过。追加调查传递上一轮冲突与证据，再重新仲裁，预算耗尽或分歧未解决时暂停写入。跨阶段共享模型调用、工具调用和 attempt 总预算。
+
+```bash
+# 只读分析；需预先配置 AGENT_MODEL / AGENT_API_KEY / AGENT_BASE_URL
+uv run advanced-coding-agent "分析接口慢的原因" --mode multi-agent --workdir .
+
+# 允许修改明确文件；测试与验收仍不执行
+uv run advanced-coding-agent "修复配置读取" --mode multi-agent --workdir . \
+  --write-path src/config.py --criterion "配置兼容原有格式"
+
+# 读取已有 W17 Goal JSON
+uv run advanced-coding-agent --mode multi-agent --goal-file goal.json --workdir .
+```
+
+`--write-path` 是精确文件白名单；未提供则只读。工具拒绝越界、符号链接及 `.git`/`.env` 等敏感路径，不提供任意 shell。已有文件须先读取，再以唯一原文片段替换；宿主路径保护适用于合作式本地运行，不是操作系统沙箱。
+
+输出包括 Goal、拆分理由、路由、角色输入/输出、各阶段执行记录、调查仲裁、变更文件及证据。非验证流程完成返回 `pending_verification`，退出码 0 仅代表该流程完成；`verification.verified_success` 保持 false。冲突、预算耗尽或未知副作用返回 blocked/needs_review，且不会自动重放写入。
+
+测试、最终 verifier 和 Session 6 批量配对评估不属于此非验证入口，不自动启动。仓库中的 10 个 Session 1 case 是冻结的任务描述与拆分预期，不等于 10 次真实 coding 对照运行。路由正确率、并行实际提速、超时恢复以及 single/multi-agent 的完整实测对照仍待执行验收，不能仅根据模块存在或理论耗时认定 W18 完成。

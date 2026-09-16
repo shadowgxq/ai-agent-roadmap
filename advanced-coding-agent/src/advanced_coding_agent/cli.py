@@ -55,9 +55,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=("reactive", "planning", "compare", "split-decision", "multi-agent-eval"),
+        choices=("reactive", "planning", "compare", "split-decision", "multi-agent", "multi-agent-eval"),
         default="reactive",
         help="选择运行模式；multi-agent-eval 仅汇总现有观测，不执行 Agent。",
+    )
+    parser.add_argument(
+        "--goal-file", type=Path,
+        help="multi-agent 的 W17 Goal JSON；与 objective/--case-file 互斥。",
+    )
+    parser.add_argument(
+        "--write-path", action="append", default=[],
+        help="multi-agent 可修改的仓库相对文件路径，可重复；省略则只读。",
+    )
+    parser.add_argument(
+        "--criterion", action="append", default=[],
+        help="multi-agent 的人工验收条件，可重复；本轮不运行验证。",
     )
     parser.add_argument(
         "--observations-file",
@@ -242,17 +254,44 @@ def _run_langgraph_planning(
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.mode != "multi-agent" and (args.goal_file or args.write_path or args.criterion):
+        parser.error("--goal-file/--write-path/--criterion 仅用于 multi-agent。")
+    if args.goal_file is not None and (args.objective is not None or args.case_file is not None):
+        parser.error("--goal-file 与 objective/--case-file 互斥。")
     if args.mode != "multi-agent-eval" and (args.observations_file is not None or args.repetitions != 1):
         parser.error("--observations-file/--repetitions 仅用于 multi-agent-eval。")
     if args.mode == "multi-agent-eval" and args.case_file is None:
         parser.error("multi-agent-eval 必须提供冻结任务集 --case-file。")
     if args.objective is not None and args.case_file is not None:
         parser.error("objective 与 --case-file 不能同时使用。")
-    if args.objective is None and args.case_file is None:
+    if args.objective is None and args.case_file is None and args.goal_file is None:
         parser.print_help()
         return 0
 
-    if args.mode == "multi-agent-eval":
+    if args.mode == "multi-agent":
+        if args.case_file or args.tool or args.planner_backend:
+            parser.error("multi-agent 使用 objective 或 --goal-file；工具由角色与路径授权固定。")
+        if args.goal_file and (args.constraint or args.criterion):
+            parser.error("使用 --goal-file 时约束与验收条件须写入该 Goal。")
+        from .long_horizon.goal import Goal, SuccessCriterion
+        from .multi_agent.workflow import run_multi_agent
+
+        try:
+            goal = (Goal.from_dict(json.loads(args.goal_file.read_text(encoding="utf-8")))
+                    if args.goal_file else Goal.create(
+                        objective=args.objective, constraints=tuple(args.constraint),
+                        success_criteria=tuple(SuccessCriterion(
+                            f"criterion-{index}", "manual", description,
+                        ) for index, description in enumerate(args.criterion)),
+                    ))
+            result = run_multi_agent(goal, OpenAICompatibleChatModel.from_env(),
+                                     args.workdir, write_paths=tuple(args.write_path))
+        except (OSError, ValueError, PlannerModelError) as exc:
+            parser.error(str(exc))
+        # Zero means the requested non-verification workflow finished, not that
+        # tests or independent acceptance passed. JSON retains that distinction.
+        exit_code = 0 if result["status"] == "pending_verification" else 1
+    elif args.mode == "multi-agent-eval":
         if args.constraint or args.tool or args.planner_backend:
             parser.error("multi-agent-eval 只读取冻结基线和已记录的配对观测。")
         try:

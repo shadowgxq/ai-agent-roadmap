@@ -519,6 +519,7 @@ class ParallelWorkerExecutor:
     def execute(
         self, plan_or_graph: CollaborationPlan | DependencyGraph | Iterable[WorkerAssignment],
         runner: WorkerRunner, *, reassign_to: ReassignSelector | None = None,
+        initial_results: Iterable[WorkerResult] = (),
     ) -> WorkerExecutionReport:
         self._enter_control()
         try:
@@ -530,7 +531,7 @@ class ParallelWorkerExecutor:
             graph = (plan_or_graph if isinstance(plan_or_graph, DependencyGraph)
                      else DependencyGraph(plan_or_graph))
             self._validate_tools(graph)
-            return self._execute(graph, runner, reassign_to)
+            return self._execute(graph, runner, reassign_to, tuple(initial_results))
         finally:
             # Covers unexpected controller errors as well as normal timeout exits.
             for future, live in self._live.items():
@@ -559,6 +560,7 @@ class ParallelWorkerExecutor:
 
     def _execute(
         self, graph: DependencyGraph, runner: WorkerRunner, selector: ReassignSelector | None,
+        initial_results: tuple[WorkerResult, ...] = (),
     ) -> WorkerExecutionReport:
         started = time.monotonic()
         run_id = uuid4().hex
@@ -575,6 +577,20 @@ class ParallelWorkerExecutor:
                    for item in graph.assignments}
         submitted = 0
         self._peak_concurrency = 0
+
+        # Host-owned accepted results from the research phase; never rerun an
+        # already accepted node merely to attach the downstream write stage.
+        for result in initial_results:
+            assignment = graph.get(result.assignment_id)
+            if (result.task_id != assignment.task_id or result.role != assignment.role
+                    or assignment.role != "researcher"
+                    or self.manager.evaluate_result(result).action != "accept"):
+                raise ExecutionError("initial_results 必须是本图中已接受的只读研究结果。")
+            aggregator.add(result)
+            completed.add(assignment.assignment_id)
+            pending.discard(assignment.assignment_id)
+        if any(not set(graph.dependencies(key)) <= completed for key in completed):
+            raise ExecutionError("initial_results 缺少已接受的依赖。")
 
         while pending or running:
             self._reap_abandoned()
@@ -602,8 +618,10 @@ class ParallelWorkerExecutor:
                                 for key in assignment.dependencies}
                 if any(value is None or value.status != "succeeded" for value in dependencies.values()):
                     raise ExecutionError("已完成依赖缺少已接受结果。")
-                if assignment.role == "coder" and self._before_write is not None:
+                if assignment.role == "coder":
                     try:
+                        if self._before_write is None:
+                            raise ExecutionError("Coder 必须配置 before_write 证据审查。")
                         gate = self._before_write(assignment, MappingProxyType(dependencies))
                         refs = {ref for result in dependencies.values() for ref in result.evidence_refs}
                         if (not isinstance(gate, ManagerDecision)

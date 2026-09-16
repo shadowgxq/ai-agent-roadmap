@@ -21,7 +21,7 @@ from .decision import (
     WorkerRole,
     default_worker_boundaries,
 )
-from .routing import RouteDecision, RouteRecovery
+from .routing import DeterministicRouter, RouteDecision, RouteRecovery, RouteRequest
 
 WorkerStatus = Literal[
     "assigned",
@@ -477,6 +477,7 @@ class Manager:
                 "只有 multi-agent SplitDecision 才能创建 Manager/Worker plan。"
             )
         selected = {boundary.role for boundary in decision.worker_boundaries}
+        success_criteria = _texts(success_criteria, "success_criteria")
         assignments: list[WorkerAssignment] = []
         researcher_ids: list[str] = []
         coder_id: str | None = None
@@ -504,9 +505,8 @@ class Manager:
                         objective=research_objective,
                         constraints=constraints,
                         input_context=(
-                            "goal",
-                            "constraints",
-                            "bounded_search_scope",
+                            f"任务目标：{objective}",
+                            f"当前研究范围：{research_objective}",
                         ),
                         dependencies=(),
                     )
@@ -520,8 +520,8 @@ class Manager:
                     role="coder",
                     objective=f"根据已接受 evidence 修改：{objective}",
                     constraints=constraints,
-                    input_context=("goal", "constraints",
-                                   "accepted_research_evidence"),
+                    input_context=(f"任务目标：{objective}",
+                                   *(f"验收条件：{item}" for item in success_criteria)),
                     dependencies=tuple(researcher_ids),
                 )
             )
@@ -533,8 +533,8 @@ class Manager:
                     role="tester",
                     objective=f"验证任务是否满足成功标准：{objective}",
                     constraints=constraints,
-                    input_context=("success_criteria",
-                                   "changed_files", "diff"),
+                    input_context=(f"任务目标：{objective}",
+                                   *(f"验收条件：{item}" for item in success_criteria)),
                     dependencies=(coder_id,) if coder_id else tuple(researcher_ids),
                 )
             )
@@ -656,6 +656,7 @@ class Manager:
         decision: RouteDecision,
         *,
         reassign_to: WorkerRole | None = None,
+        clarified_request: RouteRequest | None = None,
     ) -> RouteRecovery:
         """Handle an unsafe or unknown route without choosing a Worker blindly."""
 
@@ -663,7 +664,22 @@ class Manager:
             raise SplitDecisionValidationError(
                 "只有 needs_review 或 blocked route 才需要 Manager recovery。"
             )
+        if decision.status == "blocked" or decision.fallback == "blocked":
+            return RouteRecovery(
+                task_id=decision.task_id,
+                action="blocked",
+                reason=f"路由禁止继续执行：{decision.failure_reason}",
+            )
         if reassign_to is not None:
+            clarified = (
+                DeterministicRouter().route(clarified_request)
+                if clarified_request is not None else None
+            )
+            if (clarified is None or clarified.task_id != decision.task_id
+                    or clarified.status != "routed" or clarified.worker_role != reassign_to):
+                raise SplitDecisionValidationError(
+                    "改派需要同一任务的明确类型与权限声明，且通过确定性路由。"
+                )
             if reassign_to not in _WORKER_ROLES:
                 raise SplitDecisionValidationError(
                     "route recovery 的 reassign_to 必须是 Worker 角色。"
@@ -678,16 +694,10 @@ class Manager:
                 reason="Manager 根据路由失败原因选择了明确的替代 Worker。",
                 next_role=reassign_to,
             )
-        if decision.status == "blocked" or decision.fallback == "blocked":
-            return RouteRecovery(
-                task_id=decision.task_id,
-                action="blocked",
-                reason="路由失败且 fallback 禁止继续自动执行。",
-            )
         return RouteRecovery(
             task_id=decision.task_id,
             action="manager_review",
-            reason="路由失败，等待 Manager 补充上下文或人工确认。",
+            reason=f"路由失败，等待 Manager 补充上下文或人工确认：{decision.failure_reason}",
         )
 
     def build_trace(self, plan: CollaborationPlan) -> CollaborationTrace:

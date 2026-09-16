@@ -1,0 +1,46 @@
+[
+  {
+    "request": {"task_id": "search-api", "objective": "查找 API 入口", "kind": "search"},
+    "expected_role": "researcher", "expected_status": "routed"
+  },
+  {
+    "request": {"task_id": "search-db", "objective": "检索数据库调用", "kind": "search"},
+    "expected_role": "researcher", "expected_status": "routed"
+  },
+  {
+    "request": {"task_id": "edit-config", "objective": "修改超时配置", "kind": "edit", "requires_write": true},
+    "expected_role": "coder", "expected_status": "routed"
+  },
+  {
+    "request": {"task_id": "verify-fix", "objective": "验证修复", "kind": "verify", "requires_verification": true},
+    "expected_role": "tester", "expected_status": "routed"
+  },
+  {
+    "request": {"task_id": "unknown", "objective": "处理这个问题"},
+    "expected_role": "manager_review", "expected_status": "needs_review"
+  },
+  {
+    "request": {"task_id": "mixed", "objective": "修改后独立验证", "kind": "edit", "requires_write": true, "requires_verification": true},
+    "expected_role": "manager_review", "expected_status": "needs_review"
+  },
+  {
+    "request": {"task_id": "structured-read", "objective": "定位缓存行为"},
+    "structured_result": {"worker_role": "researcher", "reason": "先收集只读证据", "confidence": 0.9},
+    "expected_role": "researcher", "expected_status": "routed"
+  },
+  {
+    "request": {"task_id": "low-confidence", "objective": "定位缓存行为"},
+    "structured_result": {"worker_role": "researcher", "reason": "目标不明确", "confidence": 0.3},
+    "expected_role": "manager_review", "expected_status": "needs_review"
+  },
+  {
+    "request": {"task_id": "unapproved-write", "objective": "分析问题"},
+    "structured_result": {"worker_role": "coder", "reason": "尝试修改", "confidence": 0.99},
+    "expected_role": "manager_review", "expected_status": "needs_review"
+  },
+  {
+    "request": {"task_id": "wrong-verifier", "objective": "验证接口", "requires_verification": true},
+    "structured_result": {"worker_role": "researcher", "reason": "查找接口", "confidence": 0.99},
+    "expected_role": "manager_review", "expected_status": "needs_review"
+  }
+]

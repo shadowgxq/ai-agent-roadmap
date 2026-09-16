@@ -185,7 +185,7 @@ class MultiAgentComparison:
         payload = asdict(self)
         payload["mode"] = "multi-agent-eval"
         payload["definitions"] = {
-            "success_rate": "独立验收成功数 / 配对运行数；越预算或重复副作用不计成功",
+            "success_rate": "计量完整且独立验收成功数 / 配对运行数；越预算、重复副作用或缺少副作用审计不计成功",
             "failure_rate": "1 - success_rate；包含 failed/blocked/review 和未通过验收",
             "latency": "端到端 wall-clock，不累加并行 Worker 耗时",
             "cost": "同币种全部角色、模型、工具与重试的总成本",
@@ -209,7 +209,8 @@ def _budget_issues(suite: DecisionSuite, item: EvalObservation) -> list[str]:
 
 def _success(suite: DecisionSuite, item: EvalObservation) -> bool:
     return (item.status == "succeeded" and item.verified_success
-            and item.duplicate_side_effects in (None, 0) and not _budget_issues(suite, item))
+            and item.accounting_complete and item.duplicate_side_effects == 0
+            and not _budget_issues(suite, item))
 
 
 def _metrics(suite: DecisionSuite, items: tuple[EvalObservation, ...]) -> dict[str, object]:

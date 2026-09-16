@@ -109,7 +109,11 @@ from .routing import (
     TaskRouter,
 )
 
+from .workflow import MultiAgentWorkflow, run_multi_agent
+
 __all__ = [
+    "MultiAgentWorkflow",
+    "run_multi_agent",
     "AdoptionPolicy",
     "EvalMode",
     "EvalObservation",

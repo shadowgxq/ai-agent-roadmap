@@ -142,8 +142,13 @@ class AggregationReport:
         """
         actual = {task_id: result.attempt_id for task_id, result in dependencies.items()}
         versions_match = bool(actual) and dict(self.source_attempts) == actual
+        sources_valid = all(
+            task_id == result.task_id and result.status == "succeeded"
+            and result.outcome_known and result.side_effect_status != "unknown"
+            for task_id, result in dependencies.items()
+        )
         evidence = {ref for result in dependencies.values() for ref in result.evidence_refs}
-        allowed = (assignment.role == "coder" and self.can_write and versions_match
+        allowed = (assignment.role == "coder" and self.can_write and versions_match and sources_valid
                    and bool(self.evidence_refs) and set(self.evidence_refs) <= evidence)
         return ManagerDecision(
             assignment.assignment_id, "accept" if allowed else "pause",

@@ -8,6 +8,7 @@ low-confidence routing results are sent to Manager recovery.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
@@ -51,6 +52,24 @@ def _optional_text(value: object, field_name: str) -> str | None:
     if value is None:
         return None
     return _text(value, field_name)
+
+
+def _confidence(value: object) -> None:
+    if (not isinstance(value, (int, float)) or isinstance(value, bool)
+            or not math.isfinite(value) or not 0 <= value <= 1):
+        raise SplitDecisionValidationError("confidence 必须是 [0, 1] 内的有限数字。")
+
+
+def _role_conflict(request: RouteRequest, role: RouteTarget) -> str | None:
+    if request.requires_write and request.requires_verification:
+        return "修改与独立验证需要拆成 Coder、Tester 两个依赖任务。"
+    if request.requires_write and role != "coder":
+        return "需要修改的任务必须交给 Coder。"
+    if request.requires_verification and role != "tester":
+        return "需要独立验证的任务必须交给 Tester。"
+    if role == "coder" and request.kind != "edit" and not request.requires_write:
+        return "未知任务未明确声明修改需求，不能由 Router 授予写权限。"
+    return None
 
 
 @dataclass(frozen=True)
@@ -106,10 +125,7 @@ class StructuredRouteResult:
                 "structured route.worker_role 不合法。"
             )
         _text(self.reason, "structured route.reason")
-        if not 0 <= self.confidence <= 1:
-            raise SplitDecisionValidationError(
-                "structured route.confidence 必须在 0 到 1 之间。"
-            )
+        _confidence(self.confidence)
         if self.fallback not in _ROUTE_FALLBACKS:
             raise SplitDecisionValidationError("structured route.fallback 不合法。")
 
@@ -122,12 +138,8 @@ class StructuredRouteResult:
                 "structured route result 必须是对象。"
             )
         worker_role = payload.get("worker_role", payload.get("target"))
-        try:
-            confidence = float(payload.get("confidence", -1))
-        except (TypeError, ValueError) as exc:
-            raise SplitDecisionValidationError(
-                "structured route.confidence 必须是数字。"
-            ) from exc
+        confidence = payload.get("confidence")
+        _confidence(confidence)
         return cls(
             worker_role=worker_role,  # type: ignore[arg-type]
             reason=payload.get("reason"),  # type: ignore[arg-type]
@@ -174,10 +186,7 @@ class RouteDecision:
         if self.status not in _ROUTE_STATUSES:
             raise SplitDecisionValidationError("route_decision.status 不合法。")
         _text(self.reason, "route_decision.reason")
-        if not 0 <= self.confidence <= 1:
-            raise SplitDecisionValidationError(
-                "route_decision.confidence 必须在 0 到 1 之间。"
-            )
+        _confidence(self.confidence)
         if self.fallback not in _ROUTE_FALLBACKS:
             raise SplitDecisionValidationError("route_decision.fallback 不合法。")
         if self.worker_role == "manager_review" and self.status == "routed":
@@ -312,11 +321,7 @@ class DeterministicRouter:
 
     @staticmethod
     def _conflict(request: RouteRequest) -> str | None:
-        if request.kind == "search" and request.requires_write:
-            return "搜索任务声明需要写权限，无法安全路由给只读 Researcher。"
-        if request.kind == "verify" and request.requires_write:
-            return "验证任务声明需要写权限，无法安全路由给只读 Tester。"
-        return None
+        return _role_conflict(request, DeterministicRouter._RULES[request.kind])
 
 
 StructuredResolver = Callable[
@@ -335,10 +340,7 @@ class StructuredRouter:
     ) -> None:
         if not callable(resolver):
             raise SplitDecisionValidationError("structured resolver 必须可调用。")
-        if not 0 <= min_confidence <= 1:
-            raise SplitDecisionValidationError(
-                "min_confidence 必须在 0 到 1 之间。"
-            )
+        _confidence(min_confidence)
         self._resolver = resolver
         self.min_confidence = min_confidence
 
@@ -354,7 +356,7 @@ class StructuredRouter:
             return self._failure(
                 request,
                 reason="Structured Router 输出无效，交由 Manager recovery。",
-                failure_reason=str(exc),
+                failure_reason=f"{type(exc).__name__}: {exc}",
                 fallback="manager_review",
             )
 
@@ -365,6 +367,12 @@ class StructuredRouter:
                 failure_reason="Structured Router 明确要求 Manager review。",
                 fallback=result.fallback,
                 confidence=result.confidence,
+            )
+        conflict = _role_conflict(request, result.worker_role)
+        if conflict is not None:
+            return self._failure(
+                request, reason=result.reason, failure_reason=conflict,
+                fallback="ask_clarification", confidence=result.confidence,
             )
         if result.confidence < self.min_confidence:
             return self._failure(

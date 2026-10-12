@@ -1,4 +1,4 @@
-# AI Agent 工程师企业级强化路线（W13–W23）
+# AI Agent 工程师企业级强化路线（W13–W21）
 
 > 从“能手写 Agent 并做出产品”进阶到“能设计、评估并交付长任务与多 Agent 企业系统”。
 > 适用于完成 W1–W12 后，以国内互联网 / AI 创业公司的 **Agent 全栈应用工程师**为目标，每周投入 10–15 小时，边学边投。
@@ -14,12 +14,12 @@ W1–W12 已经建立四类底层能力：
 - 用 FastAPI + SSE 暴露 Agent 运行过程。
 - 用现有 `frontend/` 的 Vite + React + TypeScript 页面展示 Agent 事件流。
 
-W13–W23 不再重复这些原理，只补框架、高级 Agent 能力和企业落地缺口：
+W13–W21 不再重复这些原理，只补框架、高级 Agent 能力和企业落地缺口：
 
 1. 用 LangChain / LangGraph 表达团队可维护的状态流。
 2. 在持久化基础上掌握 Planning、Long-horizon 和 Multi-Agent。
-3. 用 PostgreSQL、Redis、Celery 承载持久任务、失败恢复与并发。
-4. 做可评估的企业 RAG，而不是只做“能问答”的 demo。
+3. 做可评估的企业 RAG，而不是只做“能问答”的 demo。
+4. 用 PostgreSQL、Redis、Celery 承载持久任务、失败恢复与并发。
 5. 补齐鉴权、多租户、人工审批、工具权限与审计。
 6. 用同一个 React 工程完成企业工作台，不引入 Next.js。
 
@@ -32,11 +32,12 @@ W13–W23 不再重复这些原理，只补框架、高级 Agent 能力和企业
 | L3 业务编排层 | 如何设计可控的企业 Agent 流程 | 状态、分支、子图和事件都可追踪 | W14 |
 | L4 长任务层 | 怎么暂停、审批、恢复且不重复产生副作用 | 服务重启后可恢复，工具写入幂等 | W15 |
 | L5 高级 Agent 层 | 怎么规划长任务并让多个 Agent 协作 | Plan、进度、恢复、路由和冲突均可评估 | W16–W18 |
-| L6 数据与服务层 | 怎么检索、持久化、异步执行与并发 | RAG 和任务系统都有客观验收 | W19–W20 |
-| L7 企业边界层 | 怎么限制用户、租户、数据与工具权限 | 越权、注入和未审批副作用均被拦截 | W21 |
-| L8 交付层 | 怎么让用户真正完成业务闭环 | React 工作台、eval、观测和部署完整 | W22–W23 |
+| L6 企业检索层 | 如何建设可信的企业知识库 | 混合检索、引用与独立检索评估达标 | W19 |
+| L7 应用工程层 | 如何把 Agent 集成为可靠业务系统 | 后端任务、权限安全、React 工作台端到端验收 | W20 |
+| L8 评估交付层 | 如何证明 Agent 可靠且可交付 | E2E Eval、观测、故障回归和部署可复现 | W21 |
 
-**升级规则**：当周 P0 验收未通过，不得因为“时间到了”进入下一周。学习周数可以顺延，学习深度不能跳级。
+**升级规则**：P0 验收未通过不进入下一阶段；阶段编号不等于必须一周完成。W20 是跨后端、安全和前端的综合实战，W21 集中学习 Agent Eval 并交付。
+**学习分工**：W13–W19 重点掌握 Agent 原理和 RAG；W20 用 Codex 实现通用工程代码，自己重点理解运行状态、工具授权和恢复机制；W21 重点理解评估、失败归因与质量取舍。
 
 ## 3. 框架学习权重
 
@@ -54,11 +55,11 @@ W13–W23 不再重复这些原理，只补框架、高级 Agent 能力和企业
 
 ```text
 agent-mini/                 # W1–W12 手写 Agent，保留为原理作品
-support-agent/              # W13–W23 新增的 LangGraph 企业后端
+support-agent/              # W13–W21 的 LangGraph 企业后端
 advanced-coding-agent/      # W16–W18 的 Planning/Long-horizon/Multi-Agent 实验
 frontend/                   # 继续使用现有 Vite + React + TypeScript
   src/pages/agent/          # 原 coding agent 演示，保留
-  src/pages/support/        # W22 新增的工单工作台
+  src/pages/support/        # W20 工单工作台
 ```
 
 - 不把 `agent-mini` 重构成 LangGraph；两个项目分别证明“懂原理”和“能企业交付”。
@@ -162,7 +163,7 @@ W18  v3  Multi-Agent：Manager + Researcher/Coder/Tester
 - 每一版都保留上一版 single-agent baseline，使用相同任务比较成功率、成本、延迟、工具调用、context token 和失败率。
 - Multi-Agent 只有在职责隔离、并行收益或权限边界有明确证据时才保留，不以 Agent 数量作为完成标准。
 
-## 5. W13–W23 路线总览
+## 5. W13–W21 路线总览
 
 | 周 | 学习深度 | 主要产出 | 细化文档 |
 |---|---|---|---|
@@ -173,14 +174,14 @@ W18  v3  Multi-Agent：Manager + Researcher/Coder/Tester
 | W17 | Long-horizon Agent | Goal、进度、上下文压缩、失败恢复和长任务 eval | [W17](weeks/W17.md) |
 | W18 | Multi-Agent System | Manager/Worker、路由、依赖并行、冲突聚合和对照评估 | [W18](weeks/W18.md) |
 | W19 | 企业 RAG | 文档入库、pgvector + FTS 混合检索、引用和检索 eval | [W19](weeks/W19.md) |
-| W20 | 生产后端 | SQLAlchemy/Alembic、Redis + Celery、幂等、取消、重试和并发 | [W20](weeks/W20.md) |
-| W21 | 企业边界 | 鉴权、RBAC、多租户、MCP 工具权限、PII 与审计 | [W21](weeks/W21.md) |
-| W22 | 产品交付 | 在现有 React 中完成工单、引用、审批、恢复和历史 | [W22](weeks/W22.md) |
-| W23 | 质量与求职 | 30 个 E2E eval、Langfuse、并发检查、部署、README 与面试口述 | [W23](weeks/W23.md) |
+| W20 | Agent 应用工程化 | 后端长任务 + 权限与工具安全 + React 工单闭环；按纵向业务切片验收 | [W20](weeks/W20.md) |
+| W21 | Agent 评估与交付 | 30 个 E2E Eval、Langfuse、故障回归、部署和项目证据包 | [W21](weeks/W21.md) |
 
-## 6. 每周固定节奏
+## 6. 学习节奏与工程分工
 
-每周 10–15 小时按下列比例使用：
+W13–W19 沿用每周 10–15 小时的学习节奏；W20 建议累计 20–30 小时、W21 约 12–18 小时，均按验收结果推进，不为缩短编号牺牲功能或测试。
+
+常规学习周的时间分配：
 
 - 7–9h：主线项目 P0 任务。
 - 2h：官方文档与原理对照。
@@ -190,11 +191,11 @@ W18  v3  Multi-Agent：Manager + Researcher/Coder/Tester
 方法规则：
 
 1. **先契约，后代码**：先定 state、API、event 和错误边界。
-2. **一周只增加一种主复杂度**：W14 不同时加数据库，W16–W18 只推进一种高级 Agent 复杂度，W19 不同时加权限。
+2. **按复杂度推进**：W14 不同时加数据库，W16–W18 逐步增加高级 Agent 复杂度，W19 专注 RAG；W20 沿完整工单业务链纵向集成，不再按后端、安全、前端分别开课。
 3. **官方文档优先**：框架 API 只从当前官方文档学，不用过期 LangChain 教程。
 4. **评估驱动**：检索、prompt、router 和工具策略的优化必须有数据。
 5. **失败才是学习单元**：每周至少选一个失败 trace，形成“现象 → 原因 → 改动 → 数据”。
-6. **P1 不得阻塞 P0**：模型多供应商、OCR、reranker、长期 memory 和算法题按周文档说明执行。
+6. **P1 不得阻塞 P0**：模型多供应商、OCR、reranker、长期 memory 和算法题按阶段文档说明执行。
 
 ## 7. 总验收
 

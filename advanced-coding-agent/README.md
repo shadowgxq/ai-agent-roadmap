@@ -41,6 +41,10 @@ uv run advanced-coding-agent "修复登录失败并运行测试" --mode planning
 
 Planning 输出包含分类、Plan、当前步骤、步骤结果、验证状态、re-plan 次数和 graph status。`--planner-backend llm` 保留旧版直接 Planner，便于对照。
 
+LangGraph 的复杂任务默认步骤执行器和步骤 Verifier 仍是演示替身；真实文件修改与测试需注入宿主适配器。图的 Reactive 分支也必须通过 Goal completion gate；缺少可执行标准的默认 manual Goal 保持待复核，不因目录枚举或演示步骤成功就宣称任务完成。节点的活动执行时间累计保存到 checkpoint，普通步骤、Reactive 分支及终态均检查预算；宿主 StepRunner 仍须在每次工具调用前执行自己的额度和超时限制，图的步骤边界检查不提供中途强制终止。
+
+Long-horizon 报告以 `kind` 区分实测、估算和固定参考轨迹。`build_reference_long_horizon_eval()` 返回 `fixture`，不通过正式 readiness gate；缺少来源的历史 JSON 保守读取为 `estimate`。转换为 W18 对照观测时保留来源，不把参考轨迹升级成实测成功。
+
 ## W18 Session 1：拆分决策
 
 Session 1 先冻结 W17 single-agent v2 的模型、工具、上下文、调用次数、超时和成功指标，再根据任务的并行收益、上下文隔离、专业工具、权限隔离和独立验证证据决定是否拆分：

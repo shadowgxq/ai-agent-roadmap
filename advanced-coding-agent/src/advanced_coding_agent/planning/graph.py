@@ -16,19 +16,19 @@ from langgraph.graph import END, START, StateGraph
 from ..classification import classify_task
 from ..contracts import TaskSpec
 from ..long_horizon import (
+    CompletionGate,
     ContextBudget,
     ContextManager,
     ContextSummarizer,
-    CompletionGate,
     FailureEvent,
     Goal,
     GoalRunProjection,
     GoalRunStatus,
     ProgressSnapshot,
+    RecoveryConsistencyError,
     RecoveryDecision,
     RecoveryPolicy,
     RecoverySource,
-    RecoveryConsistencyError,
     SuccessCriterion,
     assert_recovery_consistency,
     failure_event_from_exception,
@@ -246,7 +246,7 @@ class _PlanningGraphRuntime:
         recovery_sleep: Callable[[float], None] | None = None,
         completion_gate: CompletionGate | None = None,
     ) -> None:
-        self.planner = planner
+        self.planner_backend = planner
         self.workdir = Path(workdir).resolve()
         self.checkpointer = checkpointer
         self.step_runner = step_runner or self._default_step_runner
@@ -279,6 +279,9 @@ class _PlanningGraphRuntime:
         )
 
     def reactive(self, state: PlanningGraphState) -> dict[str, object]:
+        reason = self._execution_budget_reason(state, before_step=True)
+        if reason is not None:
+            return self.blocked({**state, "blocked_reason": reason})
         task = TaskSpec(
             objective=state["goal"],
             workdir=Path(state.get("workdir", str(self.workdir))),
@@ -287,12 +290,13 @@ class _PlanningGraphRuntime:
         updates: dict[str, object] = {
             "reactive_result": result.as_dict(),
             "execution_status": result.status,
-            "graph_status": "completed" if result.status == "completed" else "blocked",
+            "graph_status": "reactive" if result.status == "completed" else "blocked",
+            "tool_call_count": int(state.get("tool_call_count", 0)) + len(result.tool_results),
         }
         updates.update(
             _projection_updates(
                 state,
-                status="completed" if result.status == "completed" else "blocked",
+                status="running" if result.status == "completed" else "blocked",
             )
         )
         return updates
@@ -303,7 +307,7 @@ class _PlanningGraphRuntime:
             constraints=tuple(state.get("constraints", [])),
             available_tools=tuple(state.get("available_tools", [])),
         )
-        result = self.planner.plan(request)
+        result = self.planner_backend.plan(request)
         if result.plan is None:
             updates: dict[str, object] = {
                 "planner_result": result.as_dict(),
@@ -364,6 +368,9 @@ class _PlanningGraphRuntime:
     def completion(self, state: PlanningGraphState) -> dict[str, object]:
         """Evaluate the frozen Goal criteria before writing a terminal status."""
 
+        reason = self._execution_budget_reason(state)
+        if reason is not None:
+            return self.blocked({**state, "blocked_reason": reason})
         goal = _goal_from_state(state)
         raw_results = state.get("step_results", [])
         evidence_refs: list[str] = []
@@ -504,6 +511,11 @@ class _PlanningGraphRuntime:
 
     def select_step(self, state: PlanningGraphState) -> dict[str, object]:
         domain_state = self._restore_domain_state(state)
+        reason = self._execution_budget_reason(
+            state, before_step=domain_state.status != "completed",
+        )
+        if reason is not None:
+            return self.blocked({**state, "blocked_reason": reason})
         domain_state.claim_next_step()
         updates = self._domain_updates(domain_state)
         updates["progress_snapshot"] = domain_state.progress_snapshot(
@@ -513,11 +525,7 @@ class _PlanningGraphRuntime:
         updates.update(
             _projection_updates(
                 state,
-                status=(
-                    "completed"
-                    if domain_state.status == "completed"
-                    else "running"
-                ),
+                status="running",
                 plan_version=domain_state.plan.version,
             )
         )
@@ -625,6 +633,9 @@ class _PlanningGraphRuntime:
         return updates
 
     def verify(self, state: PlanningGraphState) -> dict[str, object]:
+        reason = self._execution_budget_reason(state)
+        if reason is not None:
+            return self.blocked({**state, "blocked_reason": reason})
         domain_state = self._restore_domain_state(state)
         step = self._current_step(domain_state)
         context_manager = self._restore_context(state)
@@ -751,9 +762,7 @@ class _PlanningGraphRuntime:
             _projection_updates(
                 state,
                 status=(
-                    "completed"
-                    if domain_state.status == "completed"
-                    else "failed"
+                    "failed"
                     if domain_state.status == "failed"
                     else "running"
                 ),
@@ -823,7 +832,7 @@ class _PlanningGraphRuntime:
         replan_state.tool_call_count = int(state.get("tool_call_count", 0))
         replan_state.runtime_seconds = float(state.get("runtime_seconds", 0.0))
 
-        result = ReplanController(self.planner).consider(
+        result = ReplanController(self.planner_backend).consider(
             replan_state,
             observation,
         )
@@ -1184,6 +1193,23 @@ class _PlanningGraphRuntime:
             ),
         }
 
+    def _execution_budget_reason(
+        self, state: PlanningGraphState, *, before_step: bool = False,
+    ) -> str | None:
+        """Check normal execution and completion, even without a re-plan."""
+
+        budget = self._budget_from_state(state)
+        raw_plan = state.get("plan")
+        if isinstance(raw_plan, Mapping) and len(raw_plan.get("steps", [])) > budget.max_steps:
+            return "计划超过 max_steps，进入 blocked。"
+        calls = int(state.get("tool_call_count", 0))
+        if calls > budget.max_tool_calls or (before_step and calls >= budget.max_tool_calls):
+            return "tool call budget 已耗尽，进入 blocked。"
+        runtime = float(state.get("runtime_seconds", 0.0))
+        if runtime > budget.max_runtime_seconds or (before_step and runtime >= budget.max_runtime_seconds):
+            return "runtime budget 已耗尽，进入 blocked。"
+        return None
+
     @staticmethod
     def _current_step(domain_state: PlanExecutionState) -> PlanStep:
         if domain_state.current_step is None:
@@ -1301,15 +1327,31 @@ def create_planning_graph(
         completion_gate=completion_gate,
     )
     builder = StateGraph(PlanningGraphState)
-    builder.add_node("classify", runtime.classify)
-    builder.add_node("reactive", runtime.reactive)
-    builder.add_node("planner", runtime.planner)
-    builder.add_node("select_step", runtime.select_step)
-    builder.add_node("execute", runtime.execute)
-    builder.add_node("verify", runtime.verify)
-    builder.add_node("completion", runtime.completion)
-    builder.add_node("replan", runtime.replan)
-    builder.add_node("blocked", runtime.blocked)
+
+    def measured(node: Callable[[PlanningGraphState], dict[str, object]]):
+        def invoke(state: PlanningGraphState) -> dict[str, object]:
+            started = time.monotonic()
+            updates = node(state)
+            # Active execution time accumulates in checkpoints across resume.
+            updates["runtime_seconds"] = float(updates.get(
+                "runtime_seconds", state.get("runtime_seconds", 0.0),
+            )) + max(0.0, time.monotonic() - started)
+            if updates.get("graph_status") == "completed":
+                reason = runtime._execution_budget_reason({**state, **updates})
+                if reason is not None:
+                    updates.update(runtime.blocked({**state, **updates, "blocked_reason": reason}))
+            return updates
+        return invoke
+
+    builder.add_node("classify", measured(runtime.classify))
+    builder.add_node("reactive", measured(runtime.reactive))
+    builder.add_node("planner", measured(runtime.planner))
+    builder.add_node("select_step", measured(runtime.select_step))
+    builder.add_node("execute", measured(runtime.execute))
+    builder.add_node("verify", measured(runtime.verify))
+    builder.add_node("completion", measured(runtime.completion))
+    builder.add_node("replan", measured(runtime.replan))
+    builder.add_node("blocked", measured(runtime.blocked))
 
     builder.add_edge(START, "classify")
     builder.add_conditional_edges(
@@ -1317,7 +1359,11 @@ def create_planning_graph(
         runtime.route_after_classify,
         {"reactive": "reactive", "planning": "planner"},
     )
-    builder.add_edge("reactive", END)
+    builder.add_conditional_edges(
+        "reactive",
+        lambda state: "completion" if state.get("execution_status") == "completed" else "blocked",
+        {"completion": "completion", "blocked": "blocked"},
+    )
     builder.add_conditional_edges(
         "planner",
         runtime.route_after_planner,

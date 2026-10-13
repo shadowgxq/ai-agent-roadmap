@@ -35,6 +35,8 @@ uv run alembic upgrade head --sql > /tmp/support-migration.sql
 
 30-case 分布：8 分类/澄清、8 检索/引用/无答案、5 低风险、4 高风险审批、3 恢复/幂等、2 跨租户/注入。case 和知识库快照使用 SHA-256 冻结，每次运行独立分配 run、thread、ticket 和工具状态。
 
+`uv run pytest -q tests` 默认只运行离线检查；W15 PostgreSQL 集成用例保持跳过。数据库用例必须在明确允许访问已运行数据库时显式添加 `--run-integration`，该选项本身不会启动服务，也不调用模型。
+
 `support-eval` 默认运行真实 ticket Graph，但模型、检索和 CRM 是明确的本地替身。默认词项匹配基线为 29/30；离线推荐配置为 30/30。费用和人工引用正确率为 `null`，`production_quality_verified=false`。报告检查分类、文档 ID、引用 ID、审批、工具审计、事件序号和唯一终态，不用回答流畅度代替这些断言。
 
 固定实验结果位于 `evals/w21_offline_experiments.json`：

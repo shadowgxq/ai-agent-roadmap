@@ -268,12 +268,12 @@ def compare_multi_agent(
 
     rows: list[dict[str, object]] = []
     paired: dict[EvalMode, list[EvalObservation]] = {mode: [] for mode in _MODES}
-    for case_id in cases:
+    for case_id, case in cases.items():
         for trial in range(1, repetitions + 1):
             pair = [records.get((case_id, trial, mode)) for mode in _MODES]
             row: dict[str, object] = {
                 "case_id": case_id, "trial": trial,
-                "objective": cases[case_id].profile.objective,
+                "objective": case.profile.objective,
                 "single-agent": pair[0].as_dict() if pair[0] else None,
                 "multi-agent": pair[1].as_dict() if pair[1] else None,
                 "delta_multi_minus_single": None,
@@ -393,8 +393,8 @@ def observation_from_long_horizon(
     return EvalObservation(
         case_id, "single-agent", report.run_id, baseline_fingerprint(suite),
         case_fingerprint(suite, case_id), workspace_snapshot, suite.baseline.runtime_version,
-        verifier_version, report.final_status, verified_success,
-        wall_clock_seconds, report.tool_call_count, evidence_refs, trial=trial,
+        verifier_version, report.final_status, verified_success and report.ready,
+        wall_clock_seconds, report.tool_call_count, evidence_refs, trial=trial, kind=report.kind,
         total_cost=total_cost, context_tokens=context_tokens, peak_context_tokens=peak_context_tokens,
         duplicate_side_effects=duplicate_side_effects, accounting_complete=accounting_complete,
         currency=currency, failure_reason=None if report.final_status == "succeeded"

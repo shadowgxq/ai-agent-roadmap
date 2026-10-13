@@ -32,6 +32,26 @@ class StreamDouble {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('support SSE lifecycle', () => {
+  it('keeps done terminal when a closed stream delivers late callbacks', () => {
+    vi.stubGlobal('EventSource', StreamDouble);
+    const queryClient = new QueryClient();
+    function Wrapper({ children }: PropsWithChildren) {
+      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    }
+    const { result, unmount } = renderHook(() => useRunTimeline('run-1'), { wrapper: Wrapper });
+    const stream = StreamDouble.latest;
+    act(() => {
+      stream.emit('done', 1);
+      stream.onopen?.();
+      stream.onerror?.();
+      stream.emit('status', 2);
+    });
+    expect(stream.isClosed).toBe(true);
+    expect(result.current.events.map((event) => event.kind)).toEqual(['done']);
+    expect(result.current.connection).toBe('done');
+    unmount();
+  });
+
   it('reconnects the same run, deduplicates replay, and closes only on done or unmount', () => {
     vi.stubGlobal('EventSource', StreamDouble);
     const queryClient = new QueryClient();

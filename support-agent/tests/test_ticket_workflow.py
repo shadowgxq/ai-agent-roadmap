@@ -187,7 +187,9 @@ def test_hard_risk_rule_cannot_be_downgraded_by_model() -> None:
 
     result = graph.invoke(initial_state_for_sample(sample))
 
-    assert result["status"] == "completed"
+    assert result["status"] == "assessed"
+    assert result["__interrupt__"]
+    assert result.get("tool_result") is None
     assert result["risk_level"] == "high"
     assert result["requires_approval"] is True
     assert "资金副作用" in result["risk_reasons"][0]

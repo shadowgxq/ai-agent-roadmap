@@ -117,7 +117,7 @@ class EvalEvent:
         object.__setattr__(self, "metadata", dict(self.metadata))
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "EvalEvent":
+    def from_dict(cls, payload: Mapping[str, object]) -> EvalEvent:
         kind = payload.get("kind")
         if not isinstance(kind, str):
             raise LongHorizonEvalValidationError("event.kind 必须是字符串。")
@@ -172,8 +172,11 @@ class LongHorizonEvalReport:
     total_cost: float
     total_latency_seconds: float
     final_evidence_refs: tuple[str, ...]
+    kind: Literal["measured", "estimate", "fixture"] = "measured"
 
     def __post_init__(self) -> None:
+        if self.kind not in ("measured", "estimate", "fixture"):
+            raise LongHorizonEvalValidationError("eval kind 无效。")
         object.__setattr__(self, "goal_id", _text(self.goal_id, "goal_id"))
         object.__setattr__(self, "run_id", _text(self.run_id, "run_id"))
         if not 30 <= self.target_tool_calls <= 50:
@@ -236,6 +239,8 @@ class LongHorizonEvalReport:
     @property
     def readiness_issues(self) -> tuple[str, ...]:
         issues: list[str] = []
+        if self.kind != "measured":
+            issues.append("缺少实测来源，参考样例或估算不能作为验收证据")
         if not 30 <= self.tool_call_count <= 50:
             issues.append("tool_call_count 不在 30–50 范围内")
         if self.replan_count == 0:
@@ -252,7 +257,7 @@ class LongHorizonEvalReport:
             issues.append("缺少最终 evidence")
         return tuple(issues)
 
-    def assert_ready(self) -> "LongHorizonEvalReport":
+    def assert_ready(self) -> LongHorizonEvalReport:
         """Raise instead of silently accepting an incomplete experiment."""
 
         if not self.ready:
@@ -271,7 +276,8 @@ class LongHorizonEvalReport:
         final_status: EvalFinalStatus,
         target_tool_calls: int = 30,
         final_evidence_refs: Iterable[str] = (),
-    ) -> "LongHorizonEvalReport":
+        kind: Literal["measured", "estimate", "fixture"] = "measured",
+    ) -> LongHorizonEvalReport:
         ordered = tuple(events)
         expected_sequences = tuple(range(1, len(ordered) + 1))
         actual_sequences = tuple(event.sequence for event in ordered)
@@ -331,10 +337,11 @@ class LongHorizonEvalReport:
                 6,
             ),
             final_evidence_refs=refs,
+            kind=kind,
         )
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, object]) -> "LongHorizonEvalReport":
+    def from_dict(cls, payload: Mapping[str, object]) -> LongHorizonEvalReport:
         raw_events = payload.get("events", ())
         if isinstance(raw_events, (str, bytes)) or not isinstance(raw_events, Sequence):
             raise LongHorizonEvalValidationError("events 必须是对象数组。")
@@ -358,11 +365,14 @@ class LongHorizonEvalReport:
                 payload.get("final_evidence_refs", ()),
                 "final_evidence_refs",
             ),
+            # Legacy reports have no provenance and cannot certify a measured run.
+            kind=payload.get("kind", "estimate"),  # type: ignore[arg-type]
         )
 
     def as_dict(self) -> dict[str, object]:
         return {
             "goal_id": self.goal_id,
+            "kind": self.kind,
             "run_id": self.run_id,
             "target_tool_calls": self.target_tool_calls,
             "events": [event.as_dict() for event in self.events],
@@ -571,6 +581,7 @@ class LongHorizonEvalRecorder:
         *,
         final_status: EvalFinalStatus = "succeeded",
         final_evidence_refs: Iterable[str] = (),
+        kind: Literal["measured", "estimate", "fixture"] = "measured",
     ) -> LongHorizonEvalReport:
         return LongHorizonEvalReport.from_events(
             goal_id=self.goal_id,
@@ -579,6 +590,7 @@ class LongHorizonEvalRecorder:
             final_status=final_status,
             target_tool_calls=self.target_tool_calls,
             final_evidence_refs=final_evidence_refs,
+            kind=kind,
         )
 
 
@@ -647,6 +659,7 @@ def build_reference_long_horizon_eval(
     return recorder.report(
         final_status="succeeded",
         final_evidence_refs=("completion:all-criteria-pass",),
+        kind="fixture",
     )
 
 

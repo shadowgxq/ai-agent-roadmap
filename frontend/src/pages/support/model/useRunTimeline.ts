@@ -40,8 +40,12 @@ export function useRunTimeline(runId: string): {
     };
     for (const name of ['status', 'response', 'cancel_requested', 'done'])
       stream.addEventListener(name, receive as EventListener);
-    stream.onopen = (): void => setConnection('live');
-    stream.onerror = (): void => setConnection('reconnecting');
+    stream.onopen = (): void => {
+      if (!isClosed) setConnection('live');
+    };
+    stream.onerror = (): void => {
+      if (!isClosed) setConnection('reconnecting');
+    };
     return (): void => {
       isClosed = true;
       stream.close();

@@ -26,6 +26,9 @@ from support_agent.services import (
 )
 
 
+pytestmark = pytest.mark.integration
+
+
 @dataclass(frozen=True)
 class RecoveryCase:
     organization_id: str

@@ -1,7 +1,7 @@
 name: Support offline checks
 on:
   pull_request:
-    paths: ['support-agent/**', 'frontend/**', 'deploy/**', 'compose.support.yaml', '.github/workflows/support-offline.yml']
+    paths: ['support-agent/**', 'advanced-coding-agent/**', 'frontend/**', 'deploy/**', 'compose.support.yaml', '.github/workflows/support-offline.yml']
   workflow_dispatch:
 jobs:
   python:
@@ -14,7 +14,8 @@ jobs:
       - working-directory: support-agent
         env: {SUPPORT_APP_TRACING_ENABLED: 'false', LANGCHAIN_TRACING_V2: 'false'}
         run: |
-          uv run pytest -q tests/test_w19_offline.py tests/test_w20_contracts.py tests/test_w20_api.py tests/test_w20_security.py tests/test_w20_recovery.py tests/test_w20_acceptance.py tests/test_w20_graph_flow.py tests/test_w21_catalog.py tests/test_w21_report.py tests/test_w21_telemetry.py tests/test_w21_faults.py tests/test_w21_experiments.py tests/test_w21_deployment.py
+          uv run pytest -q tests
+          PYTHONPATH=../advanced-coding-agent/src uv run pytest -q ../advanced-coding-agent/tests
           uv run python -m compileall -q src migrations
           uv run alembic upgrade head --sql > /tmp/support-migration.sql
           uv run support-eval --config evals/w21_offline_recommended.json --output /tmp/support-eval.json

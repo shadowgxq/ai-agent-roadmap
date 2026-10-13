@@ -7,7 +7,7 @@ from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from .contracts import ConflictError, Identity, NotFoundError, TicketInput, request_hash, validate_key
+from .contracts import ConflictError, Identity, NotFoundError, TicketInput, ApprovalInput, TERMINAL, check_transition, request_hash, validate_key
 
 
 async def event(conn, org: str, run_id: str, kind: str, payload: dict):
@@ -108,3 +108,81 @@ class ApplicationStore:
         async with self.connection() as conn:
             cursor = await conn.execute("SELECT actor_id,action,payload,created_at FROM support_audit WHERE organization_id=%s AND run_id=%s ORDER BY created_at,audit_id", (identity.organization_id, run_id))
             return await cursor.fetchall()
+
+    async def cancel(self, identity: Identity, run_id: str):
+        async with self.connection() as conn:
+            run = await self.lock_run(conn, identity.organization_id, run_id)
+            if run["status"] in TERMINAL:
+                return run
+            if run["status"] == "running":
+                await conn.execute("UPDATE support_runs SET cancel_requested=true WHERE organization_id=%s AND run_id=%s", (identity.organization_id, run_id))
+                if not run["cancel_requested"]:
+                    await event(conn, identity.organization_id, run_id, "cancel_requested", {})
+                return run | {"cancel_requested": True}
+            return await self.change(conn, run, "cancelled", {})
+
+    async def approve(self, identity: Identity, run_id: str, data: ApprovalInput):
+        if data.decision in {"reject", "revise"} and not (data.feedback or "").strip():
+            raise ValueError("Feedback is required for reject/revise")
+        org = identity.organization_id
+        async with self.connection() as conn:
+            run = await self.lock_run(conn, org, run_id)
+            cursor = await conn.execute("SELECT * FROM approvals WHERE organization_id=%s AND run_id=%s AND proposal_hash=%s", (org, run_id, data.proposal_hash))
+            existing = await cursor.fetchone()
+            if existing:
+                if existing["decision"] != data.decision or existing["feedback"] != data.feedback or existing["actor_id"] != identity.user_id:
+                    raise ConflictError("Proposal already has a different decision")
+                return run
+            if run["status"] != "waiting_approval" or run["projection"].get("proposal_hash") != data.proposal_hash:
+                raise ConflictError("Proposal is no longer awaiting approval")
+            payload = data.model_dump() | {"actor_id": identity.user_id}
+            await conn.execute("""INSERT INTO approvals(id,organization_id,ticket_id,run_id,thread_id,actor_id,decision,feedback,proposal_hash)
+                                  VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                               (uuid4(), org, str(run["ticket_id"]), run_id, str(run["thread_id"]), identity.user_id,
+                                data.decision, data.feedback, data.proposal_hash))
+            await conn.execute("INSERT INTO support_audit(organization_id,run_id,audit_id,actor_id,action,payload) VALUES(%s,%s,%s,%s,'approval',%s)",
+                               (org, run_id, uuid4(), identity.user_id, Jsonb({"decision": data.decision, "proposal_hash": data.proposal_hash})))
+            await conn.execute("UPDATE support_runs SET generation=generation+1,resume_payload=%s WHERE organization_id=%s AND run_id=%s", (Jsonb(payload), org, run_id))
+            updated = await self.change(conn, run, "queued", {"decision": data.decision})
+            await conn.execute("INSERT INTO support_outbox(organization_id,run_id,generation) VALUES(%s,%s,%s)", (org, run_id, run["generation"] + 1))
+            return updated | {"generation": run["generation"] + 1}
+
+    async def lock_run(self, conn, org: str, run_id: str):
+        cursor = await conn.execute("SELECT * FROM support_runs WHERE organization_id=%s AND run_id=%s FOR UPDATE", (org, run_id))
+        run = await cursor.fetchone()
+        if run is None:
+            raise NotFoundError("Run not found")
+        return run
+
+    async def change(self, conn, run: dict, status: str, payload: dict):
+        check_transition(run["status"], status)
+        org, run_id = run["organization_id"], str(run["run_id"])
+        await conn.execute("UPDATE support_runs SET status=%s,updated_at=now() WHERE organization_id=%s AND run_id=%s", (status, org, run_id))
+        await event(conn, org, run_id, "done" if status in TERMINAL else "status", payload | {"status": status})
+        return run | {"status": status}
+
+    async def claim(self, org: str, run_id: str, generation: int, lease_seconds: int):
+        async with self.connection() as conn:
+            run = await self.lock_run(conn, org, run_id)
+            if run["status"] != "queued" or run["generation"] != generation:
+                return None
+            if run["cancel_requested"]:
+                await self.change(conn, run, "cancelled", {})
+                return None
+            token = uuid4()
+            cursor = await conn.execute("""UPDATE support_runs SET lease_token=%s,lease_until=now()+(%s * interval '1 second'),attempt=attempt+1
+                WHERE organization_id=%s AND run_id=%s RETURNING *""", (token, lease_seconds, org, run_id))
+            claimed = await cursor.fetchone()
+            await self.change(conn, run, "running", {})
+            return claimed | {"status": "running"}
+
+    async def finish(self, run: dict, status: str, projection: dict):
+        org, run_id = run["organization_id"], str(run["run_id"])
+        async with self.connection() as conn:
+            current = await self.lock_run(conn, org, run_id)
+            if current["status"] != "running" or current["lease_token"] != run["lease_token"]:
+                return False
+            await conn.execute("UPDATE support_runs SET projection=%s,resume_payload=NULL,lease_token=NULL,lease_until=NULL WHERE organization_id=%s AND run_id=%s", (Jsonb(projection), org, run_id))
+            await event(conn, org, run_id, "response", projection)
+            await self.change(conn, current, "cancelled" if current["cancel_requested"] else status, {})
+            return True

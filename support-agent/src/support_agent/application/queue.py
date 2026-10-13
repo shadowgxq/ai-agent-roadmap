@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+from functools import wraps
 from celery import Celery
 from dotenv import load_dotenv
 from support_agent.config.settings import PROJECT_ROOT
@@ -18,6 +19,16 @@ celery_app.conf.update(task_acks_late=True, task_reject_on_worker_lost=True,
                                       "support-recover": {"task": "support.recover", "schedule": 30.0}})
 
 
+def redacted_task(function):
+    @wraps(function)
+    def execute_safely(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except Exception as exc:
+            raise RuntimeError(type(exc).__name__) from None
+    return execute_safely
+
+
 async def dispatch_pending(store, publish):
     async with store.connection() as conn:
         cursor = await conn.execute("SELECT * FROM support_outbox WHERE NOT dispatched ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 100")
@@ -28,6 +39,7 @@ async def dispatch_pending(store, publish):
 
 
 @celery_app.task(name="support.dispatch")
+@redacted_task
 def dispatch():
     settings = ApplicationSettings()
     asyncio.run(dispatch_pending(ApplicationStore(settings.database_url),
@@ -35,6 +47,7 @@ def dispatch():
 
 
 @celery_app.task(name="support.execute")
+@redacted_task
 def execute(org: str, run_id: str, generation: int):
     from .worker import execute_run
     settings = ApplicationSettings()
@@ -45,6 +58,7 @@ def execute(org: str, run_id: str, generation: int):
 
 
 @celery_app.task(name="support.recover")
+@redacted_task
 def recover():
     settings = ApplicationSettings()
     asyncio.run(ApplicationStore(settings.database_url).recover(settings.max_attempts, settings.lease_seconds))

@@ -1,0 +1,12 @@
+[
+  {"id":"heading_body","format":"md","text":"# Refunds\n\nRefunds require the order ID.","expect":"Heading and body remain together"},
+  {"id":"nested_headings","format":"md","text":"# Accounts\n## Email\n\nVerify both email addresses.\n## Recovery\n\nVerify identity.","expect":"Separate sections retain Accounts/Email and Accounts/Recovery"},
+  {"id":"list_conditions","format":"md","text":"# Refund eligibility\n\n- Purchase within 30 days.\n  Receipt must match the customer.\n- No consumed credits.","expect":"List item continuation stays with its condition"},
+  {"id":"code_fence","format":"md","text":"# API\n\n```python\n# this is not a heading\nrequest_id = 'r-1'\n\nprint(request_id)\n```\n\nInclude request ID.","expect":"Short fenced code block stays intact; code comments are not headings"},
+  {"id":"long_heading","format":"md","text":"# Enterprise subscription cancellation and invoice dispute policy\n\nContact billing before cancelling.","expect":"Full heading path retained, explicit error if heading exceeds budget"},
+  {"id":"short_paragraphs","format":"md","text":"# Security\n\nVerify identity.\n\nNever share passwords.\n\nEscalate suspicious access.","expect":"Short paragraphs combine within the same section"},
+  {"id":"unicode_long_paragraph","format":"txt","text":"账户变更前必须验证身份。","repeat":300,"expect":"Token-bounded overlap with no replacement characters or lost body text"},
+  {"id":"oversized_code","format":"md","text":"# Example\n\n```python\n","repeat_body":"print('request')\n","repeat":300,"end":"```","expect":"Only oversized code may split; each chunk retains source heading"},
+  {"id":"pdf_cross_page","format":"pdf","pages":["Refund policy\nRequests within 30 days require","Refund policy\na receipt and the original order ID.","Refund policy\nContact billing for exceptions."],"expect":"Retain body and page 1/2 locations; repeated edge header removed"},
+  {"id":"pdf_footer","format":"pdf","pages":["Export data from the project page.\nInternal knowledge / Page 1","CSV is the supported export format.\nInternal knowledge / Page 2","Only project members can export.\nInternal knowledge / Page 3"],"expect":"Repeated numbered footer removed; each body page remains traceable"}
+]

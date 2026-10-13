@@ -39,6 +39,7 @@ TicketStatus = Literal[
     "revising",
     "tool_executed",
     "completed",
+    "abstained",
     "failed",
 ]
 TicketErrorCode = Literal[
@@ -52,6 +53,7 @@ TicketErrorCode = Literal[
     "INVALID_APPROVAL_DECISION",
     "TOOL_NOT_CONFIGURED",
     "REVISION_LIMIT_REACHED",
+    "RETRIEVAL_FAILED",
 ]
 
 
@@ -61,6 +63,14 @@ class EvidenceRef(BaseModel):
     source_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     snippet: str = Field(min_length=1)
+    # Legacy W14 references remain readable; W19 retrieval fills all provenance fields.
+    chunk_id: str | None = None
+    document_id: str | None = None
+    document_title: str | None = None
+    document_version: int | None = None
+    heading_path: list[str] = Field(default_factory=list)
+    page: int | None = None
+    score: float | None = None
 
 
 class TicketAgentState(TypedDict):
@@ -91,6 +101,9 @@ class TicketAgentState(TypedDict):
 
     # evidence
     evidence_refs: NotRequired[list[EvidenceRef]]
+    citation_ids: NotRequired[list[str]]
+    citation_invalid_ids: NotRequired[list[str]]
+    retrieval_fallback: NotRequired[str | None]
 
     # output
     draft_response: NotRequired[str]

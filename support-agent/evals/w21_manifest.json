@@ -1,0 +1,19 @@
+{
+  "version": "w21-v1",
+  "source": "offline-test-doubles",
+  "model": "offline-scripted-v1",
+  "tools": [
+    "mock-crm"
+  ],
+  "budget": {
+    "max_model_calls": 8,
+    "max_tool_calls": 1,
+    "max_context_tokens": 8000,
+    "timeout_seconds": 30,
+    "max_cost_usd": 0.5
+  },
+  "snapshots": {
+    "w21_cases.json": "897a10e546ee891ed1c85fa47d7cefce57fe1da56f57fcc3fb27d7f0d8b71868",
+    "w21_corpus.json": "995728326e2ef9ccdafa90dba1ae7e2cf255905997048731fc2139778e0aa594"
+  }
+}

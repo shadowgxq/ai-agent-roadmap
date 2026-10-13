@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 support-agent = "support_agent.cli:main"
+support-app = "support_agent.application.cli:main"
 support-knowledge = "support_agent.knowledge_cli:main"
 support-knowledge-eval = "support_agent.knowledge_eval_cli:main"
 support-knowledge-audit = "support_agent.knowledge_audit_cli:main"

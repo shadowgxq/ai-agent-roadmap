@@ -580,6 +580,7 @@ def prepare_approval(state: TicketAgentState) -> dict[str, object]:
             draft_response=state.get("draft_response", ""),
             tool_name="update_crm_ticket",
             arguments=arguments,
+            revision=state.get("revision_count", 0),
         ),
         "approval_error": None,
     }

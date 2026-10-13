@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeEvents, toRun, type RunDto } from './support.types';
+import { decodeTimelineEvent, mergeEvents, toRun, type RunDto } from './support.types';
 
 describe('support event replay', () => {
   it('deduplicates repeated sequence numbers and keeps replay ordered', () => {
@@ -12,5 +12,13 @@ describe('support event replay', () => {
   });
   it('does not promote an unknown backend status to success', () => {
     expect(toRun({ status: 'brand-new-state' } as RunDto).status).toBe('unknown');
+  });
+  it('rejects malformed terminal frames and normalizes unknown event statuses', () => {
+    expect(decodeTimelineEvent(0, 'done', '{"status":"succeeded"}')).toBeNull();
+    expect(decodeTimelineEvent(1, 'done', '{"status":"running"}')).toBeNull();
+    expect(decodeTimelineEvent(1, 'response', 'not-json')).toBeNull();
+    expect(decodeTimelineEvent(1, 'status', '{"status":"new-status"}')?.payload.status).toBe(
+      'unknown',
+    );
   });
 });

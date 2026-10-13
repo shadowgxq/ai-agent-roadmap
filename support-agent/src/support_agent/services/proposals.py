@@ -25,14 +25,20 @@ def build_proposal_hash(
     draft_response: str,
     tool_name: str,
     arguments: Mapping[str, object],
+    revision: int = 0,
 ) -> str:
     """Bind human approval to the exact draft, tool, and arguments."""
 
-    return _sha256({
+    proposal = {
         "draft_response": draft_response,
         "tool_name": tool_name,
         "arguments": dict(arguments),
-    })
+    }
+    if revision:
+        # A revised proposal needs a new decision even when the model returns
+        # unchanged wording; it must not collide with the prior 'revise' record.
+        proposal["revision"] = revision
+    return _sha256(proposal)
 
 
 def build_idempotency_key(

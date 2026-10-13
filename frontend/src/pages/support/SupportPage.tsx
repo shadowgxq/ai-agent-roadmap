@@ -21,8 +21,9 @@ export function SupportPage() {
       queryClient.setQueryData(['support', 'session'], null);
     },
   });
-  const isUnavailable =
-    session.isError && !(session.error instanceof SupportApiError && session.error.status === 403);
+  const isAuthError =
+    session.isError && session.error instanceof SupportApiError && session.error.status === 403;
+  const isUnavailable = session.isError && !isAuthError;
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -31,7 +32,7 @@ export function SupportPage() {
           <h1>{t('support.title')}</h1>
           <p>{t('support.subtitle')}</p>
         </div>
-        {session.data ? (
+        {session.data && !isAuthError ? (
           <div>
             <p>
               {session.data.identity.user_id} · {session.data.identity.role}
@@ -50,7 +51,7 @@ export function SupportPage() {
           <p role="alert">{t('support.actionError')}</p>
           <SupportButton onClick={() => void session.refetch()}>{t('support.retry')}</SupportButton>
         </section>
-      ) : session.data ? (
+      ) : session.data && !isAuthError ? (
         <TicketBrowser
           key={`${session.data.identity.organization_id}:${session.data.identity.user_id}`}
           session={session.data}

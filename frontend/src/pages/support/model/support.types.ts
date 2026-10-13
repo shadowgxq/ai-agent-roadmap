@@ -72,3 +72,39 @@ export function mergeEvents(current: TimelineEvent[], incoming: TimelineEvent): 
     return current;
   return [...current, incoming].sort((left, right) => left.sequence - right.sequence);
 }
+
+export function decodeTimelineEvent(
+  sequence: number,
+  kind: string,
+  text: string,
+): TimelineEvent | null {
+  if (
+    !Number.isSafeInteger(sequence) ||
+    sequence < 1 ||
+    !['status', 'response', 'cancel_requested', 'done'].includes(kind)
+  )
+    return null;
+  try {
+    const payload: unknown = JSON.parse(text);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const source = payload as Record<string, unknown>;
+    const status =
+      typeof source.status === 'string'
+        ? (runStatuses.find((value) => value === source.status) ?? 'unknown')
+        : undefined;
+    if (kind === 'done' && (!status || !['succeeded', 'failed', 'cancelled'].includes(status)))
+      return null;
+    return {
+      sequence,
+      kind,
+      payload: {
+        ...(status ? { status } : {}),
+        ...(typeof source.draft_response === 'string'
+          ? { draft_response: source.draft_response }
+          : {}),
+      },
+    };
+  } catch {
+    return null;
+  }
+}

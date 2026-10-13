@@ -13,6 +13,10 @@ export function LoginPanel() {
   const login = useMutation({
     mutationFn: () => supportApi.login(username, password),
     onSuccess: (session) => {
+      queryClient.removeQueries({
+        queryKey: ['support'],
+        predicate: (query) => query.queryKey[1] !== 'session',
+      });
       queryClient.setQueryData(['support', 'session'], session);
       setPassword('');
     },

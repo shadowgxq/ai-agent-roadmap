@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { supportApi } from './support.api';
-import { mergeEvents, type TimelineEvent } from './support.types';
+import { decodeTimelineEvent, mergeEvents, type TimelineEvent } from './support.types';
 
 export function useRunTimeline(runId: string): {
   events: TimelineEvent[];
@@ -14,21 +14,23 @@ export function useRunTimeline(runId: string): {
   );
   useEffect(() => {
     const stream = new EventSource(supportApi.eventsUrl(runId), { withCredentials: true });
+    let isClosed = false;
     const receive = (message: MessageEvent<string>): void => {
       try {
-        const payload: unknown = JSON.parse(message.data);
-        if (!payload || typeof payload !== 'object') return;
-        const incoming: TimelineEvent = {
-          sequence: Number(message.lastEventId),
-          kind: message.type,
-          payload,
-        };
+        if (isClosed) return;
+        const incoming = decodeTimelineEvent(
+          Number(message.lastEventId),
+          message.type,
+          message.data,
+        );
+        if (!incoming) return;
         setEvents((current) => mergeEvents(current, incoming));
         if (message.type === 'status' || message.type === 'done') {
           void queryClient.invalidateQueries({ queryKey: ['support', 'run', runId] });
           void queryClient.invalidateQueries({ queryKey: ['support', 'audit', runId] });
         }
         if (message.type === 'done') {
+          isClosed = true;
           stream.close();
           setConnection('done');
         }
@@ -40,7 +42,10 @@ export function useRunTimeline(runId: string): {
       stream.addEventListener(name, receive as EventListener);
     stream.onopen = (): void => setConnection('live');
     stream.onerror = (): void => setConnection('reconnecting');
-    return (): void => stream.close();
+    return (): void => {
+      isClosed = true;
+      stream.close();
+    };
   }, [runId, queryClient]);
   return { events, connection };
 }

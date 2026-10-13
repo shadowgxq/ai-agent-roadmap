@@ -42,7 +42,8 @@ def assess(case: E2ECase, observation: dict) -> dict:
     if sequences != list(range(1, len(sequences) + 1)) or done != int(terminal):
         failures.append("infra")
     return {"case_id": case.id, "passed": not failures, "failure_categories": sorted(set(failures)),
-            "citation_ids_valid": citation.valid if refs else None}
+            "citation_ids_valid": citation.valid if refs else None,
+            "retrieval_precision": len(set(expected.documents) & actual_docs) / len(actual_docs) if expected.documents and actual_docs else 0.0 if expected.documents else None}
 
 
 def percentile(values: list[float], quantile: float) -> float | None:
@@ -74,13 +75,23 @@ def make_report(manifest: dict, cases: list[E2ECase], observations: list[dict]) 
     sources = {row["source"] for row in observations}
     if len(sources) != 1:
         raise ValueError("Offline and production observations must not be mixed")
+    if next(iter(sources)) != "offline" and any(not row.get("model") for row in observations):
+        raise ValueError("Production observations require the actual model identity")
+    models = {row.get("model", manifest["model"]) for row in observations}
+    if len(models) != 1:
+        raise ValueError("A baseline cannot mix models")
     latency = [row["latency_seconds"] for row in observations]
     cost = [row["cost_usd"] for row in observations if row.get("cost_usd") is not None]
     citations = [row["citation_ids_valid"] for row in results if row["citation_ids_valid"] is not None]
+    precisions = [row["retrieval_precision"] for row in results if row["retrieval_precision"] is not None]
+    contexts = [row["context_characters"] for row in observations if row.get("context_characters") is not None]
     return {"version": manifest["version"], "snapshots": manifest["snapshots"], "source": next(iter(sources)),
+            "model": next(iter(models)), "budget": manifest["budget"],
             "case_count": len(cases), "passed_count": sum(row["passed"] for row in results),
             "success_rate": mean(row["passed"] for row in results),
             "citation_id_validity": mean(citations) if citations else None,
+            "retrieval_precision": mean(precisions) if precisions else None,
+            "mean_context_characters": mean(contexts) if len(contexts) == len(cases) else None,
             "citation_correctness": None, "citation_review": "requires independent claim-support annotations",
             "tool_approval_violations": sum(row.get("unauthorized_writes", 0) for row in observations),
             "average_cost_usd": mean(cost) if len(cost) == len(cases) else None,

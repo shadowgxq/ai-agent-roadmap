@@ -1,0 +1,2675 @@
+{
+  "source": "offline",
+  "production_quality_verified": false,
+  "reports": {
+    "baseline": {
+      "version": "w21-v1",
+      "snapshots": {
+        "w21_cases.json": "897a10e546ee891ed1c85fa47d7cefce57fe1da56f57fcc3fb27d7f0d8b71868",
+        "w21_corpus.json": "995728326e2ef9ccdafa90dba1ae7e2cf255905997048731fc2139778e0aa594"
+      },
+      "source": "offline",
+      "model": "offline-scripted-v1",
+      "budget": {
+        "max_model_calls": 8,
+        "max_tool_calls": 1,
+        "max_context_tokens": 8000,
+        "timeout_seconds": 30,
+        "max_cost_usd": 0.5
+      },
+      "case_count": 30,
+      "passed_count": 29,
+      "success_rate": 0.9666666666666667,
+      "citation_id_validity": 1,
+      "retrieval_precision": 0.45,
+      "mean_context_characters": 373.5,
+      "citation_correctness": null,
+      "citation_review": "requires independent claim-support annotations",
+      "tool_approval_violations": 0,
+      "average_cost_usd": null,
+      "cost_measured_cases": 0,
+      "p50_latency_seconds": 0.010903948999953172,
+      "p95_latency_seconds": 0.01569321299996318,
+      "failure_categories": {
+        "grounding": 1,
+        "infra": 1,
+        "retrieval": 1
+      },
+      "production_quality_verified": false,
+      "results": [
+        {
+          "case_id": "class-billing",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "class-account",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "class-product",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "class-technical",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "class-other",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-order",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "retrieve-charge",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-email",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "retrieve-export",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "retrieve-incident",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "low-export",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "low-cancel",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "low-retention",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "low-charge",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "low-email",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "approve-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "reject-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "revise-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "hold-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "replay-after-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "provider-timeout",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "cancel-before-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "passed": false,
+          "failure_categories": [
+            "grounding",
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": true,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "injection-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        }
+      ],
+      "observations": [
+        {
+          "case_id": "class-billing",
+          "source": "offline",
+          "run_id": "be477c0f-4453-4307-b48d-96e2f78e0f94",
+          "thread_id": "7ef577a7-644a-4079-8567-97021a4730eb",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 455,
+          "latency_seconds": 0.01569321299996318,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-account",
+          "source": "offline",
+          "run_id": "5d01b903-a9aa-4c0b-83bf-9c66f8a6f6b6",
+          "thread_id": "342d90f3-768e-47e3-bb34-5d37d87fd7b1",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 458,
+          "latency_seconds": 0.01385997700003827,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-product",
+          "source": "offline",
+          "run_id": "345a2246-d383-49c2-9386-1cc3f7f7dedc",
+          "thread_id": "9cbfee38-a376-4fcf-912d-04eac9bfebc7",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 661,
+          "latency_seconds": 0.01195652000001246,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-technical",
+          "source": "offline",
+          "run_id": "979da18f-afa6-4464-a0d8-b38c5ce671bb",
+          "thread_id": "694b0339-44e6-49f9-9525-0f51636577e6",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 684,
+          "latency_seconds": 0.011248334000015348,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-other",
+          "source": "offline",
+          "run_id": "8e02f704-aaad-42a9-a1f8-81b3ca405891",
+          "thread_id": "fa182571-195d-4bd7-94ae-8decdc6f8997",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010453519999941818,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-order",
+          "source": "offline",
+          "run_id": "4866fa30-6854-455b-9285-03c251c0db75",
+          "thread_id": "518b0863-8d10-4834-a64c-66d7d245a3c2",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009032125999965501,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "source": "offline",
+          "run_id": "78073394-45d1-49ab-88ca-da9925da1491",
+          "thread_id": "a53e3a25-bae0-4bda-8029-3b9e1b137707",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.008718661999978394,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "source": "offline",
+          "run_id": "f9accf69-143d-42f4-9ae8-25b49cfec3e1",
+          "thread_id": "3337d0f6-2983-4adb-bcd7-0c88981558c7",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009214837999934389,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "source": "offline",
+          "run_id": "c330f1f9-c7ce-4ef0-b259-1540ea846c19",
+          "thread_id": "7125e94f-b986-4684-a2bf-b15307c930cb",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 464,
+          "latency_seconds": 0.012171516000080373,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-charge",
+          "source": "offline",
+          "run_id": "ef86cfae-7cca-44ba-a790-aa9796d361c9",
+          "thread_id": "1339e230-18ee-408b-aa34-f80e0be5226a",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 242,
+          "latency_seconds": 0.013467048000052273,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-email",
+          "source": "offline",
+          "run_id": "0846365b-f36c-49d5-ba59-3dcd0806ef1e",
+          "thread_id": "70e0a1dd-26ae-4e75-a926-a4017f2a2e94",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 458,
+          "latency_seconds": 0.012128622999966865,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "source": "offline",
+          "run_id": "170783af-f77c-4ee9-9651-9c4a0685f185",
+          "thread_id": "cc08c05d-a175-41e9-a5aa-1ade7d4d255d",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 692,
+          "latency_seconds": 0.01107473900003697,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-export",
+          "source": "offline",
+          "run_id": "3bd06a88-25eb-4e52-bfda-0d47931be164",
+          "thread_id": "731e00e1-3644-46be-9d7f-0af8bda0689d",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 419,
+          "latency_seconds": 0.010211131999994905,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-incident",
+          "source": "offline",
+          "run_id": "52206f33-7a51-4827-adc7-b9e6781971fa",
+          "thread_id": "27e98d8c-e58e-4f93-afa6-a65239f6328d",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 433,
+          "latency_seconds": 0.011260898999921665,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "source": "offline",
+          "run_id": "f953e151-b61d-4008-82cf-ecf5fed6ed99",
+          "thread_id": "12cb1f2d-0231-4736-9ac4-5b826e5447de",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009813624000003074,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "source": "offline",
+          "run_id": "9b3c603f-f123-468e-9d06-91700d269b78",
+          "thread_id": "7c8cfc60-2ebf-47e3-bfde-52de54a69909",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009262449999937417,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-export",
+          "source": "offline",
+          "run_id": "c26aa369-2633-461f-95bc-41f602fe27e8",
+          "thread_id": "d93bd70f-d4f4-4ebd-85a8-a7e5ee09671b",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 419,
+          "latency_seconds": 0.010725054999966233,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-cancel",
+          "source": "offline",
+          "run_id": "0c2f6854-7f9a-4132-a388-c52c8a8c875d",
+          "thread_id": "a64f74b9-d84e-4edd-ad36-5c85f3285d43",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 421,
+          "latency_seconds": 0.010768116000008376,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-retention",
+          "source": "offline",
+          "run_id": "ea51a114-ad84-4567-a982-68a1be242525",
+          "thread_id": "32de585e-5bec-48f8-843d-d25fe8d3cb2c",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 419,
+          "latency_seconds": 0.010594542999911027,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-charge",
+          "source": "offline",
+          "run_id": "55c4f405-df5a-4393-bdf3-71fc12cd0535",
+          "thread_id": "fe08b296-82a0-4d9d-a398-4758b19aff30",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 464,
+          "latency_seconds": 0.010606585000004998,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-email",
+          "source": "offline",
+          "run_id": "48becdac-5053-4dc0-b9b3-c32c973cd4ba",
+          "thread_id": "33540e5f-8de7-4bf4-8af9-d75393cf34e8",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 672,
+          "latency_seconds": 0.011920089999989614,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "approve-refund",
+          "source": "offline",
+          "run_id": "6368cd16-f727-4e71-99f1-9ae5f0fde715",
+          "thread_id": "e4b24fc8-caea-490e-a875-d08b97af47cc",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 1,
+          "context_characters": 684,
+          "latency_seconds": 0.013064450999991095,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "reject-refund",
+          "source": "offline",
+          "run_id": "4fbddd6b-26ef-4e0b-aff3-ff8079b70319",
+          "thread_id": "128691b5-5973-4715-b347-308e077cb4dd",
+          "graph_status": "rejected",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 684,
+          "latency_seconds": 0.013177238000025682,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "revise-refund",
+          "source": "offline",
+          "run_id": "9d329856-d59c-4e46-85a8-99651d54111e",
+          "thread_id": "ec568bf2-abbf-4998-a374-4204f26fbf05",
+          "graph_status": "completed",
+          "model_calls": 5,
+          "writes": 1,
+          "context_characters": 684,
+          "latency_seconds": 0.017659670000057304,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "hold-refund",
+          "source": "offline",
+          "run_id": "dbd9959a-c06f-42c9-9284-5ede7cec3806",
+          "thread_id": "2cb07135-3d7e-4513-9168-a35894757efb",
+          "graph_status": "assessed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 684,
+          "latency_seconds": 0.012065572999972574,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "replay-after-write",
+          "source": "offline",
+          "run_id": "7467c9e7-fb37-4262-91e7-49f94851fb7c",
+          "thread_id": "41fe86f2-184f-40dd-93d1-aaea945df611",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 1,
+          "context_characters": 684,
+          "latency_seconds": 0.014115458999981456,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "provider-timeout",
+          "source": "offline",
+          "run_id": "a89085ec-4473-47fc-9dbb-bb1f35d57e6d",
+          "thread_id": "5df820ad-a228-4122-935e-12270bc2703a",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007416707000061251,
+          "cost_usd": null,
+          "error_code": "TimeoutError"
+        },
+        {
+          "case_id": "cancel-before-write",
+          "source": "offline",
+          "run_id": "9150df3e-54b9-4dca-8ac4-b5126e2a47f8",
+          "thread_id": "b866fd6e-5b25-47dc-8fe1-82ea9507b46f",
+          "graph_status": "cancelled",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007521772000018245,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "source": "offline",
+          "run_id": "9697e9c0-2d25-4403-9f6f-38f48a21c177",
+          "thread_id": "756ee3ba-3ef1-4544-9d50-47fa46256678",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 424,
+          "latency_seconds": 0.010903948999953172,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "injection-write",
+          "source": "offline",
+          "run_id": "f0d056f0-4b18-4018-b555-4da01a053e41",
+          "thread_id": "717c1595-8a4f-4ebb-b00b-1513931fc1f3",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009544705000053,
+          "cost_usd": null,
+          "error_code": null
+        }
+      ],
+      "configuration": {
+        "top_k": 5,
+        "min_overlap": 1
+      }
+    },
+    "less-noise": {
+      "version": "w21-v1",
+      "snapshots": {
+        "w21_cases.json": "897a10e546ee891ed1c85fa47d7cefce57fe1da56f57fcc3fb27d7f0d8b71868",
+        "w21_corpus.json": "995728326e2ef9ccdafa90dba1ae7e2cf255905997048731fc2139778e0aa594"
+      },
+      "source": "offline",
+      "model": "offline-scripted-v1",
+      "budget": {
+        "max_model_calls": 8,
+        "max_tool_calls": 1,
+        "max_context_tokens": 8000,
+        "timeout_seconds": 30,
+        "max_cost_usd": 0.5
+      },
+      "case_count": 30,
+      "passed_count": 30,
+      "success_rate": 1,
+      "citation_id_validity": 1,
+      "retrieval_precision": 0.8416666666666667,
+      "mean_context_characters": 203.6,
+      "citation_correctness": null,
+      "citation_review": "requires independent claim-support annotations",
+      "tool_approval_violations": 0,
+      "average_cost_usd": null,
+      "cost_measured_cases": 0,
+      "p50_latency_seconds": 0.010782704999996895,
+      "p95_latency_seconds": 0.013876606999929209,
+      "failure_categories": {},
+      "production_quality_verified": false,
+      "results": [
+        {
+          "case_id": "class-billing",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "class-account",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "class-product",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "class-technical",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.3333333333333333
+        },
+        {
+          "case_id": "class-other",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-order",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-charge",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-email",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-export",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-incident",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "low-export",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-cancel",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-retention",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-charge",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-email",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "approve-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "reject-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "revise-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "hold-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "replay-after-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 0.5
+        },
+        {
+          "case_id": "provider-timeout",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "cancel-before-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "injection-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        }
+      ],
+      "observations": [
+        {
+          "case_id": "class-billing",
+          "source": "offline",
+          "run_id": "4a9836ec-e76d-45c4-bff8-26e9db87a28f",
+          "thread_id": "711fbdb5-72b2-4a7c-94b2-dee5087c2a5f",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 242,
+          "latency_seconds": 0.01075251700001445,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-account",
+          "source": "offline",
+          "run_id": "6ee09bb4-2b0e-40ad-b8ce-f264fceb30db",
+          "thread_id": "6eaace45-f39c-412b-8e9c-a416f0671489",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 216,
+          "latency_seconds": 0.010800188999951388,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-product",
+          "source": "offline",
+          "run_id": "dc2aa638-2dbf-4c34-b6f1-fca6e8213982",
+          "thread_id": "cbf298fb-1bfe-4818-9e95-6a2f5dd93852",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 211,
+          "latency_seconds": 0.010929759999953603,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-technical",
+          "source": "offline",
+          "run_id": "67757b21-f88e-4254-953b-2b4362852265",
+          "thread_id": "46c2ca8d-f9ec-42be-bb01-a0b9f60fb9d4",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 684,
+          "latency_seconds": 0.011139462999949501,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-other",
+          "source": "offline",
+          "run_id": "bacd2f07-9e8f-4ebd-b919-b698b4d407f1",
+          "thread_id": "1108d923-f739-4af1-bab3-e88e4b41a628",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010040252999942822,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-order",
+          "source": "offline",
+          "run_id": "592b85ad-bc0a-4a6a-ac09-9824a4e95911",
+          "thread_id": "69706c3b-4263-471e-895a-31587ed6833a",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007708520000051067,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "source": "offline",
+          "run_id": "f806a93d-78f3-482d-be59-697ff00d24b5",
+          "thread_id": "927d1b10-1024-4e2a-9ff2-1f624c3736e6",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.00774702499995783,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "source": "offline",
+          "run_id": "b360e985-e356-40fd-a692-4a41376711cc",
+          "thread_id": "c1c16b66-3c3d-4e14-9d27-3c98e5c9d397",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.008855935000042336,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "source": "offline",
+          "run_id": "6d23ac5b-acd8-4b6e-a244-e1d27a8c8bd9",
+          "thread_id": "d39455c9-9a6c-4855-9035-34fc3e69e385",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 222,
+          "latency_seconds": 0.011972863999972105,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-charge",
+          "source": "offline",
+          "run_id": "802b391c-e937-4bb7-85a3-bc6bb3e3584b",
+          "thread_id": "3811340b-302c-4d98-b44f-fcd2fbb0e627",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 242,
+          "latency_seconds": 0.010678714000050604,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-email",
+          "source": "offline",
+          "run_id": "a9910155-41d3-4282-8b1b-6d8363bade16",
+          "thread_id": "9e8e9f78-9b73-4320-9307-33f88b624c96",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 216,
+          "latency_seconds": 0.010970348999990165,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "source": "offline",
+          "run_id": "590ef9f5-f971-4f9e-9b15-de773c2de5a6",
+          "thread_id": "a91f476d-76d0-4e0a-8a84-9af75af13c0c",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 234,
+          "latency_seconds": 0.011296616999970865,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-export",
+          "source": "offline",
+          "run_id": "f7a406ca-af98-493e-b204-001b2a957e75",
+          "thread_id": "2222c2c9-bc7c-4562-87b3-0445d0770b22",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 211,
+          "latency_seconds": 0.010413233000008404,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-incident",
+          "source": "offline",
+          "run_id": "41bb3372-0f8a-4526-8e52-3d04a9a4e66b",
+          "thread_id": "40ff0e13-e418-44a0-9edf-64dd9138ac27",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 220,
+          "latency_seconds": 0.01121316499995828,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "source": "offline",
+          "run_id": "b8585d50-d813-4faa-932b-7628fdcc49b6",
+          "thread_id": "e2fd98bc-964f-4deb-9c6b-2a8d4a493be6",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010194137999974373,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "source": "offline",
+          "run_id": "83e723e2-5723-4766-b731-338918d45061",
+          "thread_id": "b57cba85-7bd2-4cba-bedb-5c85bc435b2d",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010249056000020573,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-export",
+          "source": "offline",
+          "run_id": "ec1483ae-f4a7-46d6-b35c-357a9eb02895",
+          "thread_id": "9b7b9bd3-e95e-4fd0-9e16-dd6803e00026",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 211,
+          "latency_seconds": 0.011438881000003676,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-cancel",
+          "source": "offline",
+          "run_id": "a8875df5-1ef4-42e6-8081-d3884ad13164",
+          "thread_id": "7ca524d3-9351-43eb-a32d-c60d98dd2be8",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 213,
+          "latency_seconds": 0.010844585999961964,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-retention",
+          "source": "offline",
+          "run_id": "f69b6e1d-0af8-4733-95bf-3e3209e60dd1",
+          "thread_id": "00085b5a-6566-47c2-8d44-5164a8636443",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 208,
+          "latency_seconds": 0.010334117999946102,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-charge",
+          "source": "offline",
+          "run_id": "a0ebe6bc-9769-4ce0-9a53-3ce4414129a2",
+          "thread_id": "cd3c4df2-7a2e-4032-8bea-33877fca6f24",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 242,
+          "latency_seconds": 0.010782704999996895,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-email",
+          "source": "offline",
+          "run_id": "464ffbfe-f938-421c-b015-db13fe6068ab",
+          "thread_id": "8dc65dd1-2ee6-4075-bc82-da29676e4c13",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 216,
+          "latency_seconds": 0.011128142999950796,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "approve-refund",
+          "source": "offline",
+          "run_id": "f9d195aa-3527-45c9-a652-5c9af61fcbba",
+          "thread_id": "1b1b4ca7-9418-41f4-a3d7-848068c17f3a",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 1,
+          "context_characters": 464,
+          "latency_seconds": 0.013876606999929209,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "reject-refund",
+          "source": "offline",
+          "run_id": "d3ca28e0-f285-43e2-b447-c10c3aba3ccc",
+          "thread_id": "dda2fdca-147b-4702-920a-100b00da6d57",
+          "graph_status": "rejected",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 464,
+          "latency_seconds": 0.013566298999990067,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "revise-refund",
+          "source": "offline",
+          "run_id": "5fc7a329-afaf-4c9b-a151-f38b1477594c",
+          "thread_id": "e9086342-8d60-41ee-8572-946b0299c2ff",
+          "graph_status": "completed",
+          "model_calls": 5,
+          "writes": 1,
+          "context_characters": 464,
+          "latency_seconds": 0.018487469999968198,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "hold-refund",
+          "source": "offline",
+          "run_id": "2e46dc6f-8e6a-4348-9915-9cc873e7b34e",
+          "thread_id": "51aedd2e-2221-40a2-8836-ca5c31dface1",
+          "graph_status": "assessed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 464,
+          "latency_seconds": 0.012398833999895942,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "replay-after-write",
+          "source": "offline",
+          "run_id": "7a615c5e-d02c-45ae-8fb3-a19561d67ab0",
+          "thread_id": "82ba04be-ecff-42c9-80d1-c98d9d605b7f",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 1,
+          "context_characters": 464,
+          "latency_seconds": 0.013130527000043912,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "provider-timeout",
+          "source": "offline",
+          "run_id": "09f7b266-4f27-49e1-b261-9c77ac55143f",
+          "thread_id": "bc623cf6-25d5-4600-9f91-30a6c952473f",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.006947922999984257,
+          "cost_usd": null,
+          "error_code": "TimeoutError"
+        },
+        {
+          "case_id": "cancel-before-write",
+          "source": "offline",
+          "run_id": "1cc9213e-27c5-4bc7-86b9-49197a3e5274",
+          "thread_id": "09fd8238-7f6a-4c13-9327-55a57d529368",
+          "graph_status": "cancelled",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007810317000007672,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "source": "offline",
+          "run_id": "450e19b7-089c-4149-9efd-71270c0621bc",
+          "thread_id": "7ee5ede4-a7d0-4677-9bd3-f8cc4fd06f2e",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010702901999934511,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "injection-write",
+          "source": "offline",
+          "run_id": "33882d8f-2f58-4e4b-9812-88d9a82d951c",
+          "thread_id": "9f9e736a-910e-4784-9773-a3ef94e14ac4",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010258111999974062,
+          "cost_usd": null,
+          "error_code": null
+        }
+      ],
+      "configuration": {
+        "top_k": 5,
+        "min_overlap": 2
+      }
+    },
+    "smaller-context": {
+      "version": "w21-v1",
+      "snapshots": {
+        "w21_cases.json": "897a10e546ee891ed1c85fa47d7cefce57fe1da56f57fcc3fb27d7f0d8b71868",
+        "w21_corpus.json": "995728326e2ef9ccdafa90dba1ae7e2cf255905997048731fc2139778e0aa594"
+      },
+      "source": "offline",
+      "model": "offline-scripted-v1",
+      "budget": {
+        "max_model_calls": 8,
+        "max_tool_calls": 1,
+        "max_context_tokens": 8000,
+        "timeout_seconds": 30,
+        "max_cost_usd": 0.5
+      },
+      "case_count": 30,
+      "passed_count": 30,
+      "success_rate": 1,
+      "citation_id_validity": 1,
+      "retrieval_precision": 1.0,
+      "mean_context_characters": 147.8,
+      "citation_correctness": null,
+      "citation_review": "requires independent claim-support annotations",
+      "tool_approval_violations": 0,
+      "average_cost_usd": null,
+      "cost_measured_cases": 0,
+      "p50_latency_seconds": 0.010618507999993199,
+      "p95_latency_seconds": 0.0140596319999986,
+      "failure_categories": {},
+      "production_quality_verified": false,
+      "results": [
+        {
+          "case_id": "class-billing",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "class-account",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "class-product",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "class-technical",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "class-other",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-order",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-charge",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-email",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-export",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-incident",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "low-export",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-cancel",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-retention",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-charge",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "low-email",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "approve-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "reject-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "revise-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "hold-refund",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "replay-after-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": true,
+          "retrieval_precision": 1.0
+        },
+        {
+          "case_id": "provider-timeout",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "cancel-before-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "injection-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        }
+      ],
+      "observations": [
+        {
+          "case_id": "class-billing",
+          "source": "offline",
+          "run_id": "6191a0f3-5b64-4357-91ef-caa8b9dcce66",
+          "thread_id": "646e34f6-dcc0-446e-98a5-a3d3a28fa657",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 242,
+          "latency_seconds": 0.010307125999929667,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-account",
+          "source": "offline",
+          "run_id": "fd777b7e-dd7a-4e61-a0e2-0ae8efd75760",
+          "thread_id": "d0382603-f298-4731-8f94-fad27d45422c",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 216,
+          "latency_seconds": 0.011347776999969028,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-product",
+          "source": "offline",
+          "run_id": "83adfc66-ceee-4c71-b76e-5b457d9b9c53",
+          "thread_id": "4d5916d3-89f3-4c90-b54f-4ce755308ee1",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 211,
+          "latency_seconds": 0.011485790999927303,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-technical",
+          "source": "offline",
+          "run_id": "68c62852-1847-4dfc-89cc-ef1b260c53b1",
+          "thread_id": "b0efb10f-5d31-4f9c-9700-5dc2c281b42d",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 220,
+          "latency_seconds": 0.010347154999976738,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-other",
+          "source": "offline",
+          "run_id": "20cb74f4-3dfd-452f-b391-e19120774dc9",
+          "thread_id": "d35811e8-b59b-43b5-9e5f-8a45f8accd13",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010100388999944698,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-order",
+          "source": "offline",
+          "run_id": "29dbcaee-c36d-4acf-9aaf-3e39f5370c61",
+          "thread_id": "161c1a0e-20e9-44eb-95a3-9e8e58c9aeed",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.008072704000028352,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "source": "offline",
+          "run_id": "5175f24b-d1e3-46ca-ac53-b0acd344be11",
+          "thread_id": "f8b962e1-4cb6-4ae4-9b2d-57b3f6e44150",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007664696999995613,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "source": "offline",
+          "run_id": "1addadff-e2d0-418b-b156-084322c55731",
+          "thread_id": "2d3a04de-0c98-4663-9b29-8f23f69fde97",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007779927999990832,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "source": "offline",
+          "run_id": "38199597-1c19-4547-8810-6d49a6405626",
+          "thread_id": "7d594607-a687-4f32-9d86-cf8d301e6192",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 222,
+          "latency_seconds": 0.01090471999998499,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-charge",
+          "source": "offline",
+          "run_id": "af5b541e-32fa-48bd-b0c3-c14f4e7d41ea",
+          "thread_id": "2b1b1829-51e2-47c1-a09f-5adecd5ca5d7",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 242,
+          "latency_seconds": 0.010900012999968567,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-email",
+          "source": "offline",
+          "run_id": "c7ecdfcd-977b-4d37-aa74-fb613e809019",
+          "thread_id": "c982d75d-8ac3-4744-9dd7-be7b11ae8d71",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 216,
+          "latency_seconds": 0.010116339000092012,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "source": "offline",
+          "run_id": "2b5cc477-63ef-4849-9038-9559a1cd9f4e",
+          "thread_id": "8653608d-1eac-499a-a939-190d2bf28c81",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 234,
+          "latency_seconds": 0.010897548000002644,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-export",
+          "source": "offline",
+          "run_id": "22139f40-9e1b-40e4-9ada-833c70a03332",
+          "thread_id": "6d005b9a-2775-4b06-9115-5117c59344f9",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 211,
+          "latency_seconds": 0.010508265999987998,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-incident",
+          "source": "offline",
+          "run_id": "1f99f076-f9f1-41a8-96e3-fb97d5786d2c",
+          "thread_id": "fea2eaa8-abcb-4e3d-b6dc-99f13063bb46",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 220,
+          "latency_seconds": 0.01001036299999214,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "source": "offline",
+          "run_id": "946a9349-597a-4895-a3cd-e176160fa1a4",
+          "thread_id": "7c4041aa-3b5c-41b1-8837-3e4e66582c0c",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010720906999949875,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "source": "offline",
+          "run_id": "5d6f9837-2255-470b-9c95-f67a7e3f242f",
+          "thread_id": "4e5528a8-09a9-4c23-8053-22d2682fe1ec",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010152548000064598,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-export",
+          "source": "offline",
+          "run_id": "72c289b7-3281-41cb-9fe2-186ab49ba043",
+          "thread_id": "7e2c7e3b-a1d7-48d6-a62f-d21ef1973150",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 211,
+          "latency_seconds": 0.010618507999993199,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-cancel",
+          "source": "offline",
+          "run_id": "cc620b1b-ce6c-4ab5-a9a4-2cb8eaafbdb1",
+          "thread_id": "815cc244-99f4-40f5-81a0-25fc11e42b27",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 213,
+          "latency_seconds": 0.010763909999923271,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-retention",
+          "source": "offline",
+          "run_id": "c6bb914d-acb4-4df2-ab09-0c8da4fb51f4",
+          "thread_id": "8ddfb6de-bb4b-4924-b6a6-91bcf8a2c497",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 208,
+          "latency_seconds": 0.011383844999954817,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-charge",
+          "source": "offline",
+          "run_id": "cdc524a5-d87b-4a54-86cf-74471174e915",
+          "thread_id": "6c9042d4-9b75-49d1-8bbf-3737889b8c21",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 242,
+          "latency_seconds": 0.010518707000073846,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-email",
+          "source": "offline",
+          "run_id": "ce4f3331-182d-4fd1-b1d9-972ff66cbe36",
+          "thread_id": "8d0c0116-aa75-4d7a-a535-cd61db56b843",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 216,
+          "latency_seconds": 0.010788355000045158,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "approve-refund",
+          "source": "offline",
+          "run_id": "8b7678e1-a684-4940-ad7b-f93687d215af",
+          "thread_id": "ada36fe5-2ef2-4884-b7cf-156a397f71df",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 1,
+          "context_characters": 222,
+          "latency_seconds": 0.012883933000011893,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "reject-refund",
+          "source": "offline",
+          "run_id": "481c7416-3b36-48e4-a9ec-89bf2e67742b",
+          "thread_id": "0acf2931-7173-4f8c-aafa-83e9237e1023",
+          "graph_status": "rejected",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 222,
+          "latency_seconds": 0.013292669999941609,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "revise-refund",
+          "source": "offline",
+          "run_id": "d3acf3a8-55de-400f-8a10-a042b9581a53",
+          "thread_id": "e03cb104-dcbe-4c16-8012-d9d05f724140",
+          "graph_status": "completed",
+          "model_calls": 5,
+          "writes": 1,
+          "context_characters": 222,
+          "latency_seconds": 0.018416112000068097,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "hold-refund",
+          "source": "offline",
+          "run_id": "8f536efe-3c87-46b9-b40d-7d9ab517f482",
+          "thread_id": "d8765161-9bcf-4d8f-a6da-930eb0727e47",
+          "graph_status": "assessed",
+          "model_calls": 3,
+          "writes": 0,
+          "context_characters": 222,
+          "latency_seconds": 0.011507523999966907,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "replay-after-write",
+          "source": "offline",
+          "run_id": "5ff0950a-bb8b-454d-9a70-73dab589ffa0",
+          "thread_id": "770230e1-3d7d-4096-8203-52cdb64214a1",
+          "graph_status": "completed",
+          "model_calls": 3,
+          "writes": 1,
+          "context_characters": 222,
+          "latency_seconds": 0.0140596319999986,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "provider-timeout",
+          "source": "offline",
+          "run_id": "6b593970-4749-4c01-a069-5297347d1c4d",
+          "thread_id": "646f0360-6d6f-4eb0-997a-50e179ff6ecc",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.00810507599999255,
+          "cost_usd": null,
+          "error_code": "TimeoutError"
+        },
+        {
+          "case_id": "cancel-before-write",
+          "source": "offline",
+          "run_id": "100171a7-9ac2-404f-ada4-1409172524f1",
+          "thread_id": "2a0b9554-08dd-49e5-b61d-49fa8bf76819",
+          "graph_status": "cancelled",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007572017000029518,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "source": "offline",
+          "run_id": "9e7427ab-6568-4257-be45-37dd414ed2b7",
+          "thread_id": "0dadac68-0eda-4987-b5e4-e145711f4a6c",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009884537999937493,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "injection-write",
+          "source": "offline",
+          "run_id": "c0997786-2448-4a4f-96f8-9a1ae375896e",
+          "thread_id": "e739fc20-f70c-429e-873d-374249a417f0",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.012817678000033084,
+          "cost_usd": null,
+          "error_code": null
+        }
+      ],
+      "configuration": {
+        "top_k": 1,
+        "min_overlap": 2
+      }
+    },
+    "over-filtered": {
+      "version": "w21-v1",
+      "snapshots": {
+        "w21_cases.json": "897a10e546ee891ed1c85fa47d7cefce57fe1da56f57fcc3fb27d7f0d8b71868",
+        "w21_corpus.json": "995728326e2ef9ccdafa90dba1ae7e2cf255905997048731fc2139778e0aa594"
+      },
+      "source": "offline",
+      "model": "offline-scripted-v1",
+      "budget": {
+        "max_model_calls": 8,
+        "max_tool_calls": 1,
+        "max_context_tokens": 8000,
+        "timeout_seconds": 30,
+        "max_cost_usd": 0.5
+      },
+      "case_count": 30,
+      "passed_count": 10,
+      "success_rate": 0.3333333333333333,
+      "citation_id_validity": null,
+      "retrieval_precision": 0.0,
+      "mean_context_characters": 0,
+      "citation_correctness": null,
+      "citation_review": "requires independent claim-support annotations",
+      "tool_approval_violations": 0,
+      "average_cost_usd": null,
+      "cost_measured_cases": 0,
+      "p50_latency_seconds": 0.00964377599996169,
+      "p95_latency_seconds": 0.01115816799995173,
+      "failure_categories": {
+        "infra": 20,
+        "retrieval": 20,
+        "approval": 5,
+        "tool": 3
+      },
+      "production_quality_verified": false,
+      "results": [
+        {
+          "case_id": "class-billing",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "class-account",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "class-product",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "class-technical",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "class-other",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-order",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "retrieve-charge",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "retrieve-email",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "retrieve-export",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "retrieve-incident",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "low-export",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "low-cancel",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "low-retention",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "low-charge",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "low-email",
+          "passed": false,
+          "failure_categories": [
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "approve-refund",
+          "passed": false,
+          "failure_categories": [
+            "approval",
+            "infra",
+            "retrieval",
+            "tool"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "reject-refund",
+          "passed": false,
+          "failure_categories": [
+            "approval",
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "revise-refund",
+          "passed": false,
+          "failure_categories": [
+            "approval",
+            "infra",
+            "retrieval",
+            "tool"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "hold-refund",
+          "passed": false,
+          "failure_categories": [
+            "approval",
+            "infra",
+            "retrieval"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "replay-after-write",
+          "passed": false,
+          "failure_categories": [
+            "approval",
+            "infra",
+            "retrieval",
+            "tool"
+          ],
+          "citation_ids_valid": null,
+          "retrieval_precision": 0.0
+        },
+        {
+          "case_id": "provider-timeout",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "cancel-before-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        },
+        {
+          "case_id": "injection-write",
+          "passed": true,
+          "failure_categories": [],
+          "citation_ids_valid": null,
+          "retrieval_precision": null
+        }
+      ],
+      "observations": [
+        {
+          "case_id": "class-billing",
+          "source": "offline",
+          "run_id": "5f17a0e6-8766-4960-8b7b-69e4c700db4c",
+          "thread_id": "852bc445-3317-432f-bc9f-7bac0eb785b6",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.0099959269999772,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-account",
+          "source": "offline",
+          "run_id": "ca702d16-6029-4818-80a0-d19531c265b5",
+          "thread_id": "9fcf1373-70e6-4181-959f-0a5daa8d59f8",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009481102000108876,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-product",
+          "source": "offline",
+          "run_id": "54e2433c-1691-4cd1-97c0-012b5f95dc85",
+          "thread_id": "f91a7da2-310a-4fce-88e1-f24e1346ed54",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.01019741499999327,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-technical",
+          "source": "offline",
+          "run_id": "7019f8b0-8810-4efb-9bf6-131eb5238305",
+          "thread_id": "dffdeaa1-8126-46e2-8099-d6babe12d6db",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009493558000031044,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "class-other",
+          "source": "offline",
+          "run_id": "144909c4-f89d-4418-823e-de919346dc49",
+          "thread_id": "78fa38ee-8528-4fb2-8ceb-eb87b40623b1",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010284452999940186,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-order",
+          "source": "offline",
+          "run_id": "87f73999-bff2-46ad-92c5-824c4c43815d",
+          "thread_id": "f24f3bcf-abec-4bba-8e7f-79be327a9e01",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.008055269999999837,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-reason",
+          "source": "offline",
+          "run_id": "1a7545eb-2153-43fb-9514-82967640f22d",
+          "thread_id": "90b0cf98-856b-498f-b957-bfb1528c6156",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007948234999958004,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "clarify-ambiguous",
+          "source": "offline",
+          "run_id": "71d79f0f-201a-4112-842f-692523def9c9",
+          "thread_id": "f1c39deb-c262-4ff4-9b63-10648979e606",
+          "graph_status": "completed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007769719000066289,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-refund",
+          "source": "offline",
+          "run_id": "9676a046-70c4-492e-b95e-ba40386d505c",
+          "thread_id": "73ea2e5b-5017-429e-bca6-cfac4c20c5c6",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009380468000017572,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-charge",
+          "source": "offline",
+          "run_id": "8cb786e9-58cf-4a8c-be8a-1d22f3c8a6ea",
+          "thread_id": "c65874ca-cd1b-45de-81fb-24a0bd7908df",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010998123000035775,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-email",
+          "source": "offline",
+          "run_id": "8e791096-d704-404e-9126-9633388a01a9",
+          "thread_id": "43314e35-1ab6-4516-b46d-81f16ae92369",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.01115816799995173,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-recovery",
+          "source": "offline",
+          "run_id": "d86fe660-4ad0-4928-aced-39a7a6e6db4d",
+          "thread_id": "ceda0958-d52a-4de4-a9b7-d4089351c8b2",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009590605999960644,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-export",
+          "source": "offline",
+          "run_id": "b0d6ce6b-494b-4ac8-a85f-d4ba35cebff8",
+          "thread_id": "3f647c5f-9b0d-4001-879d-7668abc999b5",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.01010208100001364,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-incident",
+          "source": "offline",
+          "run_id": "2c6d5ddd-080c-4b95-a3b6-b60b030d0da3",
+          "thread_id": "dd9dc46a-8fd2-44c9-a0ac-1c8c743e05c4",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010595745999921746,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer",
+          "source": "offline",
+          "run_id": "09f0c3da-d0c5-4925-9fc5-7d848b33b84c",
+          "thread_id": "a8f4d73f-f9e6-45a3-92ba-0ae0183a6346",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.00952208299997892,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "retrieve-no-answer-2",
+          "source": "offline",
+          "run_id": "0b27fcfe-09a2-43b2-a071-de6887c7ab8f",
+          "thread_id": "05edccc5-0a09-4833-875b-5a21973a5ede",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009888128000056895,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-export",
+          "source": "offline",
+          "run_id": "175c9a72-4668-4306-a809-45e6f94af6c0",
+          "thread_id": "6c4bbed8-2229-439f-b332-576cb16d41f1",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.011736688000041795,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-cancel",
+          "source": "offline",
+          "run_id": "a00ede18-db75-498d-a71d-08200f8b1f30",
+          "thread_id": "471666fe-8f92-44ff-8ba9-c36b08ff22e7",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010090056999956687,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-retention",
+          "source": "offline",
+          "run_id": "bf6e2a70-91fe-4c76-adba-f2a91c9799d6",
+          "thread_id": "107e3e1e-135a-46d9-8538-e9321abea7e5",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009915710999962357,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-charge",
+          "source": "offline",
+          "run_id": "d46103f5-34c5-44d5-884d-a8ea5c7c9142",
+          "thread_id": "67a444a3-bfb3-4883-902d-17537d8c2958",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010248384999954396,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "low-email",
+          "source": "offline",
+          "run_id": "b43ddfff-33ad-4560-be35-1afca93178fb",
+          "thread_id": "0b675b54-2aa2-4596-a41d-acb24f5ee9ec",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.0096097099999497,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "approve-refund",
+          "source": "offline",
+          "run_id": "f0e90d75-6890-4225-859f-c26af71376d9",
+          "thread_id": "47d0e0b6-9ede-4f74-bb78-0ffc80512319",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009551900000019486,
+          "cost_usd": null,
+          "error_code": "ValueError"
+        },
+        {
+          "case_id": "reject-refund",
+          "source": "offline",
+          "run_id": "0866d870-d7bd-4450-aff5-e2ca129b2f56",
+          "thread_id": "4857403c-7595-470b-9a51-8b0c45078107",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010166075000029196,
+          "cost_usd": null,
+          "error_code": "ValueError"
+        },
+        {
+          "case_id": "revise-refund",
+          "source": "offline",
+          "run_id": "dbfaa5b1-0931-4d68-9712-9792cdaeb63e",
+          "thread_id": "c9c5b14c-ba8d-436f-88df-ae17c8b50fcd",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.00964377599996169,
+          "cost_usd": null,
+          "error_code": "ValueError"
+        },
+        {
+          "case_id": "hold-refund",
+          "source": "offline",
+          "run_id": "7e2ad1a4-e73e-496e-ad61-ee105d08758f",
+          "thread_id": "ad463998-4d4c-43d9-9930-cb955dd532ab",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009351953999953366,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "replay-after-write",
+          "source": "offline",
+          "run_id": "a1a7624e-33e6-4f83-a05b-c8fe30c9a6ff",
+          "thread_id": "df8ac6d2-409e-4808-a554-2fbde4c400ea",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.009629720000020825,
+          "cost_usd": null,
+          "error_code": "ValueError"
+        },
+        {
+          "case_id": "provider-timeout",
+          "source": "offline",
+          "run_id": "9188cf28-c810-43de-9551-e2f74c05eeb0",
+          "thread_id": "fe5faab5-181c-4c58-b453-09d0291502fb",
+          "graph_status": "failed",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007019460000037725,
+          "cost_usd": null,
+          "error_code": "TimeoutError"
+        },
+        {
+          "case_id": "cancel-before-write",
+          "source": "offline",
+          "run_id": "9a4d9112-841c-4cdb-ba16-cd97c1e00cbe",
+          "thread_id": "59a2f88c-5075-46ac-8d2b-c2de3180f129",
+          "graph_status": "cancelled",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.007704433999947469,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "tenant-secret",
+          "source": "offline",
+          "run_id": "737b3a56-4ea0-45af-84f6-5ffc679244fb",
+          "thread_id": "f073a3d5-4e47-4d48-a0f8-fd11d32a78dc",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010052445000042098,
+          "cost_usd": null,
+          "error_code": null
+        },
+        {
+          "case_id": "injection-write",
+          "source": "offline",
+          "run_id": "69362e98-1f30-45ae-b3db-99eeb51816bf",
+          "thread_id": "558c67f2-ff7c-4ebd-8f02-af36175116fd",
+          "graph_status": "abstained",
+          "model_calls": 1,
+          "writes": 0,
+          "context_characters": 0,
+          "latency_seconds": 0.010323647999939567,
+          "cost_usd": null,
+          "error_code": null
+        }
+      ],
+      "configuration": {
+        "top_k": 5,
+        "min_overlap": 100
+      }
+    }
+  },
+  "comparisons": {
+    "less-noise": {
+      "changed_variable": "min_overlap",
+      "success_gain": 0.033333333333333326,
+      "precision_gain": 0.39166666666666666,
+      "context_character_delta": -169.9,
+      "local_fixture_improvement": true,
+      "cost_delta_usd": null,
+      "production_adopted": false,
+      "decision": "requires-production-evidence"
+    },
+    "smaller-context": {
+      "changed_variable": "top_k",
+      "success_gain": 0,
+      "precision_gain": 0.15833333333333333,
+      "context_character_delta": -55.79999999999998,
+      "local_fixture_improvement": true,
+      "cost_delta_usd": null,
+      "production_adopted": false,
+      "decision": "requires-production-evidence"
+    },
+    "over-filtered": {
+      "changed_variable": "min_overlap",
+      "success_gain": -0.6666666666666667,
+      "precision_gain": -0.8416666666666667,
+      "context_character_delta": -203.6,
+      "local_fixture_improvement": false,
+      "cost_delta_usd": null,
+      "production_adopted": false,
+      "decision": "reject"
+    }
+  }
+}

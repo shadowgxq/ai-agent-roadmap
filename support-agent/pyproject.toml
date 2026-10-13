@@ -25,6 +25,7 @@ dependencies = [
 support-agent = "support_agent.cli:main"
 support-app = "support_agent.application.cli:main"
 support-eval = "support_agent.evaluation_cli:main"
+support-eval-experiments = "support_agent.evaluation_experiments_cli:main"
 support-knowledge = "support_agent.knowledge_cli:main"
 support-knowledge-eval = "support_agent.knowledge_eval_cli:main"
 support-knowledge-audit = "support_agent.knowledge_audit_cli:main"

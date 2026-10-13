@@ -1,0 +1,6 @@
+{
+  "source": "offline-fixture-only",
+  "production_adopted": false,
+  "top_k": 1,
+  "min_overlap": 2
+}

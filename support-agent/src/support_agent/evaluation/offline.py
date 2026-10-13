@@ -68,8 +68,8 @@ class ScriptedModel:
 
 
 class ScopedFixtureRetriever:
-    def __init__(self, corpus: list[dict], organization_id: str, top_k=5):
-        self.corpus, self.organization_id, self.top_k = corpus, organization_id, top_k
+    def __init__(self, corpus: list[dict], organization_id: str, top_k=5, min_overlap=1):
+        self.corpus, self.organization_id, self.top_k, self.min_overlap = corpus, organization_id, top_k, min_overlap
 
     async def retrieve(self, organization_id, knowledge_base_id, query):
         if organization_id != self.organization_id or knowledge_base_id != "policy":
@@ -81,7 +81,7 @@ class ScopedFixtureRetriever:
             if document["organization_id"] != "eval-org-a":
                 continue
             score = len(terms & set(search_terms(document["text"])))
-            if score:
+            if score >= self.min_overlap:
                 scored.append((score, document))
         scored.sort(key=lambda item: (-item[0], item[1]["document_id"]))
         refs = [EvidenceRef(chunk_id="fixture-" + doc["document_id"], document_id=doc["document_id"],
@@ -91,7 +91,7 @@ class ScopedFixtureRetriever:
 
 
 async def execute_offline(case: E2ECase, manifest: dict, corpus: list[dict], batch_id: str,
-                          *, top_k: int = 5) -> dict:
+                          *, top_k: int = 5, min_overlap: int = 1) -> dict:
     start = time.monotonic()
     ids = isolated_ids(case, batch_id)
     state = ids | {"subject": case.subject, "description": case.description, "customer_tier": "standard", "status": "pending"}
@@ -119,7 +119,7 @@ async def execute_offline(case: E2ECase, manifest: dict, corpus: list[dict], bat
         return CrmUpdateResult(organization_id=ids["organization_id"], ticket_id=ids["ticket_id"],
                               status="resolved", update_count=1, idempotency_key=key, replayed=replayed)
     graph = create_ticket_graph(model, checkpointer=checkpoint,
-        retriever=ScopedFixtureRetriever(corpus, ids["organization_id"], top_k),
+        retriever=ScopedFixtureRetriever(corpus, ids["organization_id"], top_k, min_overlap),
         organization_id=ids["organization_id"], knowledge_base_id="policy", tool_executor=crm,
         interrupt_before=["response_subgraph"] if case.scenario == "cancel" else None)
     config = {"configurable": {"thread_id": ids["thread_id"]}}
@@ -165,4 +165,5 @@ async def execute_offline(case: E2ECase, manifest: dict, corpus: list[dict], bat
             "approval_required": initial_approval, "approval_count": approval_count,
             "writes": len(writes), "unauthorized_writes": unauthorized_writes, "audit": audit, "events": events,
             "model_calls": model.calls, "cost_usd": None, "input_tokens": None, "output_tokens": None,
+            "context_characters": sum(len(ref.snippet if hasattr(ref, "snippet") else ref["snippet"]) for ref in refs),
             "latency_seconds": time.monotonic() - start, "error_code": error_code}

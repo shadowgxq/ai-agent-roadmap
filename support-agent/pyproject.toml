@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 support-agent = "support_agent.cli:main"
 support-knowledge = "support_agent.knowledge_cli:main"
+support-knowledge-eval = "support_agent.knowledge_eval_cli:main"
 support-routing = "support_agent.routing_cli:main"
 support-ticket-contract = "support_agent.ticket_contract_cli:main"
 support-ticket-workflow = "support_agent.ticket_workflow_cli:main"

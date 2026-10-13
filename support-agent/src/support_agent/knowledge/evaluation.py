@@ -7,7 +7,7 @@ import time
 from pydantic import BaseModel, Field
 
 from .models import EvidenceRef
-from .retrieval import HybridRetriever
+from .retrieval import HybridRetriever, reciprocal_rank_fusion
 
 
 class RetrievalCase(BaseModel):
@@ -50,6 +50,8 @@ async def evaluate_retrieval(retriever: HybridRetriever, cases: list[RetrievalCa
             "relevant_documents": case.relevant_documents, "relevant_chunks": case.relevant_chunks,
             "latency_seconds": time.monotonic() - start, "fallback": result.fallback,
             "rankings": {name: [ref.model_dump() for ref in refs] for name, refs in rankings.items()},
+            "candidates": [ref.model_dump() for ref in reciprocal_rank_fusion(
+                result.vector, result.fts, limit=20)],
             "metrics": {name: ranking_metrics(refs, case) for name, refs in rankings.items()},
         })
     by_id = {row["id"]: row for row in observations}

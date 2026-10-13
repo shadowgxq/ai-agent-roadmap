@@ -24,10 +24,11 @@ class Telemetry(BaseCallbackHandler):
         self.pending = {}
         self.root_id = None
         prior = run.get("projection", {}).get("metrics", {})
+        self.attempt = run.get("attempt", 1)
         self.calls = prior.get("model_calls", 0)
         self.input_tokens = prior.get("input_tokens") or 0
         self.output_tokens = prior.get("output_tokens") or 0
-        self.complete = prior.get("usage_complete", True)
+        self.complete = prior.get("usage_complete", True) and self.attempt <= prior.get("attempt", 0) + 1
 
     def start(self, name, kind="span"):
         if self.client is None:
@@ -55,6 +56,11 @@ class Telemetry(BaseCallbackHandler):
         finally:
             if span is not None:
                 span.end()
+                if name == "support-run" and self.client is not None:
+                    try:
+                        self.client.flush()
+                    except Exception:
+                        pass
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         self.calls += 1
@@ -110,9 +116,10 @@ class Telemetry(BaseCallbackHandler):
         cost = None
         if self.complete and self.input_price is not None and self.output_price is not None:
             cost = (self.input_tokens * self.input_price + self.output_tokens * self.output_price) / 1_000_000
-        return {"model_calls": self.calls, "input_tokens": self.input_tokens if self.complete else None,
+        return {"model_calls": self.calls, "attempt": self.attempt, "input_tokens": self.input_tokens if self.complete else None,
                 "output_tokens": self.output_tokens if self.complete else None, "usage_complete": self.complete,
-                "cost_usd": cost, "cost_source": "configured-per-million-prices" if cost is not None else "unmeasured"}
+                "cost_usd": cost, "cost_scope": "chat-generations-only",
+                "cost_source": "configured-per-million-prices" if cost is not None else "unmeasured"}
 
     def score(self, status):
         if self.client is not None:

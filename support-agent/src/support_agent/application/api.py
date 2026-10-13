@@ -118,6 +118,23 @@ def create_app(settings: ApplicationSettings | None = None, store=None) -> FastA
     async def audit(run_id: UUID, actor: Identity = Depends(identity)):
         return redact(await store.audit(actor, str(run_id)))
 
+    @app.get("/support-api/runs/{run_id}/event-history")
+    async def event_history(run_id: UUID, after: int = 0, actor: Identity = Depends(identity)):
+        if after < 0:
+            raise ValueError("Event cursor cannot be negative")
+        # A finite snapshot for replay/export, including waiting-approval runs.
+        return redact(await store.events(actor, str(run_id), after))
+
+    @app.get("/health/live")
+    async def health_live():
+        return {"status": "alive"}
+
+    @app.get("/health/ready")
+    async def health_ready():
+        async with store.connection() as conn:
+            await conn.execute("SELECT 1 FROM support_runs LIMIT 1")
+        return {"status": "ready"}
+
     @app.get("/support-api/runs/{run_id}/events")
     async def events(run_id: UUID, request: Request, after: int = 0,
                      last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),

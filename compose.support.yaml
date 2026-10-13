@@ -1,0 +1,85 @@
+name: support-agent-demo
+
+x-application: &application
+  image: support-agent-local
+  build:
+    context: .
+    dockerfile: deploy/support.Dockerfile
+  env_file: support-agent/.env
+  environment:
+    SUPPORT_APP_DATABASE_URL: postgresql://support_agent:support_agent@postgres:5432/support_agent
+    SUPPORT_AGENT_DATABASE_URL: postgresql://support_agent:support_agent@postgres:5432/support_agent
+    SUPPORT_APP_REDIS_URL: redis://redis:6379/0
+    SUPPORT_APP_SECURE_COOKIE: "false"
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: support_agent
+      POSTGRES_PASSWORD: support_agent
+      POSTGRES_DB: support_agent
+    volumes: [support_postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U support_agent -d support_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, "yes"]
+    volumes: [support_redis:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    <<: *application
+    command: [support-app, migrate]
+    restart: "no"
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    <<: *application
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  worker:
+    <<: *application
+    command: [celery, -A, "support_agent.application.queue:celery_app", worker, --loglevel=WARNING, --concurrency=2]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import socket; from support_agent.application.queue import celery_app; assert celery_app.control.inspect(timeout=3,destination=['celery@'+socket.gethostname()]).ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+  scheduler:
+    <<: *application
+    command: [celery, -A, "support_agent.application.queue:celery_app", beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "from pathlib import Path; assert b'beat' in Path('/proc/1/cmdline').read_bytes()"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+    ports: ["127.0.0.1:8082:80"]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  support_postgres:
+  support_redis:

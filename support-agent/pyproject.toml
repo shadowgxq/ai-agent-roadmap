@@ -19,6 +19,7 @@ dependencies = [
     "uvicorn>=0.30.0",
     "celery[redis]>=5.5.0",
     "langfuse>=3.14.0,<4",
+    "httpx>=0.27.0",
 ]
 
 [project.scripts]
@@ -42,6 +43,7 @@ support-ticket-store = "support_agent.ticket_store_cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 [build-system]

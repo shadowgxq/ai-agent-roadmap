@@ -13,6 +13,7 @@ from support_agent.knowledge.models import EvidenceRef
 from support_agent.knowledge.retrieval import RetrievalResult, search_terms
 from support_agent.models import CrmUpdateResult, RiskAssessment, TicketWorkflowClassification
 from support_agent.application.security import public_projection, validate_crm_request
+from support_agent.persistence.checkpointer import ticket_serializer
 from .catalog import E2ECase, isolated_ids
 
 
@@ -95,7 +96,7 @@ async def execute_offline(case: E2ECase, manifest: dict, corpus: list[dict], bat
     start = time.monotonic()
     ids = isolated_ids(case, batch_id)
     state = ids | {"subject": case.subject, "description": case.description, "customer_tier": "standard", "status": "pending"}
-    checkpoint = InMemorySaver()
+    checkpoint = InMemorySaver(serde=ticket_serializer())
     model = ScriptedModel(case.scenario == "timeout", manifest["budget"]["max_model_calls"])
     writes, audit, events = {}, [], []
     authorized = False

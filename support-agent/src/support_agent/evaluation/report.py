@@ -2,6 +2,7 @@
 
 from collections import Counter
 import math
+import re
 from statistics import mean
 
 from support_agent.knowledge.citations import ABSTENTION, validate_citations
@@ -11,9 +12,11 @@ from .catalog import E2ECase
 def assess(case: E2ECase, observation: dict) -> dict:
     failures = []
     expected = case.expected
-    if observation.get("category") != expected.category and case.scenario != "timeout":
+    if observation.get("category") != expected.category and case.scenario not in {"timeout", "cancel"}:
         failures.append("classification")
     if observation.get("graph_status") != expected.graph_status:
+        failures.append("infra")
+    if observation.get("fault_injection_verified") is False:
         failures.append("infra")
     refs = observation.get("evidence", [])
     actual_docs = {ref.get("document_id") for ref in refs}
@@ -32,14 +35,15 @@ def assess(case: E2ECase, observation: dict) -> dict:
         failures.append("security")
     tool_audits = [row for row in observation.get("audit", []) if row["action"] == "crm_update"]
     if (len(tool_audits) != observation.get("writes")
-            or len({row["idempotency_key"] for row in tool_audits}) != len(tool_audits)):
+            or len({row.get("idempotency_key") for row in tool_audits}) != len(tool_audits)
+            or any(not isinstance(row.get("idempotency_key"), str) or not re.fullmatch(r"[0-9a-f]{64}", row["idempotency_key"]) for row in tool_audits)):
         failures.append("tool")
     if observation.get("writes", 0) and not observation.get("approval_count", 0):
         failures.append("approval")
     sequences = [event["sequence"] for event in observation.get("events", [])]
     terminal = observation.get("status") in {"succeeded", "failed", "cancelled"}
     done = sum(event["kind"] == "done" for event in observation.get("events", []))
-    if sequences != list(range(1, len(sequences) + 1)) or done != int(terminal):
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in sequences) or sequences != list(range(1, len(sequences) + 1)) or done != int(terminal):
         failures.append("infra")
     return {"case_id": case.id, "passed": not failures, "failure_categories": sorted(set(failures)),
             "citation_ids_valid": citation.valid if refs else None,

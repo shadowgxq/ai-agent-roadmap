@@ -1,0 +1,12 @@
+**/.env
+**/.env.*
+**/.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/dist
+**/.git
+outputs
+demo
+.codex
+.agents

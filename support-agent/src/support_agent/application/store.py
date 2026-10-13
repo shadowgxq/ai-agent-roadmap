@@ -184,6 +184,9 @@ class ApplicationStore:
             current = await self.lock_run(conn, org, run_id)
             if current["status"] != "running" or current["lease_token"] != run["lease_token"]:
                 return False
+            cursor = await conn.execute("SELECT lease_until>now() AS valid FROM support_runs WHERE organization_id=%s AND run_id=%s", (org, run_id))
+            if not (await cursor.fetchone())["valid"]:
+                return False
             await conn.execute("UPDATE support_runs SET projection=%s,resume_payload=NULL,lease_token=NULL,lease_until=NULL WHERE organization_id=%s AND run_id=%s", (Jsonb(projection), org, run_id))
             await event(conn, org, run_id, "response", projection)
             await self.change(conn, current, "cancelled" if current["cancel_requested"] else status, {})
@@ -227,6 +230,49 @@ class ApplicationStore:
         await conn.execute("""INSERT INTO support_audit(organization_id,run_id,audit_id,actor_id,action,payload,idempotency_key)
                              VALUES(%s,%s,%s,%s,'crm_update',%s,%s) ON CONFLICT(organization_id,idempotency_key) DO NOTHING""",
                            (run["organization_id"], run["run_id"], uuid4(), "worker", Jsonb(public_projection({"tool_result": result})), request["idempotency_key"]))
+
+    async def heartbeat(self, run: dict, lease_seconds: int):
+        async with self.connection() as conn:
+            cursor = await conn.execute("""UPDATE support_runs SET lease_until=now()+(%s * interval '1 second')
+                WHERE organization_id=%s AND run_id=%s AND status='running' AND lease_token=%s
+                  AND lease_until>now() RETURNING cancel_requested""",
+                (lease_seconds, run["organization_id"], run["run_id"], run["lease_token"]))
+            row = await cursor.fetchone()
+            return row is not None and not row["cancel_requested"]
+
+    async def retry(self, run: dict, error_code: str, max_attempts: int):
+        async with self.connection() as conn:
+            current = await self.lock_run(conn, run["organization_id"], str(run["run_id"]))
+            if current["status"] != "running" or current["lease_token"] != run["lease_token"]:
+                return
+            await self.requeue_or_fail(conn, current, error_code, max_attempts)
+
+    async def requeue_or_fail(self, conn, run: dict, error_code: str, max_attempts: int):
+        org, run_id = run["organization_id"], str(run["run_id"])
+        cursor = await conn.execute("SELECT 1 FROM tool_actions WHERE organization_id=%s AND run_id=%s AND status IN ('pending','unknown')", (org, run_id))
+        unknown_write = await cursor.fetchone() is not None
+        if run["cancel_requested"] or unknown_write or run["attempt"] >= max_attempts:
+            code = "TOOL_OUTCOME_UNKNOWN" if unknown_write else error_code
+            await conn.execute("UPDATE support_runs SET lease_token=NULL,lease_until=NULL,projection=projection || %s WHERE organization_id=%s AND run_id=%s", (Jsonb({"error_code": code}), org, run_id))
+            await self.change(conn, run, "cancelled" if run["cancel_requested"] else "failed", {"error_code": code})
+            return
+        await conn.execute("UPDATE support_runs SET generation=generation+1,lease_token=NULL,lease_until=NULL WHERE organization_id=%s AND run_id=%s", (org, run_id))
+        await self.change(conn, run, "queued", {"retry_code": error_code})
+        await conn.execute("INSERT INTO support_outbox(organization_id,run_id,generation) VALUES(%s,%s,%s)", (org, run_id, run["generation"] + 1))
+
+    async def recover(self, max_attempts: int, lease_seconds: int):
+        async with self.connection() as conn:
+            cursor = await conn.execute("""SELECT * FROM support_runs
+                WHERE (status='running' AND lease_until<now())
+                   OR (status='queued' AND updated_at<now()-(%s * interval '1 second'))
+                ORDER BY updated_at FOR UPDATE SKIP LOCKED LIMIT 100""", (lease_seconds,))
+            for run in await cursor.fetchall():
+                if run["status"] == "running":
+                    await self.requeue_or_fail(conn, run, "WORKER_LEASE_EXPIRED", max_attempts)
+                else:
+                    # Redis loss after publish is repaired from the durable queued run.
+                    await conn.execute("UPDATE support_outbox SET dispatched=false WHERE organization_id=%s AND run_id=%s AND generation=%s", (run["organization_id"], run["run_id"], run["generation"]))
+                    await conn.execute("UPDATE support_runs SET updated_at=now() WHERE organization_id=%s AND run_id=%s", (run["organization_id"], run["run_id"]))
 
 
 class CancelledRun(RuntimeError):

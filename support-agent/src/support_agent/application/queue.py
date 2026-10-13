@@ -3,15 +3,19 @@
 import asyncio
 import os
 from celery import Celery
+from dotenv import load_dotenv
+from support_agent.config.settings import PROJECT_ROOT
 
 from .settings import ApplicationSettings
 from .store import ApplicationStore
 
 
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 celery_app = Celery("support", broker=os.getenv("SUPPORT_APP_REDIS_URL", "redis://localhost:6379/0"))
 celery_app.conf.update(task_acks_late=True, task_reject_on_worker_lost=True,
                        worker_prefetch_multiplier=1, task_ignore_result=True,
-                       beat_schedule={"support-outbox": {"task": "support.dispatch", "schedule": 5.0}})
+                       beat_schedule={"support-outbox": {"task": "support.dispatch", "schedule": 5.0},
+                                      "support-recover": {"task": "support.recover", "schedule": 30.0}})
 
 
 async def dispatch_pending(store, publish):
@@ -34,4 +38,13 @@ def dispatch():
 def execute(org: str, run_id: str, generation: int):
     from .worker import execute_run
     settings = ApplicationSettings()
-    asyncio.run(execute_run(ApplicationStore(settings.database_url), settings, org, run_id, generation))
+    try:
+        asyncio.run(execute_run(ApplicationStore(settings.database_url), settings, org, run_id, generation))
+    except Exception as exc:
+        raise RuntimeError(type(exc).__name__) from None
+
+
+@celery_app.task(name="support.recover")
+def recover():
+    settings = ApplicationSettings()
+    asyncio.run(ApplicationStore(settings.database_url).recover(settings.max_attempts, settings.lease_seconds))

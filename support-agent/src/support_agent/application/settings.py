@@ -18,3 +18,9 @@ class ApplicationSettings(BaseSettings):
     session_seconds: int = Field(default=3600, ge=60, le=86400)
     lease_seconds: int = Field(default=120, ge=30)
     max_attempts: int = Field(default=3, ge=1, le=10)
+    tracing_enabled: bool = False
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
+    input_price_per_million: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    output_price_per_million: float | None = Field(default=None, ge=0, allow_inf_nan=False)

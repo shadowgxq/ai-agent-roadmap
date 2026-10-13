@@ -5,7 +5,8 @@ from support_agent.services.proposals import build_idempotency_key
 
 
 PUBLIC_FIELDS = frozenset({"draft_response", "evidence_refs", "risk_level", "risk_reasons", "requires_approval",
-                          "proposal_hash", "approval_decision", "revision_count", "tool_result", "tool_replayed", "error_code"})
+                          "proposal_hash", "approval_decision", "revision_count", "tool_result", "tool_replayed", "error_code",
+                          "trace_id", "metrics", "graph_status", "category", "missing_fields"})
 SECRET_KEYS = frozenset({"api_key", "authorization", "cookie", "password", "access_token", "token"})
 
 

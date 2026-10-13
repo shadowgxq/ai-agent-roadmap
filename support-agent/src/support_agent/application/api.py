@@ -15,6 +15,7 @@ from .auth import Sessions
 from .contracts import ApprovalInput, ConflictError, Identity, NotFoundError, TicketInput, TERMINAL
 from .settings import ApplicationSettings
 from .store import ApplicationStore
+from .security import redact, public_projection
 
 
 class LoginInput(BaseModel):
@@ -24,11 +25,14 @@ class LoginInput(BaseModel):
 
 
 def public_run(run: dict) -> dict:
-    return {key: run[key] for key in ("run_id", "ticket_id", "thread_id", "status", "sequence", "projection", "cancel_requested", "created_at") if key in run}
+    result = {key: run[key] for key in ("run_id", "ticket_id", "thread_id", "status", "sequence", "projection", "cancel_requested", "created_at") if key in run}
+    if "projection" in result:
+        result["projection"] = public_projection(result["projection"])
+    return result
 
 
 def sse_frame(row: dict) -> str:
-    return f"id: {row['sequence']}\nevent: {row['kind']}\ndata: {json.dumps(jsonable_encoder(row['payload']), ensure_ascii=False)}\n\n"
+    return f"id: {row['sequence']}\nevent: {row['kind']}\ndata: {json.dumps(jsonable_encoder(redact(row['payload'])), ensure_ascii=False)}\n\n"
 
 
 def create_app(settings: ApplicationSettings | None = None, store=None) -> FastAPI:
@@ -76,16 +80,16 @@ def create_app(settings: ApplicationSettings | None = None, store=None) -> FastA
 
     @app.get("/support-api/tickets")
     async def tickets(actor: Identity = Depends(identity)):
-        return await store.tickets(actor)
+        return redact(await store.tickets(actor))
 
     @app.post("/support-api/tickets", status_code=201)
     async def create_ticket(data: TicketInput, actor: Identity = Depends(identity)):
         actor.require("operator")
-        return await store.create_ticket(actor, data)
+        return redact(await store.create_ticket(actor, data))
 
     @app.get("/support-api/tickets/{ticket_id}")
     async def ticket(ticket_id: UUID, actor: Identity = Depends(identity)):
-        return await store.ticket(actor, str(ticket_id))
+        return redact(await store.ticket(actor, str(ticket_id)))
 
     @app.get("/support-api/tickets/{ticket_id}/runs")
     async def runs(ticket_id: UUID, actor: Identity = Depends(identity)):
@@ -112,7 +116,7 @@ def create_app(settings: ApplicationSettings | None = None, store=None) -> FastA
 
     @app.get("/support-api/runs/{run_id}/audit")
     async def audit(run_id: UUID, actor: Identity = Depends(identity)):
-        return await store.audit(actor, str(run_id))
+        return redact(await store.audit(actor, str(run_id)))
 
     @app.get("/support-api/runs/{run_id}/events")
     async def events(run_id: UUID, request: Request, after: int = 0,

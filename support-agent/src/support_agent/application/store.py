@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .contracts import ConflictError, Identity, NotFoundError, TicketInput, ApprovalInput, TERMINAL, check_transition, request_hash, validate_key
+from .security import public_projection, validate_crm_request
 
 
 async def event(conn, org: str, run_id: str, kind: str, payload: dict):
@@ -177,6 +178,7 @@ class ApplicationStore:
             return claimed | {"status": "running"}
 
     async def finish(self, run: dict, status: str, projection: dict):
+        projection = public_projection(projection)
         org, run_id = run["organization_id"], str(run["run_id"])
         async with self.connection() as conn:
             current = await self.lock_run(conn, org, run_id)
@@ -186,3 +188,46 @@ class ApplicationStore:
             await event(conn, org, run_id, "response", projection)
             await self.change(conn, current, "cancelled" if current["cancel_requested"] else status, {})
             return True
+
+    async def progress(self, run: dict, values: dict):
+        projection = public_projection(values)
+        if not projection:
+            return
+        async with self.connection() as conn:
+            current = await self.lock_run(conn, run["organization_id"], str(run["run_id"]))
+            if current["status"] != "running" or current["lease_token"] != run["lease_token"]:
+                raise ConflictError("Worker lease has been replaced")
+            if current["cancel_requested"]:
+                raise CancelledRun()
+            await conn.execute("UPDATE support_runs SET projection=projection || %s WHERE organization_id=%s AND run_id=%s",
+                               (Jsonb(projection), run["organization_id"], run["run_id"]))
+            await event(conn, run["organization_id"], str(run["run_id"]), "response", projection)
+
+    @asynccontextmanager
+    async def tool_guard(self, run: dict, request: dict):
+        validate_crm_request(run, request)
+        async with self.connection() as conn:
+            current = await self.lock_run(conn, run["organization_id"], str(run["run_id"]))
+            if current["status"] != "running" or current["lease_token"] != run["lease_token"]:
+                raise PermissionError("Worker does not own this run")
+            cursor = await conn.execute("SELECT lease_until>now() AS valid FROM support_runs WHERE organization_id=%s AND run_id=%s", (run["organization_id"], run["run_id"]))
+            if not (await cursor.fetchone())["valid"]:
+                raise PermissionError("Worker lease expired")
+            if current["cancel_requested"]:
+                raise CancelledRun()
+            proposal = current["projection"].get("proposal_hash")
+            cursor = await conn.execute("SELECT decision FROM approvals WHERE organization_id=%s AND run_id=%s AND proposal_hash=%s",
+                                       (run["organization_id"], str(run["run_id"]), proposal))
+            approval = await cursor.fetchone()
+            if not approval or approval["decision"] != "approve":
+                raise PermissionError("Durable approval is required before CRM mutation")
+            yield conn
+
+    async def tool_audit(self, conn, run: dict, request: dict, result: dict):
+        await conn.execute("""INSERT INTO support_audit(organization_id,run_id,audit_id,actor_id,action,payload,idempotency_key)
+                             VALUES(%s,%s,%s,%s,'crm_update',%s,%s) ON CONFLICT(organization_id,idempotency_key) DO NOTHING""",
+                           (run["organization_id"], run["run_id"], uuid4(), "worker", Jsonb(public_projection({"tool_result": result})), request["idempotency_key"]))
+
+
+class CancelledRun(RuntimeError):
+    pass

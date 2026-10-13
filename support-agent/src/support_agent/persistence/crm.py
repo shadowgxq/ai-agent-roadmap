@@ -1,6 +1,7 @@
 """Transactional idempotency adapter for the local W15 mock CRM."""
 
 from uuid import uuid4
+from contextlib import asynccontextmanager
 
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
@@ -35,6 +36,14 @@ class MockCrmRepository:
     def __init__(self, database_url: str) -> None:
         self._database_url = database_url
 
+    @asynccontextmanager
+    async def _connection(self, supplied=None):
+        if supplied is not None:
+            yield supplied
+        else:
+            async with await AsyncConnection.connect(self._database_url, row_factory=dict_row) as connection:
+                yield connection
+
     async def update_ticket(
         self,
         *,
@@ -43,14 +52,12 @@ class MockCrmRepository:
         run_id: str,
         status: str,
         idempotency_key: str,
+        connection=None,
     ) -> CrmUpdateResult:
         """Execute once, or return the committed result for the same key."""
 
         request_json = {"ticket_id": ticket_id, "status": status}
-        async with await AsyncConnection.connect(
-            self._database_url,
-            row_factory=dict_row,
-        ) as connection:
+        async with self._connection(connection) as connection:
             async with connection.cursor() as cursor:
                 await cursor.execute(
                     """

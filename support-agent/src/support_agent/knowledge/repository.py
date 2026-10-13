@@ -107,6 +107,8 @@ class KnowledgeRepository:
                        VALUES (%s,%s,%s,%s,%s,%s,%s)""",
                     (*scope, version, content_hash, document.title, document.source),
                 )
+                from .retrieval import searchable_text
+
                 for ordinal, (chunk, vector) in enumerate(zip(chunks, vectors, strict=True)):
                     chunk_id = str(uuid5(NAMESPACE_URL, json.dumps((*scope, version, ordinal))))
                     await conn.execute(
@@ -114,7 +116,7 @@ class KnowledgeRepository:
                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector,
                                    to_tsvector('simple',%s))""",
                         (*scope, version, chunk_id, ordinal, chunk.text,
-                         Jsonb(chunk.heading_path), chunk.page, vector, chunk.text),
+                         Jsonb(chunk.heading_path), chunk.page, vector, searchable_text(chunk.text)),
                     )
                 count = len(chunks)
             await conn.execute(

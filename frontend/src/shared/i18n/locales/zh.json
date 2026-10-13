@@ -171,5 +171,63 @@
       "reload": "重新加载",
       "home": "返回首页"
     }
+  },
+  "support": {
+    "eyebrow": "客服运营",
+    "title": "工单工作台",
+    "subtitle": "集中查看工单、证据和审批决定。",
+    "login": "登录",
+    "logout": "退出登录",
+    "username": "用户名",
+    "password": "密码",
+    "loginError": "登录失败，请检查凭据或稍后重试。",
+    "actionError": "操作失败，输入已保留。请重试或刷新登录状态。",
+    "newTicket": "创建工单",
+    "knowledgeBase": "知识库 ID",
+    "subject": "标题",
+    "description": "问题描述",
+    "create": "创建工单",
+    "pending": "提交中…",
+    "loading": "加载中…",
+    "retry": "重试",
+    "tickets": "工单列表",
+    "empty": "暂无工单。",
+    "selectTicket": "选择工单，查看处理过程与历史。",
+    "start": "启动 Agent",
+    "run": "Agent 运行",
+    "cancel": "请求取消",
+    "cancelRequested": "已请求取消",
+    "citations": "引用证据",
+    "page": "页码",
+    "noEvidence": "暂无引用证据。",
+    "approval": "审核处理方案",
+    "feedback": "反馈（拒绝或修改时必填）",
+    "approve": "批准",
+    "reject": "拒绝",
+    "revise": "要求修改",
+    "approverOnly": "此方案需要审批人员审核。",
+    "timeline": "运行时间线",
+    "audit": "审计记录",
+    "status": {
+      "queued": "排队中",
+      "running": "执行中",
+      "waiting_approval": "等待审批",
+      "succeeded": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消",
+      "unknown": "未知状态"
+    },
+    "connection": {
+      "connecting": "连接中",
+      "live": "实时更新",
+      "reconnecting": "重连中…",
+      "done": "已结束"
+    },
+    "event": {
+      "status": "状态变化",
+      "response": "回复与证据",
+      "cancel_requested": "已请求取消",
+      "done": "运行结束"
+    }
   }
 }

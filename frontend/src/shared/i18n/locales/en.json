@@ -171,5 +171,63 @@
       "reload": "Reload page",
       "home": "Return home"
     }
+  },
+  "support": {
+    "eyebrow": "Support operations",
+    "title": "Support workspace",
+    "subtitle": "Tickets, evidence and decisions in one place.",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "username": "Username",
+    "password": "Password",
+    "loginError": "Sign-in failed. Check your credentials or retry later.",
+    "actionError": "The action failed. Your input is preserved; retry or refresh your session.",
+    "newTicket": "New ticket",
+    "knowledgeBase": "Knowledge base ID",
+    "subject": "Subject",
+    "description": "Description",
+    "create": "Create ticket",
+    "pending": "Submitting…",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "tickets": "Tickets",
+    "empty": "No tickets yet.",
+    "selectTicket": "Select a ticket to view its history.",
+    "start": "Start agent",
+    "run": "Agent run",
+    "cancel": "Request cancellation",
+    "cancelRequested": "Cancellation requested",
+    "citations": "Evidence",
+    "page": "Page",
+    "noEvidence": "No evidence available.",
+    "approval": "Review proposal",
+    "feedback": "Feedback (required for reject or revise)",
+    "approve": "Approve",
+    "reject": "Reject",
+    "revise": "Revise",
+    "approverOnly": "An approver must review this proposal.",
+    "timeline": "Run timeline",
+    "audit": "Audit trail",
+    "status": {
+      "queued": "Queued",
+      "running": "Running",
+      "waiting_approval": "Awaiting approval",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "unknown": "Unknown status"
+    },
+    "connection": {
+      "connecting": "Connecting",
+      "live": "Live",
+      "reconnecting": "Reconnecting…",
+      "done": "Complete"
+    },
+    "event": {
+      "status": "Status",
+      "response": "Response",
+      "cancel_requested": "Cancellation requested",
+      "done": "Run complete"
+    }
   }
 }
